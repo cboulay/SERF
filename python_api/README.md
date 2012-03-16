@@ -38,7 +38,7 @@ my_trial = get_or_create(Datum\
 my_trial = my_subject.data[-1]
 ```
 
-We can then store some data in the trial. Storing data will typically kick off feature calculation for the datum. Further online analysis apps are needed for more complicated features and for getting features specific to our period object.
+We can then store some data in the trial. Storing data will typically kick off feature calculation for the datum.
 
 ```python
 my_trial.store={\
@@ -47,3 +47,5 @@ my_trial.store={\
 	, 'channel_labels':'Trig, EDC'}
 print(my_trial.feature_values)
 ```
+
+Further [online analysis apps](https://github.com/cboulay/EERAT/tree/master/python_apps/online_analysis) are needed for more complicated features and for getting features specific to our period object.
