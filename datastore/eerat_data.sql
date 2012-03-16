@@ -111,9 +111,7 @@ INSERT IGNORE INTO `datum_type` (Name, Description) VALUES
 	('mep_baseline','Simple MEP'),
 	('mep_cond','Operant conditioning MEP');
 -- 3 `feature_type`
--- TODO: Add features for MEP_threshold, MEP_threshold_err, MEP_halfmax, MEP_halfmax_err,...
--- HR_threshold, HR_threshold_err, HR_halfmax, HR_halfmax_err, HR_lin_kBG
--- These will only be calculated for periods.
+-- TODO: get rid of period-specific features. They will not be persisted.
 DELETE FROM `feature_type`;
 INSERT IGNORE INTO `feature_type` (Name, Description) VALUES 
 	('BEMG_aaa','Avg abs amp of EMG in Background window'),
