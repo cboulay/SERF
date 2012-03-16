@@ -9,7 +9,7 @@
 5. Matlab data API
 6. Matlab analysis apps
 
-## Introduction(#intro)
+## Introduction##(#intro)
 
 Included in this repo are some tools to help with analysis of evoked electrophysiological responses, such as EEG SEPs, EMG H-reflexes, or TMS-evoked EMG MEPs. If you do not know what any of these things are then you probably do not need this software.
 
@@ -19,7 +19,7 @@ To facilitate interacting with the data I have also provided two separate APIs: 
 
 Finally I have provided some applications. Each app is designed to exist as an independent module but some modules may interact. These apps range in functionality from outputting simple reports on each subject to an experiment which operantly conditions evoked response sizes.
 
-## SQL Database(#sql-db)
+## SQL Database##(#sql-db)
 
 ### Installing your SQL server
 
