@@ -40,7 +40,7 @@ Everytime the API is instantiated it checks the version of the database against 
 
 The relational model was designed using MySQL Workbench. The model diagram is available in /SQL_database/EERAT_model.mwb . This file provides a representation of the data structure. You may modify the data structure to your liking but this will probably break the API and any future upgrades.
 
-## Python data API(#python-api)
+<h2 id="python-api">Python data API</h2>
 
 *** Installing Python and the API's dependencies
 
