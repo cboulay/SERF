@@ -135,17 +135,11 @@ class Datum(Base):
 			period_id = session.query("period_id")\
 				.from_statement("SELECT getParentPeriodIdForDatumId(:datum_id) AS period_id")\
 				.params(datum_id=self.datum_id).one()
-			refdatum = session.query(Datum).filter(Datum.datum_id=period_id).one()
+			refdatum = session.query(Datum).filter(Datum.datum_id==period_id).one()
 			
 			#First calculate the trial/day's values
 			for fname in self.feature_values.iterkeys():
 				self.calculate_value_for_feature_name(fname, refdatum=refdatum)
-			
-			#Start by recalculating the parent period's erp.
-			print ("TODO: Recalc parent period's erp")#Maybe we can just add the weighted latest trial.
-			#Then calculate the parent period's values.
-			for fname in refdatum.feature_values.iterkeys():
-				refdatum.calculate_value_for_feature_name(fname, refdatum=None)
 		
 		#I would prefer not to need this... is there anything else that needs triggers or the db?
 		session.flush()

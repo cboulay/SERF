@@ -156,8 +156,8 @@ INSERT IGNORE INTO `datum_type_has_feature_type` (datum_type_id, feature_type_id
 	SELECT dt.datum_type_id, ft.feature_type_id
 	FROM datum_type dt JOIN feature_type ft
 	WHERE 	(ft.Name LIKE "BEMG%")
-		OR	(dt.Name LIKE "hr%" AND ft.Name IN ("MR_aaa","HR_aaa","HR_res","HR_thresh","HR_thrsh_err","HR_halfmax","HR_halfmax_err","M_max"))
-		OR 	(dt.Name LIKE "mep%" AND ft.Name IN ("MEP_aaa", "MEP_thresh", "MEP_thresh_err", "MEP_halfmax", "MEP_halfmax_err"));
+		OR	(dt.Name LIKE "hr%" AND ft.Name IN ("MR_aaa","HR_aaa","HR_res"))
+		OR 	(dt.Name LIKE "mep%" AND ft.Name IN ("MEP_aaa"));
 -- 11 `datum_type_has_detail_type`
 INSERT IGNORE INTO `datum_type_has_detail_type` (datum_type_id, detail_type_id)
 	SELECT dat.datum_type_id, det.detail_type_id
