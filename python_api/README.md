@@ -24,15 +24,26 @@ Now we can make a new trial. The SQL database has triggers to create the trial's
 
 ```python
 #This does not persist the trial immediately, and therefore does not create detail and feature entries until after a flush.
-#new_trial = Datum(subject=my_subject, datum_type=my_dat_type, span_type='trial', IsGood=1)
-my_trial = get_or_create(Datum, subject=my_subject, datum_type=my_dat_type, span_type='trial', IsGood=1, Number=0)
+new_trial = Datum(subject=my_subject, datum_type=my_dat_type, span_type='trial', IsGood=1)
 
-#We can load an old trial with the following
+#This creates a new trial and persists immediately, generating its default details and features.
+my_trial = get_or_create(Datum\
+	, subject=my_subject\
+	, datum_type=my_dat_type\
+	, span_type='trial'\
+	, IsGood=1\
+	, Number=0)
+
+#Or we can load an old trial with the following
 my_trial = my_subject.data[-1]
 ```
 
 We can then store some data in the trial. Storing data will typically kick off feature calculation for the datum. Further online analysis apps are needed for more complicated features and for getting features specific to our period object.
 
 ```python
-my_trial.store={'x_vec':numpy.arange(-500,500, dtype=float), 'data':numpy.array(100*numpy.random.ranf((2,1000)), dtype=float), 'channel_labels':'Trig, EDC'}
+my_trial.store={\
+	'x_vec':numpy.arange(-500,500, dtype=float)\
+	, 'data':numpy.array(100*numpy.random.ranf((2,1000)), dtype=float)\
+	, 'channel_labels':'Trig, EDC'}
+print(my_trial.feature_values)
 ```
