@@ -3,9 +3,9 @@
 ## Table of Contents
 
 1. Introduction
-2. SQL Database
-3. Python data API
-4. Python analysis apps
+2. [SQL Database](https://github.com/cboulay/EERAT/tree/master/datastore)
+3. [Python data API](https://github.com/cboulay/EERAT/tree/master/python-api)
+4. [Python apps](https://github.com/cboulay/EERAT/tree/master/python-apps)
 5. Matlab data API
 6. Matlab analysis apps
 
