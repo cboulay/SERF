@@ -118,17 +118,7 @@ INSERT IGNORE INTO `feature_type` (Name, Description) VALUES
 	('MR_aaa','Avg abs amp of EMG in Mresponse window'),
 	('HR_aaa','Avg abs amp of EMG in Hreflex window'),
 	('HR_res','H-reflex residual size'),
-	('HR_thresh',''),
-	('HR_thresh_err',''),
-	('HR_halfmax',''),
-	('HR_halfmax_err',''),
-	('M_max','maximum M value in this period'),
-	('MEP_aaa','Avg abs amp of EMG in MEP wind window'),
-	('MEP_thresh',''),
-	('MEP_thresh_err',''),
-	('MEP_halfmax',''),
-	('MEP_halfmax_err',''),
-	('MEP_max','');
+	('MEP_aaa','Avg abs amp of EMG in MEP wind window');
 -- 4 `detail_type`
 DELETE FROM `detail_type`;
 INSERT IGNORE INTO `detail_type` (Name, Description, DefaultValue) VALUES 
