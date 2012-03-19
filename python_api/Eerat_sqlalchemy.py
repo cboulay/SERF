@@ -126,7 +126,8 @@ class Datum(Base):
 	def calculate_all_features(self):
 		#Should calculation of trial features such as residuals use period model prior to inclusion of the current trial?
 		
-		session=Session()
+		#session=Session()
+		session = Session.object_session(self)
 		if self.datum_type=='period':
 			for fname in self.feature_values.iterkeys():
 				self.calculate_value_for_feature_name(fname, refdatum=None)
@@ -135,7 +136,7 @@ class Datum(Base):
 			period_id = session.query("period_id")\
 				.from_statement("SELECT getParentPeriodIdForDatumId(:datum_id) AS period_id")\
 				.params(datum_id=self.datum_id).one()
-			refdatum = session.query(Datum).filter(Datum.datum_id==period_id).one()
+			refdatum = session.query(Datum).filter(Datum.datum_id==period_id[0]).one()
 			
 			#First calculate the trial/day's values
 			for fname in self.feature_values.iterkeys():

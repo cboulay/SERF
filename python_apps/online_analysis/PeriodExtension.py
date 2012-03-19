@@ -25,6 +25,7 @@ def my_sigmoid(x, x0, k, a, c):
 
 #Calculate and return _thresh and _thresh_err
 #Using sigmoid... but that might not be best.
+#Maybe sigmoid should be fit to x=intensity, y=0,1
 def my_inv_sigmoid(y,x0,k,a,c):
 	x = (x0 - ln(-1 + (a/(y-c))))/k
 	return x
@@ -66,11 +67,39 @@ class Datum:
 	#method definitions
 	
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
-	def update_store(self):
+	def update_store(self, IsGood=True):
 		if self.span_type=='period':
-		#x_vec, erp, n_channels, n_samples, channel_labels
-			pass
-		
+			session = Session.object_session(self)
+			#Assume x_vec, n_channels, n_samples, channel_labels are all the same.
+			#Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
+			last_trial_id = session.query("datum_id")\
+				.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 ORDER BY Number DESC")\
+				.params(period_id=self.datum_id).first()
+			last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
+			n_channels,n_samples=[last_trial._store.n_channels,last_trial._store.n_samples]
+			
+			#A couple options here:
+			#1) Fetch all trials, put them in an array, then avg
+			#2) Fetch each trial and incrementally sum them.
+			
+			#Try 2 - uses less memory
+			n_trials=0
+			running_sum=np.zeros([n_channels,n_samples], dtype=float)
+			for ds in session.query(Datum_store.erp).join(Datum)\
+				.filter(and_("getParentPeriodIdForDatumId(datum.datum_id)=:period_id"\
+				,Datum.IsGood==1,Datum.span_type==1))\
+				.params(period_id=self.datum_id):
+				temp_data=np.frombuffer(ds.erp, dtype=float)
+				temp_data.flags.writeable=True
+				temp_data=temp_data.reshape([n_channels,n_samples])
+				running_sum=running_sum+temp_data
+				n_trials=n_trials+1
+				
+			self.store={\
+				'x_vec':last_trial.store['x_vec']\
+				, 'data':running_sum/n_trials\
+				, 'channel_labels':last_trial.store['channel_labels']}
+				
 	def _get_child_features(self):
 		if self.span_type=='period':
 			#TODO: Get an array of all detail_values and feature_values for all trials in this period.

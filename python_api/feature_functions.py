@@ -48,5 +48,5 @@ def MEP_aaa(datum, refdatum=None):
 	chan_label=refdatum.detail_values['dat_MEP_chan_label']
 	return get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label)
 
-def HR_res(datum):
+def HR_res(datum, refdatum=None):
 	print "TODO: HR_res"

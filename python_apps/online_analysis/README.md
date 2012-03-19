@@ -13,7 +13,28 @@ my_dat_type=get_or_create(Datum_type, Name='hr_baseline')
 now_per=my_subject.get_now_period_of_type(my_dat_type)
 ```
 
+_FOR TESTING/DEBUGGING ONLY_
+We need some trial data. Create some trials if they do not already exist.
+
+```python
+my_trial = get_or_create(Datum\
+    , subject=my_subject\
+    , datum_type=my_dat_type\
+    , span_type='trial'\
+    , IsGood=1\
+    , Number=0)
+	
+my_trial.store={\
+    'x_vec':numpy.arange(-500,500, dtype=float)\
+    , 'data':numpy.array(100*numpy.random.ranf((2,1000)), dtype=float)\
+    , 'channel_labels':'Trig, EDC'}
+```
+
 Update the period's stored ERP so it is the average of all its good trials.
+
+```python
+now_per.update_store()
+```
 This should automatically kick off calculations of the period's features that are common with trials.
 
 Calculate period-specific features. These will not be persisted.
