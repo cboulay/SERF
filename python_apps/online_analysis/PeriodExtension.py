@@ -3,7 +3,10 @@
 
 import numpy as np
 import scipy.optimize
-from python_api.Eerat_sqlalchemy import Datum
+import time
+from python_api.Eerat_sqlalchemy import *
+from sqlalchemy.orm import *
+from sqlalchemy import desc
 
 def get_obj(name):return eval(name)
 class ExtendInplace(type):#This class enables class definitions here to _extend_ parent classes.
@@ -31,17 +34,12 @@ def my_inv_sigmoid(y,x0,k,a,c):
 	return x
 	
 #Calculate and return _halfmax and _halfmax err
-def _model_sigmoid(xy_array):
-	#X=dat_Nerve_stim_output, y=HR_aaa
-	#Should data be scaled/standardized? Probably not necessary in this case.
-
+def _model_sigmoid(x,y):
 	#Fit a sigmoid to those values for trials in this period.
-	n_trials = xy_array.shape[0]
+	n_trials = x.shape[0]
 	if n_trials>4:
-		xdata=xy_array[:,0]
-		ydata=xy_array[:,1]
-		p0=(np.median(xdata),0.1,np.max(ydata)-np.min(ydata),np.min(ydata)) #x0, k, a, c
-		popt, pcov = curve_fit(my_sigmoid, xdata, ydata, p0=p0)
+		p0=(np.median(x),0.1,np.max(y)-np.min(y),np.min(y)) #x0, k, a, c
+		popt, pcov = curve_fit(my_sigmoid, x, y, p0=p0)
 		#popt = x0, k, a, c
 		#diagonal pcov is variance of parameter estimates.
 		perr = np.sqrt(pcov.diagonal())
@@ -51,44 +49,90 @@ class Datum:
 	__metaclass__=ExtendInplace
 	
 	#variable definitions
-	features_array = None
-	features_names = None
-	mep_detection_limit = None
-	mep_halfmax = None
-	mep_halfmax_err = None
-	mep_thresh = None
-	mep_thresh_err = None
-	hr_detection_limit = None
-	hr_halfmax = None
-	hr_halfmax_err = None
-	hr_thresh = None
-	hr_thresh_err = None
+	erp_detection_limit = None
 	
 	#method definitions
 	
+	#get feature values from all child trials
+	def _get_child_features(self, feature_name):
+		#e.g., 'HR_aaa'
+		if self.span_type=='period':
+			session = Session.object_session(self)
+			features = session.query(Datum_feature_value.Value).filter(\
+				Datum.span_type=='trial'\
+				, Datum.subject_id==self.subject_id\
+				, Datum.datum_type_id==self.datum_type_id\
+				, Datum.IsGood==True
+				, Datum.StartTime>=self.StartTime\
+				, Datum.EndTime<=self.EndTime\
+				, Datum_feature_value.datum_id==Datum.datum_id\
+				, Datum_feature_value.feature_type_id==Feature_type.feature_type_id\
+				, Feature_type.Name==feature_name\
+				, Datum_feature_value.Value != None)
+				.order_by(Datum.Number)
+				.all()
+			return np.asarray(features).astype(np.float)
+			
+	#get detail values from all child trials.
+	def _get_child_details(self, detail_name):
+		#e.g., 'dat_Nerve_stim_output'
+		if self.span_type=='period':
+			session = Session.object_session(self)
+			details = session.query(Datum_detail_value.Value).filter(\
+				Datum.span_type=='trial'\
+				, Datum.subject_id==self.subject_id\
+				, Datum.datum_type_id==self.datum_type_id\
+				, Datum.IsGood==True
+				, Datum.StartTime>=self.StartTime\
+				, Datum.EndTime<=self.EndTime\
+				, Datum_detail_value.datum_id==Datum.datum_id\
+				, Datum_detail_value.detail_type_id==Detail_type.detail_type_id\
+				, Detail_type.Name==detail_name\
+				, Datum_detail_value.Value != None)
+				.order_by(Datum.Number)
+				.all()
+			return np.asarray(details)
+			
+		
+	#Get the statistical detection limit for MEP, M-wave (not used?), H-reflex
+	def _calc_detection_limit(self):
+		if self.span_type=='period':
+			#Load the raw data for the isometric contraction
+			#Pull out the useful segments
+			#Get the response window depending on datum_type
+			#Calculate the response size for each segment.
+			#Get the 97.5% CI for the response sizes.
+			#Save the upper limit as the detection_limit
+			self.erp_detection_limit=0
+			
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
 	def update_store(self, IsGood=True):
 		if self.span_type=='period':
 			session = Session.object_session(self)
 			#Assume x_vec, n_channels, n_samples, channel_labels are all the same.
 			#Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
+			#Getting the last_trial this way is slower for the first call to update_store but is faster for subsequent calls than using the more explicit query.
 			last_trial_id = session.query("datum_id")\
 				.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 ORDER BY Number DESC")\
 				.params(period_id=self.datum_id).first()
 			last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
+			
 			n_channels,n_samples=[last_trial._store.n_channels,last_trial._store.n_samples]
 			
 			#A couple options here:
 			#1) Fetch all trials, put them in an array, then avg
 			#2) Fetch each trial and incrementally sum them.
-			
 			#Try 2 - uses less memory
+			#Using more explicit query is faster than using stored function to get period.
 			n_trials=0
 			running_sum=np.zeros([n_channels,n_samples], dtype=float)
-			for ds in session.query(Datum_store.erp).join(Datum)\
-				.filter(and_("getParentPeriodIdForDatumId(datum.datum_id)=:period_id"\
-				,Datum.IsGood==1,Datum.span_type==1))\
-				.params(period_id=self.datum_id):
+			for ds in session.query(Datum_store).join(Datum).filter(\
+				Datum.span_type=='trial', \
+				Datum.subject_id==self.subject_id, \
+				Datum.datum_type_id==self.datum_type_id, \
+				Datum.IsGood==True, \
+				Datum.StartTime>=self.StartTime, \
+				Datum.EndTime<=self.EndTime):
 				temp_data=np.frombuffer(ds.erp, dtype=float)
 				temp_data.flags.writeable=True
 				temp_data=temp_data.reshape([n_channels,n_samples])
@@ -99,52 +143,48 @@ class Datum:
 				'x_vec':last_trial.store['x_vec']\
 				, 'data':running_sum/n_trials\
 				, 'channel_labels':last_trial.store['channel_labels']}
-				
-	def _get_child_features(self):
-		if self.span_type=='period':
-			#TODO: Get an array of all detail_values and feature_values for all trials in this period.
-			#Get the session for this object.
-			session = Session.object_session(self)
-			#Query for the data that are children of this period.
-			#Get the X and Y values from these data.
-			data = session.query(Datum_detail_value.Value, Datum_feature_value.Value).filter(\
-				Datum.span_type=='trial'\
-				, Datum.subject_id==self.subject_id\
-				, Datum.datum_type_id==self.datum_type_id\
-				, Datum.IsGood==True
-				, Datum.StartTime>=self.StartTime\
-				, Datum.EndTime<=self.EndTime\
-				, Datum_detail_value.datum_id==Datum.datum_id\
-				#, Datum_detail_value.detail_type_id==Detail_type.detail_type_id\
-				#, Detail_type.Name=='dat_Nerve_stim_output'\
-				, Datum_feature_value.datum_id==Datum.datum_id\
-				#, Datum_feature_value.feature_type_id==Feature_type.feature_type_id\
-				#, Feature_type.Name=='HR_aaa'\
-				, Datum_detail_value.Value != None\
-				, Datum_feature_value.Value != None
-				).all()
-			data = np.asarray(data)
-			data = data.astype(np.float)
 		
-	#Get the statistical detection limit for MEP, M-wave (not used?), H-reflex
-		
-	def _model_mep(self):
+	def model_mep_halfmax(self):
 		if self.span_type=='period':
 			#get xy_array as dat_TMS_powerA, MEP_aaa
-			#get sigmoid parameters (and parameter errors)
-			popt,perr=_model_sigmoid(self.xy_array)
-			self.mep_halfmax=popt[0]#popt[0] is halfmax
-			self.mep_halfmax_err=perr[0]#perr[0] is halfmax err
-			#using model params, calculate model @ self.mep_detection_limit
-			self.mep_thresh = my_inv_sigmoid(self.mep_detection_limit, *popt)
-			#I actually have no idea how to get thresh_err. Somehow get the confidence interval?
+			x=self._get_child_details('dat_TMS_powerA')
+			x=x.astype(np.float)
+			y=self._get_child_features('MEP_aaa')
+			#Should data be scaled/standardized?
+			popt,perr=_model_sigmoid(x,y)
+			return popt[0],perr[0]
+			
+	def model_mep_thresh(self):
+		if self.span_type=='period':
+			x=self._get_child_details('dat_TMS_powerA')
+			x=x.astype(np.float)
+			y=self._get_child_features('MEP_aaa')
+			y = y>self.erp_detection_limit
+			#Should data be scaled/standardized?
+			popt,perr=_model_sigmoid(x,y)
+			return popt[0],perr[0]
 		
-	def _model_hrio(self):
+	def model_hr_halfmax(self):
 		if self.span_type=='period':
 			#get xy_array as dat_Nerve_stim_output, HR_aaa
-			#limit to HR_aaa < max HR_aaa
-			popt,perr=_model_sigmoid(self.xy_array)
-			self.hr_halfmax=popt[0]#popt[0] is halfmax
-			self.hr_halfmax_err=perr[0]#perr[0] is halfmax err
-			self.hr_thresh = my_inv_sigmoid(self.hr_detection_limit, *popt)
-			#I actually have no idea how to get thresh_err. Somehow get the confidence interval?
+			x=self._get_child_details('dat_Nerve_stim_output')
+			x=x.astype(np.float)
+			y=self._get_child_features('HR_aaa')
+			y_max_ix = y.argmax()#Limit x to x<x_at_y_max
+			x_bool=x<=x[y_max_ix]
+			#Should data be scaled/standardized?
+			popt,perr=_model_sigmoid(x[x_bool],y[x_bool])
+			return popt[0],perr[0]
+			
+	def model_hr_thresh(self):
+		if self.span_type=='period':
+			x=self._get_child_details('dat_Nerve_stim_output')
+			x=x.astype(np.float)
+			y=self._get_child_features('HR_aaa')
+			y_max_ix = y.argmax()#Limit x to x<x_at_y_max
+			x_bool=x<=x[y_max_ix]
+			x=x[x_bool]
+			y = y[x_bool]>self.erp_detection_limit
+			#Should data be scaled/standardized?
+			popt,perr=_model_sigmoid(x,y)
+			return popt[0],perr[0]
