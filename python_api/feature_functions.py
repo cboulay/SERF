@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.optimize
 
 #helper functions
 def get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label):
