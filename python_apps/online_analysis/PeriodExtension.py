@@ -2,10 +2,10 @@
 #while an online application is running.
 
 import numpy as np
-import scipy.optimize
 import time
-from python_api.Eerat_sqlalchemy import *
-from sqlalchemy.orm import *
+from scipy.optimize import curve_fit
+from python_api.Eerat_sqlalchemy import Datum_feature_value, Feature_type, Datum, Datum_detail_value, Detail_type
+from sqlalchemy.orm import Session, query
 from sqlalchemy import desc
 
 def get_obj(name):return eval(name)
@@ -68,8 +68,8 @@ class Datum:
 				, Datum_feature_value.datum_id==Datum.datum_id\
 				, Datum_feature_value.feature_type_id==Feature_type.feature_type_id\
 				, Feature_type.Name==feature_name\
-				, Datum_feature_value.Value != None)
-				.order_by(Datum.Number)
+				, Datum_feature_value.Value != None)\
+				.order_by(Datum.Number)\
 				.all()
 			return np.asarray(features).astype(np.float)
 			
@@ -88,8 +88,8 @@ class Datum:
 				, Datum_detail_value.datum_id==Datum.datum_id\
 				, Datum_detail_value.detail_type_id==Detail_type.detail_type_id\
 				, Detail_type.Name==detail_name\
-				, Datum_detail_value.Value != None)
-				.order_by(Datum.Number)
+				, Datum_detail_value.Value != None)\
+				.order_by(Datum.Number)\
 				.all()
 			return np.asarray(details)
 			

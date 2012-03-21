@@ -1,3 +1,9 @@
+### Dependencies
+
+numpy
+scipy
+SQLAlchemy
+
 ### Instructions
 
 Get a period object.
