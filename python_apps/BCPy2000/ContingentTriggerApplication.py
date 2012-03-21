@@ -143,7 +143,7 @@ class BciApplication(BciGenericApplication):
 		amprange=self.params['AmplitudeRange'].val
 		if len(amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
 		if amprange[0]>amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
-		self.amprange=amprange
+		self.amprange=np.asarray(amprange,dtype='float64')
 
 		#RangeEnter not yet supported
 		if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
@@ -220,7 +220,7 @@ class BciApplication(BciGenericApplication):
 		scrw,scrh = self.screen.size #Get the screen dimensions.
 		#There is a linear transformation from amplitude to screen coordinates for the y-dimension
 		#The equation is y=mx+b where y is the screen coordinates, x is the signal amplitude, b is the screen coordinate for 0-amplitude, and m is the slope.
-		mgn=self.params['RangeMarginPcnt'].val/100
+		mgn=float(self.params['RangeMarginPcnt'].val)/100
 		margin=(max(self.amprange[1],0)-min(self.amprange[0],0))*mgn	#Add a margin around the full range
 		plot_max=max(self.amprange[1]+margin,0+margin)					#With the margin, what is the new max...
 		plot_min=min(self.amprange[0]-margin,0-margin)					#... and the new min plot range.
