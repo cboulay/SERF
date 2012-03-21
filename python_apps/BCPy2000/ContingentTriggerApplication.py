@@ -23,7 +23,7 @@
 # (processed) input channel. Whenever some criteria are met, then
 # a trigger is sent out through a stimulator. The evoked response
 # is trapped and passed off to an external application.
-import numpy
+import numpy as np
 from random import randint
 from math import ceil
 import VisionEgg
@@ -219,7 +219,7 @@ class BciApplication(BciGenericApplication):
 		self.screen.color = (0,0,0) #let's have a black background
 		scrw,scrh = self.screen.size #Get the screen dimensions.
 		#There is a linear transformation from amplitude to screen coordinates for the y-dimension
-		#The equation is y=mx+b where y is the screen coordinates, x is the signal amplitude, b is the screen coordinate for 0-amplitude, and b is the slope.
+		#The equation is y=mx+b where y is the screen coordinates, x is the signal amplitude, b is the screen coordinate for 0-amplitude, and m is the slope.
 		mgn=self.params['RangeMarginPcnt'].val/100
 		margin=(max(self.amprange[1],0)-min(self.amprange[0],0))*mgn	#Add a margin around the full range
 		plot_max=max(self.amprange[1]+margin,0+margin)					#With the margin, what is the new max...
@@ -257,7 +257,7 @@ class BciApplication(BciGenericApplication):
 		# Buffer the ERP #
 		##################
 		self.post_stim_samples = SigTools.msec2samples(self.erpwin[1], self.eegfs)
-		self.pre_stim_samples = SigTools.msec2samples(numpy.abs(self.erpwin[0]), self.eegfs)
+		self.pre_stim_samples = SigTools.msec2samples(np.abs(self.erpwin[0]), self.eegfs)
 		#Initialize the ring buffer
 		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), len(self.erpchan), leaky=True)
 
@@ -351,6 +351,7 @@ class BciApplication(BciGenericApplication):
 			self.enterok = True #TODO: Check entry direction condition.
 			self.states['SignalEnterMet'] = self.enterok
 		elif phase == 'feedback':
+			pass
 			#TODO: Try to get information from the ORM about the trial
 			#It might be too early to do it at the transition.
 		
@@ -417,13 +418,13 @@ class BciApplication(BciGenericApplication):
 			startx = None
 			# Hardware trigger:
 			if self.trigchan:
-				tr = numpy.asarray(sig[self.trigchan, :]).ravel() #flatten the trigger channel(s).
+				tr = np.asarray(sig[self.trigchan, :]).ravel() #flatten the trigger channel(s).
 				prev = self.trailingsample #The last sample from the previous packet
 				if prev == None: prev = [self.trigthresh - 1.0] #If we don't have a last sample, assume it was less than the threshold
 				self.trailingsample = tr[[-1]] #Keep the last sample of this packet for next time
-				tr = numpy.concatenate((prev,tr)) #prepend this packet with the last sample of the previous packet
-				tr = numpy.asarray(tr > self.trigthresh, numpy.int8) #booleans representing whether or not the trigger was above threshold
-				tr = numpy.argwhere(numpy.diff(tr) > 0)  #find any indices where the trigger crossed threshold
+				tr = np.concatenate((prev,tr)) #prepend this packet with the last sample of the previous packet
+				tr = np.asarray(tr > self.trigthresh, np.int8) #booleans representing whether or not the trigger was above threshold
+				tr = np.argwhere(np.diff(tr) > 0)  #find any indices where the trigger crossed threshold
 				if len(tr):
 					startx = tr[0,0] #n_samples when the trigger first crossed threshold
 			# Software trigger:
@@ -495,7 +496,7 @@ class BciApplication(BciGenericApplication):
 	def PlotERP(self, x):
 		nsamps=x.shape[1]
 		x = x.T
-		t = SigTools.samples2msec(numpy.arange(-1*nsamps/2,nsamps/2), self.eegfs)
+		t = SigTools.samples2msec(np.arange(-1*nsamps/2,nsamps/2), self.eegfs)
 		SigTools.plot(t, x)
 		#import pylab
 		#pylab.grid()
