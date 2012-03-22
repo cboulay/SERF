@@ -32,6 +32,9 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
+from BCPy2000.BCI2000Tools.DataFiles import dump
+from python_api.Eerat_sqlalchemy import Subject_type, Subject, get_or_create
+import time
 
 class BciApplication(BciGenericApplication):
 	
@@ -60,6 +63,8 @@ class BciApplication(BciGenericApplication):
 			
 			"PythonApp:Screen   int    ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Screen   float  WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
+			
+			"PythonApp:Analysisdb	string	SubjectType= BCPy_healthy % % % // Name of subject type",
 			
 		]
 		states = [
@@ -152,6 +157,19 @@ class BciApplication(BciGenericApplication):
 		self.eegfs=self.nominal['SamplesPerSecond'] #Sampling rate
 		spb=self.nominal['SamplesPerPacket'] #Samples per block/packet
 		
+		
+		#############################################
+		# Get or create the subject in the database #
+		#############################################
+		
+		my_subj_type=get_or_create(Subject_type, Name=self.params['SubjectType'])
+		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+
+		#################################
+		# Prepare MVIC file for writing #
+		#################################
+		self.mvic_filename = "data/MVIC_" + str(self.subject.subject_id) + "_" + str(int(time.time())) + ".bin"
+		
 		################################
 		# State monitors for debugging #
 		################################
@@ -231,6 +249,10 @@ class BciApplication(BciGenericApplication):
 		self.bcibar.fac=bar_fac
 		self.stimuli['barrect_1'].position=tuple(bar_pos)
 		self.updatebars(x)#Update visual stimulus based on x
+		
+		#Save the calculated value to the MVIC file.
+		if self.states['MVC']:
+			dump(self.mvic_filename, x=x)
 			
 	#############################################################
 	

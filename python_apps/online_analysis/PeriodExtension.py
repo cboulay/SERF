@@ -7,6 +7,7 @@ from scipy.optimize import curve_fit
 from python_api.Eerat_sqlalchemy import Datum_feature_value, Feature_type, Datum, Datum_detail_value, Detail_type
 from sqlalchemy.orm import Session, query
 from sqlalchemy import desc
+import BCPy2000.BCI2000Tools.DataFiles as DataFiles
 
 def get_obj(name):return eval(name)
 class ExtendInplace(type):#This class enables class definitions here to _extend_ parent classes.
@@ -18,7 +19,7 @@ class ExtendInplace(type):#This class enables class definitions here to _extend_
         for k,v in dict.iteritems():
             setattr(prevclass, k, v)
         return prevclass
-
+       
 #sigmoid function used for fitting response data
 def my_sigmoid(x, x0, k, a, c):
 #check scipy.optimize.leastsq or scipy.optimize.curve_fit
@@ -26,9 +27,7 @@ def my_sigmoid(x, x0, k, a, c):
 	y = a / (1 + np.exp(-k*(x-x0))) + c
 	return y
 
-#Calculate and return _thresh and _thresh_err
-#Using sigmoid... but that might not be best.
-#Maybe sigmoid should be fit to x=intensity, y=0,1
+#I'm not actually using this.
 def my_inv_sigmoid(y,x0,k,a,c):
 	x = (x0 - ln(-1 + (a/(y-c))))/k
 	return x
@@ -45,11 +44,19 @@ def _model_sigmoid(x,y):
 		perr = np.sqrt(pcov.diagonal())
 		return popt,perr
 	
+def nsorted(x, width=20):
+	if len(x) == 0: return []
+	import re; return zip(*sorted(zip([re.sub('[0-9]+', lambda m: m.group().rjust(width,'0'), xi) for xi in x], x)))[1]
+
+def ListDatFiles(d='.', endswith='.dat'):
+	return nsorted([os.path.realpath(os.path.join(d,f)) for f in os.listdir(d) if f.lower().endswith(endswith)]);
+	
 class Datum:
 	__metaclass__=ExtendInplace
 	
 	#variable definitions
 	erp_detection_limit = None
+	mvic = None
 	
 	#method definitions
 	
@@ -105,8 +112,32 @@ class Datum:
 			#Save the upper limit as the detection_limit
 			self.erp_detection_limit=0
 			
+	def _get_mvic(self, filename):
+		if self.span_type=='period':
+			#Load the processed MVIC data
+			filenames=ListDatFiles(d='data', endswith='.bin')
+			period_start = time.mktime(self.StartTime.timetuple())
+			period_end = time.mktime(self.EndTime.timetuple())
+			time_to_end=inf
+			best_f=None
+			for fname in filenames:
+				splits=fname.split('_')
+				if splits[0].endswith('MVIC') and str(self.subject_id)==splits[1]: 
+					file_time=int(splits[2].rstrip('.bin'))
+					ttte = period_end-file_time
+					if file_time > period_start and file_time < period_end and ttte>0 and ttte<time_to_end:
+						time_to_end = ttte
+						best_f=fname
+			if best_f:
+				content=DataFiles.load(best_f)
+				x_array=np.asarray(content['x'])
+				self.mvic = x_array.max()
+			else:
+				self.mvic = None
+			return self.mvic
+			
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
-	def update_store(self, IsGood=True):
+	def update_store(self):
 		if self.span_type=='period':
 			session = Session.object_session(self)
 			#Assume x_vec, n_channels, n_samples, channel_labels are all the same.

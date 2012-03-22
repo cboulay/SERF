@@ -13,7 +13,7 @@ Get a period object.
 #cd D:\Tools/EERAT/
 from python_api.Eerat_sqlalchemy import *
 from python_apps.online_analysis.PeriodExtension import *
-my_subj_type=get_or_create(Subject_type, Name='BCPy healthy')
+my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
 my_subject=get_or_create(Subject, Name='CHAD_TEST', subject_type=my_subj_type, species_type='human')
 my_dat_type=get_or_create(Datum_type, Name='hr_baseline')
 now_per=my_subject.get_now_period_of_type(my_dat_type)

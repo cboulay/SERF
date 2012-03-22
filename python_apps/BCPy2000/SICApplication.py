@@ -32,6 +32,15 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
+from BCPy2000.BCI2000Tools.DataFiles import dump
+from python_api.Eerat_sqlalchemy import Subject_type, Subject, get_or_create
+
+def nsorted(x, width=20):
+	if len(x) == 0: return []
+	import re; return zip(*sorted(zip([re.sub('[0-9]+', lambda m: m.group().rjust(width,'0'), xi) for xi in x], x)))[1]
+
+def ListDatFiles(d='.', endswith='.dat'):
+	return nsorted([os.path.realpath(os.path.join(d,f)) for f in os.listdir(d) if f.lower().endswith(endswith)]);
 
 class BciApplication(BciGenericApplication):
 	
@@ -67,7 +76,6 @@ class BciApplication(BciGenericApplication):
 			
 			#Subject should already be in db.
 			#"PythonApp:Analysisdb	string	SubjectType= 'BCPy healthy' // Name of subject type",
-			"PythonApp:Analysisdb	string	PeriodType= 'hr_baseline' // Name of period type",
 			
 		]
 		states = [
@@ -82,6 +90,7 @@ class BciApplication(BciGenericApplication):
 			"Posttrial 1 0 0 0", #To clear the screen.
 			"SignalCriteriaMetBlocks 16 0 0 0", #in blocks, 16-bit is max 65536
 			"CumulativeDurationBlocks 16 0 0 0", #in blocks, 16-bit is max 65536
+			"PercentComplete 8 0 0 0", #in blocks, 8-bit is max 256
 		]
 		
 		return params,states
@@ -129,19 +138,36 @@ class BciApplication(BciGenericApplication):
 		############################
 		# ANALYSIS INTERFACE CHECK #
 		############################
-		#Check that we have an MVIC file.
+		#TODO: Check that we have an MVIC file.
 		
 		
 	#############################################################
 	
 	def Initialize(self, indim, outdim):
 		
+		###################################
+		# Get the subject in the database #
+		###################################
+		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		
 		############
 		# GET MVIC #
 		############
-		#TODO: Get MVIC from subject period
-		#TODO: Get MVIC from .dat file
-		self.mvic=100#temp
+		#TODO: Get most recent MVIC for this subject
+		filenames=ListDatFiles(d='data', endswith='.bin')
+		latest_time = -Inf
+		best_f=None
+		for fname in filenames:
+			splits=fname.split('_')
+			file_time = int(splits[2].rstrip('.bin'))
+			if splits[0].endswith('MVIC') and str(self.subject_id)==splits[1] and file_time > latest_time: 
+				latest_time = file_time
+				best_f=fname
+		if best_f:
+			content=DataFiles.load(best_f)
+			x_array=np.asarray(content['x'])
+			self.mvic = x_array.max()
+		else: self.mvic=None
 	
 		##########
 		# SCREEN #
@@ -169,7 +195,7 @@ class BciApplication(BciGenericApplication):
 		self.stimuli['bartext_1'].position=(50,50)
 		self.stimuli['bartext_1'].color=[0,0,0]
 		
-		#TODO: Feedback about self.states['CumulativeDurationBlocks']
+		addstatemonitor(self, 'PercentComplete')
 		
 		#######################################################
 		# (Convert and) Attach contingency parameters to self #
@@ -177,7 +203,13 @@ class BciApplication(BciGenericApplication):
 		self.eegfs=self.nominal['SamplesPerSecond'] #Sampling rate
 		spb=self.nominal['SamplesPerPacket'] #Samples per block/packet
 		self.dmin=int(ceil(self.params['DurationMin'].val * self.eegfs / spb)) #Convert DurationMin to blocks
-		self.dtotal=int(ceil(self.params['DurationTotal'].val * self.eegfs / spb)) #Convert DurationMin to blocks		
+		self.dtotal=int(ceil(self.params['DurationTotal'].val * self.eegfs / spb)) #Convert DurationMin to blocks
+		
+		################################
+		# Prepare SIC file for writing #
+		################################
+		self.sic_filename = "data/SIC_" + str(self.subject.subject_id) + "_" + str(int(time.time())) + ".bin"
+				
 		
 		################################
 		# State monitors for debugging #
@@ -215,6 +247,7 @@ class BciApplication(BciGenericApplication):
 	def StartRun(self):
 		self.states['SignalCriteriaMetBlocks']=0
 		self.states['CumulativeDurationBlocks']=0
+		self.states['PercentComplete']=0
 		
 	#############################################################
 	
@@ -272,10 +305,13 @@ class BciApplication(BciGenericApplication):
 		#Why does SignalCriteriaMetBlocks add up faster than CumulativeDurationBlocks?
 		now_adding = now_in_range and self.states['SignalCriteriaMetBlocks'] >= self.dmin
 		self.states['SummingBlocks'] = now_adding #update state
+		if now_adding:
+			dump(self.sic_filename, x=x)
 		
 		#increment the state tracking for how many blocks we are in range.
 		self.states['SignalCriteriaMetBlocks'] = self.states['SignalCriteriaMetBlocks'] + 1 if now_in_range else 0
 		self.states['CumulativeDurationBlocks'] = self.states['CumulativeDurationBlocks'] + 1 if now_adding else self.states['CumulativeDurationBlocks']
+		self.states['PercentComplete'] =int(100 * self.states['CumulativeDurationBlocks'] / self.dtotal)
 			
 		#TODO: Feedback about self.states['CumulativeDurationBlocks']
 		

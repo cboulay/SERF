@@ -32,8 +32,9 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-import MagstimInterface
-import Eerat_storage
+from Magstim import MagstimInterface
+import python_api.Eerat_sqlalchemy
+import python_apps.online_analysis.PeriodExtension
 
 class BciApplication(BciGenericApplication):
 	
