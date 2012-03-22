@@ -100,9 +100,9 @@ DELIMITER ;
 -- 1 `subject_type`
 DELETE FROM `subject_type`;
 INSERT IGNORE INTO `subject_type` (Name, Description) VALUES 
-	('BCPy healthy','Control subject collected using BCPy2000'),
-	('BCPy stroke','Stroke subject collected using BCPy2000'),
-	('E3rat emg-eeg','Rat from emg-eeg collected using E3');
+	('BCPy_healthy','Control subject collected using BCPy2000'),
+	('BCPy_stroke','Stroke subject collected using BCPy2000'),
+	('E3rat_emg_eeg','Rat from emg-eeg collected using E3');
 -- 2 `datum_type`.
 DELETE FROM `datum_type`;
 INSERT IGNORE INTO `datum_type` (Name, Description) VALUES

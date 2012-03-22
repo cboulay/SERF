@@ -4,7 +4,7 @@ DELETE FROM subject WHERE Name LIKE "CHAD_TEST";
 INSERT INTO subject (subject_type_id, Name, species_type) 
 	SELECT subject_type.subject_type_id, "CHAD_TEST", 2
 	FROM subject_type
-	WHERE subject_type.Name LIKE "BCPy healthy";
+	WHERE subject_type.Name LIKE "BCPy_healthy";
 
 -- Test subject creation triggers subject_detail_values. Only applicable for subject types with specific details
 -- SELECT subject.Name, detail_type.Name, Value from subject INNER JOIN subject_detail_value USING (subject_id) INNER JOIN detail_type USING (detail_type_id);
