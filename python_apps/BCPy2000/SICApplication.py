@@ -131,16 +131,15 @@ class BciApplication(BciGenericApplication):
 		if len(self.amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
 		if self.amprange[0]>self.amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
 		
-		
-	#############################################################
-	
-	def Initialize(self, indim, outdim):
-		
 		###################################
 		# Get the subject in the database #
 		###################################
 		my_subj_type=get_or_create(Subject_type, Name=self.params['SubjectType'])
 		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		
+	#############################################################
+	
+	def Initialize(self, indim, outdim):
 		
 		############
 		# GET MVIC #

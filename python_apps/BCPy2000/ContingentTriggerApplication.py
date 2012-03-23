@@ -33,8 +33,8 @@ from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
 from Magstim import MagstimInterface
-from python_api.Eerat_sqlalchemy import Subject_type, Datum_type, get_or_create
-from python_apps.BCPy2000.OnlineAPIExtension import Subject, Datum
+from python_api.Eerat_sqlalchemy import Subject_type, get_or_create
+from python_apps.online_analysis.OnlineAPIExtension import Subject, Datum
 
 class BciApplication(BciGenericApplication):
 	
@@ -58,7 +58,7 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Contingency 	list 		ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent.",
 			"PythonApp:Contingency 	float 		DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before triggering",
 			"PythonApp:Contingency 	float 		DurationRand= 0.3 0.3 0 % // Randomization s around the duration",
-			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 0 100 0 0 % //Min and Max limits for signal amplitude criteria.",
+			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 10 20 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria",
 			"PythonApp:Contingency 	int 		RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
 			
 			"PythonApp:Display 	string 	CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
@@ -66,13 +66,13 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Display 	string 	BGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background (color)",
 			"PythonApp:Display 	string	InRangeBGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background indicating target range (color)",
 			"PythonApp:Display 	int		FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
-			"PythonApp:Display 	int		RangeMarginPcnt= 10 10 0 % // Percent of the display to use as a margin around the range",
+			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
 			
-			"PythonApp:Stimulator	int		StimulatorType= 0 0 0 3 // Stimulator type: 0 Magstim, 1 Bistim, 2 Rapid2, 3 analog (enumeration)",
-			"PythonApp:Stimulator	int		StimSend= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
+			"PythonApp:Stimulator	int		StimulatorType= 3 3 0 3 // Stimulator type: 0 Magstim, 1 Bistim, 2 Rapid2, 3 analog (enumeration)",
+			"PythonApp:Stimulator	int		StimTrigger= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
 			"PythonApp:Stimulator	string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
 			
-			"PythonApp:ERP	list		TriggerInputChan= 1 Trig % % % // Name of channel used to monitor trigger / control ERP window",
+			"PythonApp:ERP	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
 			"PythonApp:ERP	float		TriggerThreshold= 1 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
 			"PythonApp:ERP	list		ERPChan= 1 EDC_RAW % % % // Name of channel used for ERP",
 			"PythonApp:ERP	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
@@ -83,8 +83,8 @@ class BciApplication(BciGenericApplication):
 			
 			#"PythonApp:Magstim int ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
 			
-			"PythonApp:Analysisdb	string	SubjectType= 'BCPy healthy' // Name of subject type",
-			"PythonApp:Analysisdb	string	PeriodType= 'hr_baseline' // Name of period type",
+			"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 // Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)"
+			"PythonApp:Analysisdb 	int		PeriodType= 2 2 0 3 // Feedback type: 0 hr_baseline, 1 hr_cond, 2 mep_baseline, 3 mep_cond (enumeration)"
 			
 		]
 		states = [
@@ -108,6 +108,11 @@ class BciApplication(BciGenericApplication):
 	#############################################################
 	
 	def Preflight(self, sigprops):
+		
+		#Not yet supported
+		if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
+		#if self.params['StimulatorType'].val==3: raise EndUserError, "Analog stimulator not yet supported"
+		#if self.params['PeriodType'].val in [0,1]: raise EndUserError, "Analog stimulator not yet supported"
 		
 		##############################################
 		# http://visionegg.org/manual/visionegg.html #
@@ -140,16 +145,11 @@ class BciApplication(BciGenericApplication):
 		else:
 			raise EndUserError, "Must supply ContingentChannel"
 
-			#Check that the range makes sense.
+		#Check that the range makes sense.
 		amprange=self.params['AmplitudeRange'].val
 		if len(amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
 		if amprange[0]>amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
 		self.amprange=np.asarray(amprange,dtype='float64')
-
-		#RangeEnter not yet supported
-		if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
-
-		if self.params['StimulatorType'].val==3: raise EndUserError, "Analog stimulator not yet supported"
 		
 		#############
 		# ERP CHECK #
@@ -192,33 +192,37 @@ class BciApplication(BciGenericApplication):
 		############################
 		# ANALYSIS INTERFACE CHECK #
 		############################
-		#The online analysis must be running.
-		#Initialize eerat-online with flag for GUI
-		#Online analysis by itself will allow us to get information about the period
-		#	e.g. threshold hunting parameters, 
-		#It helps but is not necessary to interact with the online analysis through its GUI.
-		#The online analysis GUI will allow us to change period details (e.g. dat_MR_start_ms)
-		#The online analysis GUI will provide us with feedback about the current period
-		#	e.g. average evoked waveforms, IO curve, threshold hunting status
-		#Check that we have a subject type that matches.
-		my_subject_type=Eerat_storage.get_or_create(Subject_type, Name=self.params['SubjectType'].val)
-		self.ana_subject=Eerat_storage.get_or_create(Subject, Name='CHAD_TEST', subject_type=my_type, species_type='human')
-		#Check that this subject has a current period_type that matches. A period is necessary so newly created trials can inherit some default values. It is also necessary for the offline analysis to calculate certain feature values (e.g. residuals, threshold estimates, etc).
-		my_period_type=Eerat_storage.get_or_create(Eerat_storage.Datum_type, Name=self.params['PeriodType'].val)
-		self.ana_period=self.ana_subject.get_now_period_of_type(my_period_type)
-		if len(self.ana_period) != 1:
+		subj_type_name={0:'BCPy_healthy', 1:'BCPy_stroke', 2:'E3rat_emg_eeg'}.get(int(self.params['SubjectType']))
+		my_subj_type=get_or_create(Subject_type, Name=subj_type_name)
+		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		period_type_name={0:'hr_baseline', 1:'hr_cond', 2:'mep_baseline', 3:'mep_cond'}.get(int(self.params['PeriodType']))
+		my_period_type=get_or_create(Datum_type, Name=period_type_name)
+		self.period = self.subject.get_now_period_of_type(my_period_type)
+		if len(self.period) != 1:
 			raise EndUserError, "No current period defined for this subject. Check the eerat-online GUI"
-		#If we have a subject and we have a period we should be ready to go.
 		
 	#############################################################
 	
 	def Initialize(self, indim, outdim):
-	
+		
+		############
+		# GET MVIC #
+		############
+		#This is a little slow because it loads a full BCI2000.dat file
+		self.mvic = self.subject._get_last_mvic()
+		#Calculate the erp detection limit now so we don't have to calculate it during data acquisition
+		self.period._get_detection_limit()
+		
 		##########
 		# SCREEN #
 		##########
 		self.screen.color = (0,0,0) #let's have a black background
 		scrw,scrh = self.screen.size #Get the screen dimensions.
+		
+		#Target box:
+		#Convert range from %MVIC to amplitude.
+		self.amprange=(self.amprange/100)*self.mvic
+		
 		#There is a linear transformation from amplitude to screen coordinates for the y-dimension
 		#The equation is y=mx+b where y is the screen coordinates, x is the signal amplitude, b is the screen coordinate for 0-amplitude, and m is the slope.
 		mgn=float(self.params['RangeMarginPcnt'].val)/100
@@ -231,7 +235,6 @@ class BciApplication(BciGenericApplication):
 		target_box = Block(position=(0,m*self.amprange[0]+b), size=(scrw,m*(self.amprange[1]-self.amprange[0])), color=(1,0,0,0.5), anchor='lowerleft')
 		self.stimulus('target_box', z=1, stim=target_box)
 		#Setup the feedback bar
-		#self.addbar(color=(0,0,1), font_size=26, pos=None, thickness=10, fliplr=False, baseline=0.0, fac=200.0/10.0, horiz=False, fmt='%+.2f', font_name=None)
 		self.addbar(color=(0,1,0), pos=(scrw/2.0,b), thickness=scrw/10, fac=m)
 		self.stimuli['bartext_1'].position=(50,50)
 		self.stimuli['bartext_1'].color=[0,0,0]
@@ -259,8 +262,9 @@ class BciApplication(BciGenericApplication):
 		##################
 		self.post_stim_samples = SigTools.msec2samples(self.erpwin[1], self.eegfs)
 		self.pre_stim_samples = SigTools.msec2samples(np.abs(self.erpwin[0]), self.eegfs)
-		#Initialize the ring buffer
-		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), len(self.erpchan), leaky=True)
+		#Initialize the ring buffer. It will be passed the raw data (relabeled as EDC) and the erp.
+		self.dbstop()
+		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), 2, leaky=True)
 
 		######################
 		# ANALYSIS INTERFACE #
@@ -393,6 +397,7 @@ class BciApplication(BciGenericApplication):
 		# Do this every block, no matter what. #
 		########################################
 		#self.leaky_trap.process(sig[self.erpchan,:])
+		self.dbstop()#Figure out what channels to pass
 		self.leaky_trap.process(sig[1,:]) #Debug trigger timing
 		
 		##############################################
@@ -452,22 +457,25 @@ class BciApplication(BciGenericApplication):
 				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
 				self.triggered = False #We do not need to look for the ERP anymore.
 				
-				#TODO: Send this ERP to the analysis layer
-		
-				#This should trigger some feature calculations for this trial.
+				my_trial = get_or_create(Datum\
+				    , subject=self.subject\
+				    , datum_type=self.period.datum_type\
+				    , span_type='trial'\
+				    , IsGood=1\
+				    , Number=0)
 				
-				#Process or Transition might then have access to:
-				#-the size of the response for feedback purposes
-				#-estimate of stimulus intensity
-				#(threshold, 50% max, arbitrary sized response)
-				#-error associated with that intensity estimate
-				self.PlotERP(x) #TODO: send the data off to the ERP analysis
+				self.dbstop()#where do we  get x_vec and data from?
+				#TODO: Set the stimulus intensity.
+				my_trial.store={\
+				    'x_vec':numpy.arange(-500,500, dtype=float)\
+				    , 'data':numpy.array(100*numpy.random.ranf((2,1000)), dtype=float)\
+				    , 'channel_labels':'Trig, EDC'}
 		
 		##############################
 		# Response from ERP analysis #
 		##############################
 		elif self.in_phase('feedback'):
-			#TODO: Try to get information from the analysis layer
+			#TODO: Try to get information from the analysis layer like next stimulus intensity.
 			pass
 			
 	#############################################################
@@ -491,16 +499,5 @@ class BciApplication(BciGenericApplication):
 	def StopRun(self):
 		pass
 	
-	#Functions relevant to processing the traps.
-	#############################################################
-	
-	def PlotERP(self, x):
-		nsamps=x.shape[1]
-		x = x.T
-		t = SigTools.samples2msec(np.arange(-1*nsamps/2,nsamps/2), self.eegfs)
-		SigTools.plot(t, x)
-		#import pylab
-		#pylab.grid()
-		print 'got an ERP'
 #################################################################
 #################################################################
