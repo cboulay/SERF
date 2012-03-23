@@ -92,7 +92,7 @@ class BciSignalProcessing(BciGenericSignalProcessing):
 		#set self.out_signal_props
 		#or return sigprops (same type as sigprops input)
 				
-	#############################################################
+	#############################################################TMSTrigc TMSTriga NerveTrigc NerveTriga EDCc EDCa FCRc FCRa
 	
 	def Initialize(self, indim, outdim):
 		#~ Called following Preflight. Pre-allocate objects here then attach them to self.

@@ -33,8 +33,8 @@ from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
 from Magstim import MagstimInterface
-import python_api.Eerat_sqlalchemy
-import python_apps.online_analysis.PeriodExtension
+from python_api.Eerat_sqlalchemy import Subject_type, Datum_type, get_or_create
+from python_apps.BCPy2000.OnlineAPIExtension import Subject, Datum
 
 class BciApplication(BciGenericApplication):
 	

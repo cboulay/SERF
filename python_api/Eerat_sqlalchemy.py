@@ -79,7 +79,10 @@ Base = declarative_base(cls=MyBase)#Create declarative base class also inheritin
 
 	# Define many-to-many relationships in the association tables using cascades in the backrefs
 	# Define one-to-many relationships in the parent (one) table using direct cascades.
-		
+
+class System(Base):
+	pass
+
 class Detail_type(Base):
 	datum_types 		= association_proxy("datum_type_has_detail_type","datum_type")
 	subject_types 		= association_proxy("subject_type_has_detail_type","subject_type")

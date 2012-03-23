@@ -32,9 +32,7 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-from BCPy2000.BCI2000Tools.DataFiles import dump
 from python_api.Eerat_sqlalchemy import Subject_type, Subject, get_or_create
-import time
 
 class BciApplication(BciGenericApplication):
 	
@@ -75,7 +73,8 @@ class BciApplication(BciGenericApplication):
 			
 			"Cue 1 0 0 0",
 			"MVC 1 0 0 0",
-			"Rest 1 0 0 0"
+			"Rest 1 0 0 0",
+			"Value 16 0 0 0", #in blocks, 16-bit is max 65536
 		]
 		
 		return params,states
@@ -164,11 +163,6 @@ class BciApplication(BciGenericApplication):
 		
 		my_subj_type=get_or_create(Subject_type, Name=self.params['SubjectType'])
 		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
-
-		#################################
-		# Prepare MVIC file for writing #
-		#################################
-		self.mvic_filename = "data/MVIC_" + str(self.subject.subject_id) + "_" + str(int(time.time())) + ".bin"
 		
 		################################
 		# State monitors for debugging #
@@ -249,11 +243,8 @@ class BciApplication(BciGenericApplication):
 		self.bcibar.fac=bar_fac
 		self.stimuli['barrect_1'].position=tuple(bar_pos)
 		self.updatebars(x)#Update visual stimulus based on x
+		self.states['Value']=int(x)
 		
-		#Save the calculated value to the MVIC file.
-		if self.states['MVC']:
-			dump(self.mvic_filename, x=x)
-			
 	#############################################################
 	
 	def Frame(self, phase):

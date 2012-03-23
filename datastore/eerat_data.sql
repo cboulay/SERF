@@ -96,7 +96,11 @@ BEGIN
 END $$
 
 DELIMITER ;
-
+-- 0 'system'
+DELETE FROM `system`;
+INSERT IGNORE INTO `system` (Name, Value) VALUES
+	('version','1.0'),
+	('bci_dat_dir','/d/data/bci2000')
 -- 1 `subject_type`
 DELETE FROM `subject_type`;
 INSERT IGNORE INTO `subject_type` (Name, Description) VALUES 
@@ -149,7 +153,7 @@ INSERT IGNORE INTO `detail_type` (Name, Description, DefaultValue) VALUES
 INSERT IGNORE INTO `subject_type_has_detail_type` (subject_type_id, detail_type_id)
 	SELECT st.subject_type_id, dt.detail_type_id
 	FROM subject_type st JOIN detail_type dt
-	WHERE (st.Name LIKE "BCPy stroke" AND dt.Name IN ("subj_stroke","subj_injury_date"))
+	WHERE (st.Name LIKE "BCPy_stroke" AND dt.Name IN ("subj_stroke","subj_injury_date"))
 		OR (st.Name LIKE "E3rat emg-eeg" AND dt.Name IN ("subj_strain","subj_E3DB"));
 -- 6 `datum_type_has_feature_type`
 INSERT IGNORE INTO `datum_type_has_feature_type` (datum_type_id, feature_type_id)
