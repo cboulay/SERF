@@ -2,24 +2,13 @@
 #while an online application is running.
 
 import numpy as np
-import time
+import time, os, datetime
 from scipy.optimize import curve_fit
-from python_api.Eerat_sqlalchemy import Datum_feature_value, Feature_type, Datum, Datum_detail_value, Detail_type
+from python_api.Eerat_sqlalchemy import System, Subject, Datum, Detail_type, Datum_detail_value, Feature_type, Datum_feature_value, get_or_create
 from sqlalchemy.orm import Session, query
 from sqlalchemy import desc
-import BCPy2000.BCI2000Tools.DataFiles as DataFiles
+import BCPy2000.BCI2000Tools.FileReader as FileReader
 
-def get_obj(name):return eval(name)
-class ExtendInplace(type):#This class enables class definitions here to _extend_ parent classes.
-	#http://code.activestate.com/recipes/412717-extending-classes/
-    def __new__(self, name, bases, dict):
-        prevclass = get_obj(name)
-        del dict['__module__']
-        del dict['__metaclass__']
-        for k,v in dict.iteritems():
-            setattr(prevclass, k, v)
-        return prevclass
-       
 #sigmoid function used for fitting response data
 def my_sigmoid(x, x0, k, a, c):
 #check scipy.optimize.leastsq or scipy.optimize.curve_fit
@@ -44,12 +33,42 @@ def _model_sigmoid(x,y):
 		perr = np.sqrt(pcov.diagonal())
 		return popt,perr
 	
-def nsorted(x, width=20):
-	if len(x) == 0: return []
-	import re; return zip(*sorted(zip([re.sub('[0-9]+', lambda m: m.group().rjust(width,'0'), xi) for xi in x], x)))[1]
-
-def ListDatFiles(d='.', endswith='.dat'):
-	return nsorted([os.path.realpath(os.path.join(d,f)) for f in os.listdir(d) if f.lower().endswith(endswith)]);
+def get_obj(name):return eval(name)
+class ExtendInplace(type):#This class enables class definitions here to _extend_ parent classes.
+	#http://code.activestate.com/recipes/412717-extending-classes/
+    def __new__(self, name, bases, dict):
+        prevclass = get_obj(name)
+        del dict['__module__']
+        del dict['__metaclass__']
+        for k,v in dict.iteritems():
+            setattr(prevclass, k, v)
+        return prevclass
+       
+class Subject:
+	__metaclass__=ExtendInplace
+	last_mvic = None
+	last_sic = None
+	
+	def _get_most_recent_period(self):
+		#TODO: Hnadle absence of any periods.
+		session = Session.object_session(self)
+		period = session.query(Datum).filter(\
+								Datum.span_type=='period',\
+								Datum.subject_id==self.subject_id,\
+								Datum.IsGood==True)\
+								.order_by(Datum.Number.desc())\
+								.first()
+		return period
+	
+	def _get_last_mvic(self):
+		period = self._get_most_recent_period()
+		self.last_mvic = period._get_mvic()
+		return self.last_mvic
+	
+	def _get_last_sic(self):
+		period = self._get_most_recent_period()
+		self.last_sic = period._get_sic()
+		return self.last_sic
 	
 class Datum:
 	__metaclass__=ExtendInplace
@@ -99,42 +118,68 @@ class Datum:
 				.order_by(Datum.Number)\
 				.all()
 			return np.asarray(details)
-			
 		
 	#Get the statistical detection limit for MEP, M-wave (not used?), H-reflex
-	def _calc_detection_limit(self):
+	def _get_detection_limit(self):
 		if self.span_type=='period':
-			#Load the raw data for the isometric contraction
-			#Pull out the useful segments
-			#Get the response window depending on datum_type
-			#Calculate the response size for each segment.
-			#Get the 97.5% CI for the response sizes.
-			#Save the upper limit as the detection_limit
-			self.erp_detection_limit=0
+			dir_stub=get_or_create(System, Name='bci_dat_dir').Value
+			mvic_dir=dir_stub + '/' + self.subject.Name + '999/'
+			bci_stream=self._recent_stream_for_dir(mvic_dir)
+			sig,states=bci_stream.decode(nsamp='all')
+			sig,chan_labels=bci_stream.spatialfilteredsig(sig)
 			
-	def _get_mvic(self, filename):
+			if 'hr' in self.type_name:
+				chan_label=self.detail_values['dat_HR_chan_label']
+				x_start=float(self.detail_values['dat_HR_start_ms'])
+				x_stop=float(self.detail_values['dat_HR_stop_ms'])
+			elif 'mep' in self.type_name:
+				chan_label=self.detail_values['dat_MEP_chan_label']
+				x_start=float(self.detail_values['dat_MEP_start_ms'])
+				x_stop=float(self.detail_values['dat_MEP_stop_ms'])
+			
+			#Only use the relevant channel	
+			sig=sig[chan_labels.index(chan_label),:]
+			
+			#Reduce the signal to only relevant samples
+			x_bool = (states['SummingBlocks']==1).squeeze()
+			sig=sig[:,x_bool]
+			
+			#Figure out how many samples per calculation
+			fs=bci_stream.samplingfreq_hz
+			n_samps=ceil(fs*(x_stop-x_start)/1000)
+			
+			#Divide our sig into equal blocks of n_samps
+			cut_samps=int(-shape(sig)[1] % n_samps)
+			if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
+			sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
+			sig=np.abs(sig)
+			vals=np.asarray(np.average(sig,axis=1))
+			vals.sort(axis=0)
+			n_vals=vals.shape[0]
+			self.erp_detection_limit=vals[ceil(n_vals*0.975),0]
+			return self.erp_detection_limit
+			
+	def _get_mvic(self):
 		if self.span_type=='period':
-			#Load the processed MVIC data
-			filenames=ListDatFiles(d='data', endswith='.bin')
-			period_start = time.mktime(self.StartTime.timetuple())
-			period_end = time.mktime(self.EndTime.timetuple())
-			time_to_end=inf
-			best_f=None
-			for fname in filenames:
-				splits=fname.split('_')
-				if splits[0].endswith('MVIC') and str(self.subject_id)==splits[1]: 
-					file_time=int(splits[2].rstrip('.bin'))
-					ttte = period_end-file_time
-					if file_time > period_start and file_time < period_end and ttte>0 and ttte<time_to_end:
-						time_to_end = ttte
-						best_f=fname
-			if best_f:
-				content=DataFiles.load(best_f)
-				x_array=np.asarray(content['x'])
-				self.mvic = x_array.max()
-			else:
-				self.mvic = None
+			dir_stub=get_or_create(System, Name='bci_dat_dir').Value
+			mvic_dir=dir_stub + '/' + self.subject.Name + '888/'
+			bci_stream=self._recent_stream_for_dir(mvic_dir)
+			sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
+			x_bool = (states['MVC']==1).squeeze()
+			self.mvic = np.max(states['Value'][:,x_bool])
 			return self.mvic
+		
+	def _recent_stream_for_dir(self, dir):
+		dir=os.path.abspath(dir)
+		files=FileReader.ListDatFiles(d=dir)
+		#The returned list is in ascending order, assume the last is most recent
+		best_stream = None
+		for fn in files:
+			temp_stream = FileReader.bcistream(fn)
+			temp_date = datetime.datetime.fromtimestamp(temp_stream.datestamp)
+			if temp_date >= self.StartTime and temp_date <= self.EndTime:
+				best_stream=temp_stream
+		return best_stream
 			
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
 	def update_store(self):
