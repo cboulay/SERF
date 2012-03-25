@@ -68,13 +68,16 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Display 	int		FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
 			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
 			
+            #TODO: Just use one parameter for either magstim or analog. Let the initialize function handle everything else.
+            #If there is a need to change more parameters later then I will do that.
 			"PythonApp:Stimulator	int		StimulatorType= 3 3 0 3 // Stimulator type: 0 Magstim, 1 Bistim, 2 Rapid2, 3 analog (enumeration)",
 			"PythonApp:Stimulator	int		StimTrigger= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
 			"PythonApp:Stimulator	string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
-			
 			"PythonApp:ERP	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
 			"PythonApp:ERP	float		TriggerThreshold= 1 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
-			"PythonApp:ERP	list		ERPChan= 1 EDC_RAW % % % // Name of channel used for ERP",
+			
+            #TODO: Just call it EDC. Let the initialize function append _RAW
+            "PythonApp:ERP	list		ERPChan= 1 EDC_RAW % % % // Name of channel used for ERP",
 			"PythonApp:ERP	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
 			#TODO: Parameter about ERP size feedback
 			
@@ -154,6 +157,7 @@ class BciApplication(BciGenericApplication):
 		#############
 		# ERP CHECK #
 		#############
+        #TODO: Figure out trigger channel from new paramter.
 		#If there is a trigger channel, make sure it makes sense.
 		self.trigchan=None
 		tch = self.params['TriggerInputChan'].val
@@ -249,6 +253,7 @@ class BciApplication(BciGenericApplication):
 		self.drand=int(ceil(self.params['DurationRand'].val * self.eegfs / spb)) #Convert DurationRand to blocks
 		self.enterok=False #Init to False
 		
+        #TODO: Figure out stimulator from new paramter.
 		##############
 		# Stimulator #
 		##############
