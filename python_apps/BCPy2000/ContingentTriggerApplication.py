@@ -32,8 +32,7 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-from Magstim import MagstimInterface
-from python_api.Eerat_sqlalchemy import Subject_type, get_or_create
+from python_api.Eerat_sqlalchemy import Subject_type, Datum_type, get_or_create
 from python_apps.online_analysis.OnlineAPIExtension import Subject, Datum
 
 class BciApplication(BciGenericApplication):
@@ -58,8 +57,11 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Contingency 	list 		ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent.",
 			"PythonApp:Contingency 	float 		DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before triggering",
 			"PythonApp:Contingency 	float 		DurationRand= 0.3 0.3 0 % // Randomization s around the duration",
-			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 10 20 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria",
+			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 05 15 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria",
 			"PythonApp:Contingency 	int 		RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
+			"PythonApp:Contingency 	floatlist 	BaselineRange= {Min Max} 5 80 0 0 % //Min and Max of range to test before adaptive parameterization",
+			#Units depend on mode.
+			"PythonApp:Contingency 	int			BaselineTrials= 5 5 0 % // N trials spread over range",
 			
 			"PythonApp:Display 	string 	CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
 			"PythonApp:Display 	string 	CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
@@ -68,26 +70,26 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Display 	int		FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
 			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
 			
-            #TODO: Just use one parameter for either magstim or analog. Let the initialize function handle everything else.
-            #If there is a need to change more parameters later then I will do that.
-			"PythonApp:Stimulator	int		StimulatorType= 3 3 0 3 // Stimulator type: 0 Magstim, 1 Bistim, 2 Rapid2, 3 analog (enumeration)",
-			"PythonApp:Stimulator	int		StimTrigger= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
-			"PythonApp:Stimulator	string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
-			"PythonApp:ERP	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
-			"PythonApp:ERP	float		TriggerThreshold= 1 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
 			
-            #TODO: Just call it EDC. Let the initialize function append _RAW
-            "PythonApp:ERP	list		ERPChan= 1 EDC_RAW % % % // Name of channel used for ERP",
+			#There are two ways to use this app: with TMS or with nerve stimulation.
+			"PythonApp:Stimulator	int		StimulatorType= 0 0 0 1 // Stimulator type: 0 Magstim, 1 analog (enumeration)",
+			"PythonApp:Stimulator	int		TriggerType= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
+			"PythonApp:Stimulator	int 	ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
+			
+			#Some parameters are Magstim specific
+			"PythonApp:Magstim		string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
+			
+			#"PythonApp:ERP	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
+			"PythonApp:ERP	float		TriggerThreshold= 1 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
+            "PythonApp:ERP	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
 			"PythonApp:ERP	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
 			#TODO: Parameter about ERP size feedback
 			
 			"PythonApp:Screen   int    ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Screen   float  WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
 			
-			#"PythonApp:Magstim int ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
-			
-			"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 // Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)"
-			"PythonApp:Analysisdb 	int		PeriodType= 2 2 0 3 // Feedback type: 0 hr_baseline, 1 hr_cond, 2 mep_baseline, 3 mep_cond (enumeration)"
+			"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 	// Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)",
+			"PythonApp:Analysisdb 	int		PeriodType= 2 2 0 3 	// Period type: 0 hr_baseline, 1 hr_cond, 2 mep_baseline, 3 mep_cond (enumeration)",
 			
 		]
 		states = [
@@ -111,7 +113,7 @@ class BciApplication(BciGenericApplication):
 	#############################################################
 	
 	def Preflight(self, sigprops):
-		
+
 		#Not yet supported
 		if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
 		#if self.params['StimulatorType'].val==3: raise EndUserError, "Analog stimulator not yet supported"
@@ -148,19 +150,26 @@ class BciApplication(BciGenericApplication):
 		else:
 			raise EndUserError, "Must supply ContingentChannel"
 
-		#Check that the range makes sense.
+		#Check that the amplitude range makes sense.
 		amprange=self.params['AmplitudeRange'].val
 		if len(amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
 		if amprange[0]>amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
 		self.amprange=np.asarray(amprange,dtype='float64')
 		
+		#Check that the baseline range makes sense.
+		baseline_range=self.params['BaselineRange'].val
+		if len(baseline_range)!=2: raise EndUserError, "BaselineRange must have 2 values"
+		if baseline_range[0]>baseline_range[1]: raise EndUserError, "BaselineRange must be in increasing order"
+		self.baseline_range=np.asarray(baseline_range,dtype='float64')
+		self.baseline_trials=self.params['BaselineTrials'].val		
+		
 		#############
 		# ERP CHECK #
 		#############
-        #TODO: Figure out trigger channel from new paramter.
-		#If there is a trigger channel, make sure it makes sense.
 		self.trigchan=None
-		tch = self.params['TriggerInputChan'].val
+		#tch = self.params['TriggerInputChan'].val
+		self.usingAnalog = self.params['StimulatorType'].val==1
+		tch = ['NerveTrig'] if self.usingAnalog else ['TMSTrig']
 		if len(tch) != 0:
 			if False in [isinstance(x, int) for x in tch]:
 				nf = filter(lambda x: not str(x) in chn, tch)
@@ -172,9 +181,12 @@ class BciApplication(BciGenericApplication):
 				self.trigchan = [x-1 for x in tch]
 		trigthresh=self.params['TriggerThreshold'].val
 		if bool(len(tch)) != bool(trigthresh): raise EndUserError, "TriggerChannel and TriggerThreshold must both be defined or both be undefined"
+		self.tch=tch #This is used for storing the channel labels.
 		self.trigthresh=trigthresh
 		#Check the ERP channel.
 		erpch = self.params['ERPChan'].val
+		erpch = [ec + "_RAW" for ec in erpch]
+		#Append _RAW to each erpchan
 		if len(erpch) != 0:
 			if False in [isinstance(x, int) for x in erpch]:
 				nf = filter(lambda x: not str(x) in chn, erpch)
@@ -186,6 +198,7 @@ class BciApplication(BciGenericApplication):
 				self.erpchan = [x-1 for x in erpch]
 		else:
 			raise EndUserError, "Must supply ERPChan"
+			
 		#Check the ERP window.
 		erpwin = self.params['ERPWindow'].val
 		if len(erpwin)!=2: raise EndUserError, "ERPWindow must have 2 values"
@@ -199,11 +212,24 @@ class BciApplication(BciGenericApplication):
 		subj_type_name={0:'BCPy_healthy', 1:'BCPy_stroke', 2:'E3rat_emg_eeg'}.get(int(self.params['SubjectType']))
 		my_subj_type=get_or_create(Subject_type, Name=subj_type_name)
 		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		
+		#Make sure the period_type matches the stimulator type.
 		period_type_name={0:'hr_baseline', 1:'hr_cond', 2:'mep_baseline', 3:'mep_cond'}.get(int(self.params['PeriodType']))
+		if period_type_name[:2]=='hr' and not self.usingAnalog: raise EndUserError, "HR period types require analog stimulator"
+		if period_type_name[:3]=='mep' and self.usingAnalog: raise EndUserError, "MEP period types require Magstim stimulator"
+		
 		my_period_type=get_or_create(Datum_type, Name=period_type_name)
-		self.period = self.subject.get_now_period_of_type(my_period_type)
-		if len(self.period) != 1:
-			raise EndUserError, "No current period defined for this subject. Check the eerat-online GUI"
+		self.period = self.subject.get_now_period_of_type(my_period_type)		
+		if not self.period: raise EndUserError, "No current period defined for this subject. Check the eerat-online GUI"
+		
+		####################
+		# STIMULATOR CHECK #
+		####################
+		#TODO: Make sure we are not using a serial trigger with analog stimulator
+		if int(self.params['TriggerType'])==2 and self.usingAnalog:
+			raise EndUserError, "Serial Trigger only supported with Magstim Stimulator."
+		if int(self.params['TriggerType'])==1:
+			raise EndUserError, "Audio Trigger not yet supported."
 		
 	#############################################################
 	
@@ -213,7 +239,7 @@ class BciApplication(BciGenericApplication):
 		# GET MVIC #
 		############
 		#This is a little slow because it loads a full BCI2000.dat file
-		self.mvic = self.subject._get_last_mvic()
+		self.mvic = self.subject._get_last_mvic()#Assumes last_mvic file is for the same muscle as current.
 		#Calculate the erp detection limit now so we don't have to calculate it during data acquisition
 		self.period._get_detection_limit()
 		
@@ -253,14 +279,34 @@ class BciApplication(BciGenericApplication):
 		self.drand=int(ceil(self.params['DurationRand'].val * self.eegfs / spb)) #Convert DurationRand to blocks
 		self.enterok=False #Init to False
 		
-        #TODO: Figure out stimulator from new paramter.
+		#Setup the stimulus intensities for the first baseline trials
+		#self.baseline_range#self.baseline_trials
+		start = self.baseline_range[0]
+		stop = self.baseline_range[1]
+		n_start = self.baseline_trials
+		self.starting_intensities = r_[start:stop:n_start+0j].round().astype(np.integer)
+		np.random.shuffle(self.starting_intensities)		
+				
 		##############
 		# Stimulator #
 		##############
-		trigType={0:'caio', 1:'audio', 2:'serial'}.get(int(self.params['StimSend']))
-		serPort=self.params['SerialPort'].val
-		stimClass={0:MagstimInterface.Magstim, 1:MagstimInterface.Bistim, 2:MagstimInterface.Rapid2}.get(int(self.params['StimulatorType']))
-		self.stimulator=stimClass(port=serPort, triggerType=trigType)
+		if int(self.params['TriggerType'])==0:
+			from Caio.TriggerBox import TTL
+			trigbox=TTL()
+		else: trigbox=None			
+		if self.usingAnalog:
+			#It would probably be better to make a DS5 class where I can control
+			#the output range but I'm too lazy.
+			from python_apps.online_analysis.VirtualStimulatorInterface import Virtual
+			trigbox.set_TTL(width=5, channel=2)#Use a shorter TTL width, since the TTL drives the stimulator.
+			self.stimulator=Virtual(trigbox=trigbox)
+			self.intensity_detail_name = 'dat_Nerve_stim_output'
+		else:
+			from Magstim.MagstimInterface import Magstim
+			serPort=self.params['SerialPort'].val
+			self.stimulator=Magstim(port=serPort, trigbox=trigbox)
+			self.intensity_detail_name = 'dat_TMS_powerA'
+		#Then we can use self.stimulator.trigger()
 		
 		##################
 		# Buffer the ERP #
@@ -268,13 +314,12 @@ class BciApplication(BciGenericApplication):
 		self.post_stim_samples = SigTools.msec2samples(self.erpwin[1], self.eegfs)
 		self.pre_stim_samples = SigTools.msec2samples(np.abs(self.erpwin[0]), self.eegfs)
 		#Initialize the ring buffer. It will be passed the raw data (relabeled as EDC) and the erp.
-		self.dbstop()
 		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), 2, leaky=True)
 
 		######################
 		# ANALYSIS INTERFACE #
 		######################
-		#self.ana_subject and (the not used?) self.ana_period are initialized in PreFlight
+		#self.ana_subject and self.ana_period are initialized in PreFlight
 			
 		################################
 		# State monitors for debugging #
@@ -315,12 +360,31 @@ class BciApplication(BciGenericApplication):
 	def StartRun(self):
 		#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
 		self.forget('stim_trig')
-		#Set the randomized duration for the first trial
-		self.mindur=self.dmin + randint(-1*self.drand,self.drand)
-		self.trailingsample = None
-		self.triggered = False #Used to make sure we only process the trigger input when it is relevant to do so.
+		self.trailingsample = None#Used for trigger monitoring
+		#The following should be done during the 'intertrial' transition,
+		#but it appears the transition is not called for the first run.
+		self.setup_trial()
 		
 	#############################################################
+	
+	def setup_trial(self):
+		#Called from StartRun and the transition to intertrial
+		
+		#randomized EMG contingency duration
+		self.mindur=self.dmin + randint(-1*self.drand,self.drand)
+		self.triggered = False #each new trial has not yet been triggered.
+		
+		#TODO: Set the trial's stim intensity
+		trial_ix = self.states['CurrentTrial']
+		if trial_ix <= self.baseline_trials:
+			self.stimulator.intensity = self.starting_intensities[trial_ix-1]
+		else:
+			#TODO: Determine whether this is a threshold or halfmax trial
+			#TODO: Request the estimate of (threshold | halfmax) from the API
+			#TODO: Make this request asynchronous
+			#TODO: this_intensity = estimated intensity
+			pass
+		#TODO: Set the stimulator's intensity
 	
 	def Phases(self):
 		# define phase machine using calls to self.phase and self.design
@@ -350,20 +414,21 @@ class BciApplication(BciGenericApplication):
 			self.states['SignalCriteriaMetBlocks']=0#Reset the number of blocks
 			self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
 		elif phase == 'intertrial':
+			self.setup_trial()
 			#Set self.minduration from DurationMin and DurationRand
-			self.mindur=self.dmin + randint(-1*self.drand,self.drand)
-			self.triggered = False
+			
 		elif phase == 'outrange':
 			self.stimuli['target_box'].color = [1, 0, 0]
 			self.states['SignalEnterMet'] = False
 		elif phase == 'inrange':
 			self.stimuli['target_box'].color = [0, 1, 0]
-			self.enterok = True #TODO: Check entry direction condition.
+			#TODO: Check entry direction condition.
+			self.enterok = True
 			self.states['SignalEnterMet'] = self.enterok
 		elif phase == 'feedback':
 			pass
-			#TODO: Try to get information from the ORM about the trial
-			#It might be too early to do it at the transition.
+			#TODO: Try to get information about the response size and reward
+			#It might be too early to do it at the transition. Might have to do it in Process
 		
 		
 	#############################################################
@@ -402,8 +467,7 @@ class BciApplication(BciGenericApplication):
 		# Do this every block, no matter what. #
 		########################################
 		#self.leaky_trap.process(sig[self.erpchan,:])
-		self.dbstop()#Figure out what channels to pass
-		self.leaky_trap.process(sig[1,:]) #Debug trigger timing
+		self.leaky_trap.process(sig[np.hstack((self.trigchan,self.erpchan)),:]) #Debug trigger timing
 		
 		##############################################
 		# Manually change out of inrange or outrange #
@@ -469,18 +533,19 @@ class BciApplication(BciGenericApplication):
 				    , IsGood=1\
 				    , Number=0)
 				
-				self.dbstop()#where do we  get x_vec and data from?
-				#TODO: Set the stimulus intensity.
-				my_trial.store={\
-				    'x_vec':numpy.arange(-500,500, dtype=float)\
-				    , 'data':numpy.array(100*numpy.random.ranf((2,1000)), dtype=float)\
-				    , 'channel_labels':'Trig, EDC'}
+				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.stim_intensity)
+				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
+				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': self.tch[0] + ', ' + self.params['ERPChan'][0]}
 		
 		##############################
 		# Response from ERP analysis #
 		##############################
 		elif self.in_phase('feedback'):
 			#TODO: Try to get information from the analysis layer like next stimulus intensity.
+			#It might be too soon.
+			self.dbstop()
+			#self.period.model_erp(type="halfmax")
+			#self.period.model_erp(type="threshold")
 			pass
 			
 	#############################################################

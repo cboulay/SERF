@@ -14,7 +14,7 @@ INSERT INTO datum (subject_id, datum_type_id, StartTime, EndTime, span_type)
 	SELECT subject.subject_id, datum_type.datum_type_id, NOW(), NOW()+INTERVAL 1 MONTH, 3
 	FROM subject, datum_type
 	WHERE subject.Name LIKE "CHAD_TEST"
-	AND datum_type.Name LIKE "hr_baseline";
+	AND datum_type.Name IN ("hr_baseline","mep_baseline");
 
 -- check that the period has the appropriate detail values (i.e. defaults)
 -- SELECT * FROM eerat.datum_detail_value;

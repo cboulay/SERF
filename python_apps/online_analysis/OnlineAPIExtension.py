@@ -65,11 +65,6 @@ class Subject:
 		self.last_mvic = period._get_mvic()
 		return self.last_mvic
 	
-	def _get_last_sic(self):
-		period = self._get_most_recent_period()
-		self.last_sic = period._get_sic()
-		return self.last_sic
-	
 class Datum:
 	__metaclass__=ExtendInplace
 	
@@ -102,6 +97,7 @@ class Datum:
 	#get detail values from all child trials.
 	def _get_child_details(self, detail_name):
 		#e.g., 'dat_Nerve_stim_output'
+		#TODO: Should not include trials without a store.
 		if self.span_type=='period':
 			session = Session.object_session(self)
 			details = session.query(Datum_detail_value.Value).filter(\
@@ -146,17 +142,17 @@ class Datum:
 			
 			#Figure out how many samples per calculation
 			fs=bci_stream.samplingfreq_hz
-			n_samps=ceil(fs*(x_stop-x_start)/1000)
+			n_samps=np.ceil(fs*(x_stop-x_start)/1000)
 			
 			#Divide our sig into equal blocks of n_samps
-			cut_samps=int(-shape(sig)[1] % n_samps)
+			cut_samps=int(-1*np.shape(sig)[1] % n_samps)
 			if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
 			sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
 			sig=np.abs(sig)
 			vals=np.asarray(np.average(sig,axis=1))
 			vals.sort(axis=0)
 			n_vals=vals.shape[0]
-			self.erp_detection_limit=vals[ceil(n_vals*0.975),0]
+			self.erp_detection_limit=vals[np.ceil(n_vals*0.975),0]
 			return self.erp_detection_limit
 			
 	def _get_mvic(self):
@@ -220,47 +216,23 @@ class Datum:
 				, 'data':running_sum/n_trials\
 				, 'channel_labels':last_trial.store['channel_labels']}
 		
-	def model_mep_halfmax(self):
+	def model_erp(self,model_type='halfmax'):
 		if self.span_type=='period':
+			if 'hr' in self.type_name:
+				stim_det_name='dat_Nerve_stim_output'
+				erp_name='HR_aaa'
+			elif 'mep' in self.type_name:
+				stim_det_name='dat_TMS_powerA'
+				erp_name='MEP_aaa'
 			#get xy_array as dat_TMS_powerA, MEP_aaa
-			x=self._get_child_details('dat_TMS_powerA')
+			x=self._get_child_details(stim_det_name)
 			x=x.astype(np.float)
-			y=self._get_child_features('MEP_aaa')
+			y=self._get_child_features(erp_name)
+			if model_type=='threshold':
+				y=y>self.erp_detection_limit
 			#Should data be scaled/standardized?
-			popt,perr=_model_sigmoid(x,y)
-			return popt[0],perr[0]
-			
-	def model_mep_thresh(self):
-		if self.span_type=='period':
-			x=self._get_child_details('dat_TMS_powerA')
-			x=x.astype(np.float)
-			y=self._get_child_features('MEP_aaa')
-			y = y>self.erp_detection_limit
-			#Should data be scaled/standardized?
-			popt,perr=_model_sigmoid(x,y)
-			return popt[0],perr[0]
-		
-	def model_hr_halfmax(self):
-		if self.span_type=='period':
-			#get xy_array as dat_Nerve_stim_output, HR_aaa
-			x=self._get_child_details('dat_Nerve_stim_output')
-			x=x.astype(np.float)
-			y=self._get_child_features('HR_aaa')
-			y_max_ix = y.argmax()#Limit x to x<x_at_y_max
-			x_bool=x<=x[y_max_ix]
-			#Should data be scaled/standardized?
-			popt,perr=_model_sigmoid(x[x_bool],y[x_bool])
-			return popt[0],perr[0]
-			
-	def model_hr_thresh(self):
-		if self.span_type=='period':
-			x=self._get_child_details('dat_Nerve_stim_output')
-			x=x.astype(np.float)
-			y=self._get_child_features('HR_aaa')
-			y_max_ix = y.argmax()#Limit x to x<x_at_y_max
-			x_bool=x<=x[y_max_ix]
-			x=x[x_bool]
-			y = y[x_bool]>self.erp_detection_limit
-			#Should data be scaled/standardized?
-			popt,perr=_model_sigmoid(x,y)
-			return popt[0],perr[0]
+			n_trials = x.shape[0]
+			if n_trials>4:
+				popt,perr=_model_sigmoid(x,y)
+				return popt[0],perr[0]
+			else: return None,None
