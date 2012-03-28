@@ -10,11 +10,8 @@ from sqlalchemy import desc
 import BCPy2000.BCI2000Tools.FileReader as FileReader
 
 #sigmoid function used for fitting response data
-def my_sigmoid(x, x0, k, a, c):
-#check scipy.optimize.leastsq or scipy.optimize.curve_fit
-	#x0 = half-max, k = slope, a = max, c = min
-	y = a / (1 + np.exp(-k*(x-x0))) + c
-	return y
+def my_sigmoid(x, x0, k, a, c): return a / (1 + np.exp(-k*(x-x0))) + c
+#x0 = half-max, k = slope, a = max, c = min
 
 #I'm not actually using this.
 def my_inv_sigmoid(y,x0,k,a,c):
@@ -27,10 +24,18 @@ def _model_sigmoid(x,y):
 	n_trials = x.shape[0]
 	if n_trials>4:
 		p0=(np.median(x),0.1,np.max(y)-np.min(y),np.min(y)) #x0, k, a, c
-		popt, pcov = curve_fit(my_sigmoid, x, y, p0=p0)
+		try: popt, pcov = curve_fit(my_sigmoid, x, y, p0=p0)
+		except RuntimeError:
+			print("Error - curve_fit failed")
+			popt=np.empty((4,))
+			popt.fill(np.NAN)
+			pcov = np.Inf #So the err is set to nan
 		#popt = x0, k, a, c
 		#diagonal pcov is variance of parameter estimates.
-		perr = np.sqrt(pcov.diagonal())
+		if np.isinf(pcov).all():
+			perr=np.empty((4,))
+			perr.fill(np.NAN)
+		else: perr = np.sqrt(pcov.diagonal())
 		return popt,perr
 	
 def get_obj(name):return eval(name)
@@ -92,7 +97,7 @@ class Datum:
 				, Datum_feature_value.Value != None)\
 				.order_by(Datum.Number)\
 				.all()
-			return np.asarray(features).astype(np.float)
+			return np.squeeze(np.asarray(features).astype(np.float))
 			
 	#get detail values from all child trials.
 	def _get_child_details(self, detail_name):
@@ -113,7 +118,7 @@ class Datum:
 				, Datum_detail_value.Value != None)\
 				.order_by(Datum.Number)\
 				.all()
-			return np.asarray(details)
+			return np.squeeze(np.asarray(details))
 		
 	#Get the statistical detection limit for MEP, M-wave (not used?), H-reflex
 	def _get_detection_limit(self):
@@ -230,6 +235,7 @@ class Datum:
 			y=self._get_child_features(erp_name)
 			if model_type=='threshold':
 				y=y>self.erp_detection_limit
+				y=y.astype(int)
 			#Should data be scaled/standardized?
 			n_trials = x.shape[0]
 			if n_trials>4:

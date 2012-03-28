@@ -24,7 +24,7 @@
 # a trigger is sent out through a stimulator. The evoked response
 # is trapped and passed off to an external application.
 import numpy as np
-from random import randint
+from random import randint, uniform
 from math import ceil
 import VisionEgg
 import SigTools
@@ -80,7 +80,7 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Magstim		string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
 			
 			#"PythonApp:ERP	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
-			"PythonApp:ERP	float		TriggerThreshold= 1 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
+			"PythonApp:ERP	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
             "PythonApp:ERP	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
 			"PythonApp:ERP	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
 			#TODO: Parameter about ERP size feedback
@@ -103,6 +103,8 @@ class BciApplication(BciGenericApplication):
 			"SignalEnterMet 1 0 0 0",
 			"SignalCriteriaMetBlocks 16 0 0 0", #in blocks, 16-bit is max 65536
 			"ISIExceeded 1 0 0 0",
+			"StimulatorReady 1 0 0 0", #Whether or not the stimulator returns ready
+			#TODO: "StimulatorIntensity 16 0 0 0", #So it is saved off-line analysis
 			#"Trigger 1 0 0 0",
 			"Response 1 0 0 0",
 			"Feedback 1 0 0 0",
@@ -118,6 +120,8 @@ class BciApplication(BciGenericApplication):
 		if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
 		#if self.params['StimulatorType'].val==3: raise EndUserError, "Analog stimulator not yet supported"
 		#if self.params['PeriodType'].val in [0,1]: raise EndUserError, "Analog stimulator not yet supported"
+		
+		#TODO: TrialsPerBlock -> Inf
 		
 		##############################################
 		# http://visionegg.org/manual/visionegg.html #
@@ -278,13 +282,14 @@ class BciApplication(BciGenericApplication):
 		self.dmin=int(ceil(self.params['DurationMin'].val * self.eegfs / spb)) #Convert DurationMin to blocks		
 		self.drand=int(ceil(self.params['DurationRand'].val * self.eegfs / spb)) #Convert DurationRand to blocks
 		self.enterok=False #Init to False
+		self.block_dur= 1000*spb/self.eegfs#duration (ms) of a sample block
 		
 		#Setup the stimulus intensities for the first baseline trials
 		#self.baseline_range#self.baseline_trials
 		start = self.baseline_range[0]
 		stop = self.baseline_range[1]
 		n_start = self.baseline_trials
-		self.starting_intensities = r_[start:stop:n_start+0j].round().astype(np.integer)
+		self.starting_intensities = np.r_[start:stop:n_start+0j]
 		np.random.shuffle(self.starting_intensities)		
 				
 		##############
@@ -292,13 +297,12 @@ class BciApplication(BciGenericApplication):
 		##############
 		if int(self.params['TriggerType'])==0:
 			from Caio.TriggerBox import TTL
-			trigbox=TTL()
+			trigbox=TTL()#Initializing this trigbox also sends out a 0V TTL on channel1
 		else: trigbox=None			
 		if self.usingAnalog:
-			#It would probably be better to make a DS5 class where I can control
-			#the output range but I'm too lazy.
 			from python_apps.online_analysis.VirtualStimulatorInterface import Virtual
-			trigbox.set_TTL(width=5, channel=2)#Use a shorter TTL width, since the TTL drives the stimulator.
+			trigbox._caio.fs=10000
+			trigbox.set_TTL(width=1, channel=2)#Use a shorter TTL width, since the TTL drives the stimulator.
 			self.stimulator=Virtual(trigbox=trigbox)
 			self.intensity_detail_name = 'dat_Nerve_stim_output'
 		else:
@@ -361,30 +365,10 @@ class BciApplication(BciGenericApplication):
 		#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
 		self.forget('stim_trig')
 		self.trailingsample = None#Used for trigger monitoring
-		#The following should be done during the 'intertrial' transition,
-		#but it appears the transition is not called for the first run.
-		self.setup_trial()
-		
-	#############################################################
-	
-	def setup_trial(self):
-		#Called from StartRun and the transition to intertrial
-		
-		#randomized EMG contingency duration
-		self.mindur=self.dmin + randint(-1*self.drand,self.drand)
+		self.erp_parms = {"halfmax": {"est":np.nan, "err": np.nan}, "threshold": {"est":np.nan, "err": np.nan}}
 		self.triggered = False #each new trial has not yet been triggered.
 		
-		#TODO: Set the trial's stim intensity
-		trial_ix = self.states['CurrentTrial']
-		if trial_ix <= self.baseline_trials:
-			self.stimulator.intensity = self.starting_intensities[trial_ix-1]
-		else:
-			#TODO: Determine whether this is a threshold or halfmax trial
-			#TODO: Request the estimate of (threshold | halfmax) from the API
-			#TODO: Make this request asynchronous
-			#TODO: this_intensity = estimated intensity
-			pass
-		#TODO: Set the stimulator's intensity
+	#############################################################
 	
 	def Phases(self):
 		# define phase machine using calls to self.phase and self.design
@@ -392,7 +376,10 @@ class BciApplication(BciGenericApplication):
 		self.phase(name='outrange', next='inrange', duration=None)
 		self.phase(name='inrange', next='response', duration=None)
 		#self.phase(name='trigger', next='response', duration=1)#This will lead to multiple transitions per packet... but that's OK!
-		self.phase(name='response', next='feedback', duration=self.params['ERPWindow'].val[1]+1) #Includes trigger onset. Must be >=1
+		
+		self.phase(name='response', next='feedback'\
+				, duration=self.params['ERPWindow'].val[1]+(2*self.block_dur)+1)
+				#Includes trigger onset. Extra 2 blocks to make sure the response has been captured.
 		self.phase(name='feedback', next='intertrial', duration=1000)#TODO Replace this duration with some parameter
 		self.design(start='intertrial', new_trial='intertrial')
 		#Note that only Process can change phase from outrange, from inrange, and therefore into response
@@ -413,10 +400,6 @@ class BciApplication(BciGenericApplication):
 			self.remember('stim_trig')
 			self.states['SignalCriteriaMetBlocks']=0#Reset the number of blocks
 			self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
-		elif phase == 'intertrial':
-			self.setup_trial()
-			#Set self.minduration from DurationMin and DurationRand
-			
 		elif phase == 'outrange':
 			self.stimuli['target_box'].color = [1, 0, 0]
 			self.states['SignalEnterMet'] = False
@@ -425,12 +408,47 @@ class BciApplication(BciGenericApplication):
 			#TODO: Check entry direction condition.
 			self.enterok = True
 			self.states['SignalEnterMet'] = self.enterok
+			
+		elif phase == 'intertrial':
+			self.mindur=self.dmin + randint(-1*self.drand,self.drand)#randomized EMG contingency duration
+			self.triggered = False #each new trial has not yet been triggered.
+			
+			#Set this trial's stim intensity
+			trial_ix = self.states['CurrentTrial']
+			if trial_ix <= self.baseline_trials:
+				stimi = self.starting_intensities[trial_ix-1]
+			else:
+				#Determine whether this is a threshold (default) or halfmax trial
+				_th=self.erp_parms['threshold']
+				_hm=self.erp_parms['halfmax']
+				if np.isnan(_th['err']) or _th['err']>=(0.05*_th['est']):
+					model_type="threshold"
+				elif np.isnan(_hm['err']) or _hm['err']>=(0.05*_hm['est']):
+					model_type="halfmax"
+				else:
+					self.states['CurrentTrial']=999
+				stimi = self.erp_parms[model_type]['est']
+				if (not stimi) or np.isnan(stimi):#In case NaN or None
+					#Choose a random intensity in baseline_range
+					stimi=uniform(self.baseline_range[0],self.baseline_range[1])
+			stimi=min(self.baseline_range[1],stimi)#stimi should not exceed the max range
+			self.stimulator.stim_intensity = stimi if self.usingAnalog else int(round(stimi))
+			
 		elif phase == 'feedback':
-			pass
-			#TODO: Try to get information about the response size and reward
-			#It might be too early to do it at the transition. Might have to do it in Process
-		
-		
+			#This should begin about 2 blocks after the response window is over.
+			#Hopefully Process has detected the trigger and stored the data by now.
+			
+			#TODO: If rewarding, reward
+			
+			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
+			#TODO: I don't need the stimi and stimerr until the next trial begins. 
+			#Can these requests be made asynchronous?
+			for model_type in ['threshold','halfmax']:
+				stimi, stimerr=self.period.model_erp(model_type=model_type)
+				self.erp_parms[model_type]['est']=stimi
+				self.erp_parms[model_type]['err']=stimerr
+				print "%(model_type)s : %(stimi)s" % {"model_type":model_type, "stimi":str(stimi)}
+					
 	#############################################################
 	
 	def Process(self, sig):
@@ -462,6 +480,12 @@ class BciApplication(BciGenericApplication):
 		isiok = self.since('stim_trig')['msec'] >= 1000 * self.ISIMin
 		self.states['ISIExceeded'] = isiok #update state
 		
+		####################################
+		# Update the StimulatorReady state #
+		####################################
+		stim_ready = True if not self.params['ReqStimReady'].val else self.stimulator.stim_ready
+		self.states['StimulatorReady'] = stim_ready
+		
 		########################################
 		# Write the ERP data to our leaky trap #
 		# Do this every block, no matter what. #
@@ -477,7 +501,7 @@ class BciApplication(BciGenericApplication):
 		if phase_inrange or phase_outrange:
 			if now_in_range:
 				if phase_inrange:#phase was correct
-					if self.enterok and isiok and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
+					if self.enterok and isiok and stim_ready and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
 						self.change_phase('response')
 				else:#phase was wrong
 					self.change_phase('inrange')					
@@ -486,13 +510,15 @@ class BciApplication(BciGenericApplication):
 					self.change_phase('outrange')
 		
 		####################
-		# Find the Trigger #
+		# Trigger Response #
 		####################
-		#Only bother wasting CPU cycles if we have sent a trigger
-		if self.triggered:
+		if self.triggered:#Only bother wasting CPU cycles if we have sent a trigger
 			startx = None
-			# Hardware trigger:
-			if self.trigchan:
+			
+			#
+			# Find the Trigger #
+			####################
+			if self.trigchan:# Hardware trigger:
 				tr = np.asarray(sig[self.trigchan, :]).ravel() #flatten the trigger channel(s).
 				prev = self.trailingsample #The last sample from the previous packet
 				if prev == None: prev = [self.trigthresh - 1.0] #If we don't have a last sample, assume it was less than the threshold
@@ -502,13 +528,12 @@ class BciApplication(BciGenericApplication):
 				tr = np.argwhere(np.diff(tr) > 0)  #find any indices where the trigger crossed threshold
 				if len(tr):
 					startx = tr[0,0] #n_samples when the trigger first crossed threshold
-			# Software trigger:
-			elif self.changed('Response', 1):
+			elif self.changed('Response', 1):# Software trigger:
 				#Trigger onset was when we changed phase to Response
 				startx = self.detect_event() if self.detect_event() else self.nominal.SamplesPerPacket
 				#I still have quite a bit of jitter in the software trigger. 
 				
-			###################################################
+			#
 			# Forget any ERP before startx + pre_stim_samples #
 			###################################################
 			if startx:
@@ -517,7 +542,7 @@ class BciApplication(BciGenericApplication):
 				samps_to_forget = samps_in_trap - ( samps_this_packet + (self.pre_stim_samples - startx)) - 1
 				self.leaky_trap.ring.forget(samps_to_forget)
 				
-			###################
+			#
 			# Extract the ERP #
 			###################
 			n_erp_samples=self.pre_stim_samples + self.post_stim_samples
@@ -535,18 +560,16 @@ class BciApplication(BciGenericApplication):
 				
 				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.stim_intensity)
 				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
+				#The fature calculation should be asynchronous.
 				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': self.tch[0] + ', ' + self.params['ERPChan'][0]}
 		
 		##############################
 		# Response from ERP analysis #
 		##############################
 		elif self.in_phase('feedback'):
-			#TODO: Try to get information from the analysis layer like next stimulus intensity.
-			#It might be too soon.
-			self.dbstop()
-			#self.period.model_erp(type="halfmax")
-			#self.period.model_erp(type="threshold")
-			pass
+			#TODO: If providing feedback, get feedback value
+			#TODO: If providing feedback, update feedback display
+			pass			
 			
 	#############################################################
 	
