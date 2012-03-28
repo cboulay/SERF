@@ -18,16 +18,24 @@ class Virtual(object):
             stim_instance.stim_ready = True
                 Always true since there is no way to know if it is not ready.
         """
-        self.stim_ready = True
-        
+        self.V2mA = 5 #10V:50mA
         if not trigbox:
             from Caio import TriggerBox
             trigbox = TriggerBox.TTL()
         self.trigbox = trigbox
         
-    def get_stimi(self): return self.trigbox.amplitude
-    def set_stimi(self, value): self.trigbox.amplitude=value
-    stim_intensity = property(get_stimi, set_stimi)
+    def _get_stimi(self):
+        return self.trigbox.amplitude * self.V2mA
+    def _set_stimi(self, mamps):
+        #Since I am detecting triggers on the trigger channel
+        #There must be a minimum stimulus, which I set to 0.5mA or about 50mV on the output.
+        mamps = max([mamps,0.5])
+        self.trigbox.amplitude=mamps / self.V2mA
+    stim_intensity = property(_get_stimi, _set_stimi)
+    
+    def _get_stim_ready(self): return True
+    def _set_stim_ready(self): pass #Always True
+    stim_ready = property(_get_stim_ready, _set_stim_ready)
     
     def trigger(self):
         self.trigbox.trigger()

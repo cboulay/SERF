@@ -123,6 +123,7 @@ class Datum(Base):
 		self.erp=dict_in['data'].tostring() #always float?
 		#self.erp=numpy.getbuffer(dict_in['data'])
 		self.channel_labels=dict_in['channel_labels'].strip().replace(' ','')
+		#TODO: Feature calculation should be asynchronous
 		self.calculate_all_features()
 	store = property(_get_store, _set_store)
 	
