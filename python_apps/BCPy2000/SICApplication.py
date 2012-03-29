@@ -35,8 +35,8 @@ from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
 import BCPy2000.BCI2000Tools.FileReader as FileReader
-from python_api.Eerat_sqlalchemy import Subject_type, get_or_create
-from python_apps.online_analysis.OnlineAPIExtension import Subject, Datum
+from EeratAPI.API import Subject_type, get_or_create
+from EeratAPI.OnlineAPIExtension import Subject, Datum
 
 class BciApplication(BciGenericApplication):
 	

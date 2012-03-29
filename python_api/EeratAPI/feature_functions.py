@@ -5,7 +5,7 @@ def get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label):
 	x_vec=datum.store['x_vec']
 	y_mat=datum.store['data']
 	x_bool=np.logical_and(x_vec>=x_start,x_vec<=x_stop)
-	chan_list=datum.store['channel_labels'].split(',')
+	chan_list=datum.store['channel_labels']
 	chan_bool=np.asarray([cl==chan_label for cl in chan_list])
 	sub_mat=y_mat[chan_bool,x_bool]
 	sub_mat=np.abs(sub_mat)

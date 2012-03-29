@@ -32,8 +32,8 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-from python_api.Eerat_sqlalchemy import Subject_type, Datum_type, get_or_create
-from python_apps.online_analysis.OnlineAPIExtension import Subject, Datum
+from EeratAPI.API import Subject_type, Datum_type, get_or_create
+from EeratAPI.OnlineAPIExtension import Subject, Datum
 
 class BciApplication(BciGenericApplication):
 	
@@ -300,7 +300,7 @@ class BciApplication(BciGenericApplication):
 			trigbox=TTL()#Initializing this trigbox also sends out a 0V TTL on channel1
 		else: trigbox=None			
 		if self.usingAnalog:
-			from python_apps.online_analysis.VirtualStimulatorInterface import Virtual
+			from Caio.VirtualStimulatorInterface import Virtual
 			trigbox._caio.fs=10000
 			trigbox.set_TTL(width=1, channel=2)#Use a shorter TTL width, since the TTL drives the stimulator.
 			self.stimulator=Virtual(trigbox=trigbox)
@@ -441,10 +441,12 @@ class BciApplication(BciGenericApplication):
 			#TODO: If rewarding, reward
 			
 			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
-			#TODO: I don't need the stimi and stimerr until the next trial begins. 
-			#Can these requests be made asynchronous?
+			#TODO: I don't need the stimi and stimerr until the next trial begins, 
+			#can these requests be made asynchronous?
 			for model_type in ['threshold','halfmax']:
-				stimi, stimerr=self.period.model_erp(model_type=model_type)
+				popt, perr=self.period.model_erp(model_type=model_type)
+				stimi = popt[0]
+				stimerr = perr[0]
 				self.erp_parms[model_type]['est']=stimi
 				self.erp_parms[model_type]['err']=stimerr
 				print "%(model_type)s : %(stimi)s" % {"model_type":model_type, "stimi":str(stimi)}

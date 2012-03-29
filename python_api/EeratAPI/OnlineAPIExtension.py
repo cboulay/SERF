@@ -4,13 +4,13 @@
 import numpy as np
 import time, os, datetime
 from scipy.optimize import curve_fit
-from python_api.Eerat_sqlalchemy import System, Subject, Datum, Detail_type, Datum_detail_value, Feature_type, Datum_feature_value, get_or_create
+from EeratAPI.API import *
 from sqlalchemy.orm import Session, query
 from sqlalchemy import desc
 import BCPy2000.BCI2000Tools.FileReader as FileReader
 
 #sigmoid function used for fitting response data
-def my_sigmoid(x, x0, k, a, c): return a / (1 + np.exp(-k*(x-x0))) + c
+def my_sigmoid(x, x0, k, a, c): return a / (1 + np.exp(-1*k*(x-x0))) + c
 #x0 = half-max, k = slope, a = max, c = min
 
 #I'm not actually using this.
@@ -19,7 +19,7 @@ def my_inv_sigmoid(y,x0,k,a,c):
 	return x
 	
 #Calculate and return _halfmax and _halfmax err
-def _model_sigmoid(x,y):
+def model_sigmoid(x,y):
 	#Fit a sigmoid to those values for trials in this period.
 	n_trials = x.shape[0]
 	if n_trials>4:
@@ -219,7 +219,7 @@ class Datum:
 			self.store={\
 				'x_vec':last_trial.store['x_vec']\
 				, 'data':running_sum/n_trials\
-				, 'channel_labels':last_trial.store['channel_labels']}
+				, 'channel_labels':last_trial.channel_labels}
 		
 	def model_erp(self,model_type='halfmax'):
 		if self.span_type=='period':
@@ -239,6 +239,5 @@ class Datum:
 			#Should data be scaled/standardized?
 			n_trials = x.shape[0]
 			if n_trials>4:
-				popt,perr=_model_sigmoid(x,y)
-				return popt[0],perr[0]
+				return model_sigmoid(x,y)
 			else: return None,None

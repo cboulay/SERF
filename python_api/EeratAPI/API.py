@@ -113,7 +113,8 @@ class Datum(Base):
 			temp_data=numpy.frombuffer(temp_data, dtype=float)
 			temp_data.flags.writeable=True
 			temp_data=temp_data.reshape([self.n_channels,self.n_samples])
-		return {'x_vec':temp_x, 'data':temp_data, 'channel_labels':self.channel_labels}
+		chan_labels = self.channel_labels.split(',')
+		return {'x_vec':temp_x, 'data':temp_data, 'channel_labels':chan_labels}
 			
 	def _set_store(self, dict_in):
 		#Take a dict input and set the storage item
