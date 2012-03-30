@@ -123,7 +123,9 @@ class Datum(Base):
 		self.x_vec=dict_in['x_vec'].tostring() #always float?
 		self.erp=dict_in['data'].tostring() #always float?
 		#self.erp=numpy.getbuffer(dict_in['data'])
-		self.channel_labels=dict_in['channel_labels'].strip().replace(' ','')
+		#Assume dict_in['channel_labels'] is a list, not a string.
+		temp_string=",".join(dict_in['channel_labels'])
+		self.channel_labels=temp_string.strip().replace(' ','')
 		#TODO: Feature calculation should be asynchronous
 		self.calculate_all_features()
 	store = property(_get_store, _set_store)

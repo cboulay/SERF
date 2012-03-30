@@ -210,16 +210,20 @@ class Datum:
 				Datum.IsGood==True, \
 				Datum.StartTime>=self.StartTime, \
 				Datum.EndTime<=self.EndTime):
+				
 				temp_data=np.frombuffer(ds.erp, dtype=float)
 				temp_data.flags.writeable=True
 				temp_data=temp_data.reshape([n_channels,n_samples])
 				running_sum=running_sum+temp_data
 				n_trials=n_trials+1
-				
+			avg_data = running_sum/n_trials
+			
+			last_store=last_trial.store
+			
 			self.store={\
-				'x_vec':last_trial.store['x_vec']\
-				, 'data':running_sum/n_trials\
-				, 'channel_labels':last_trial.channel_labels}
+				'x_vec':last_store['x_vec']\
+				, 'data':avg_data\
+				, 'channel_labels':last_store.channel_labels}
 		
 	def model_erp(self,model_type='halfmax'):
 		if self.span_type=='period':
