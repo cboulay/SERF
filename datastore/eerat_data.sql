@@ -112,6 +112,7 @@ DELETE FROM `datum_type`;
 INSERT IGNORE INTO `datum_type` (Name, Description) VALUES
 	('hr_baseline','Baseline H-reflex'),
 	('hr_cond','Operant conditioning H-reflex'),
+	('mep_hotspot','Find the MEP hotspot'),
 	('mep_baseline','Simple MEP'),
 	('mep_cond','Operant conditioning MEP');
 -- 3 `feature_type`
@@ -146,6 +147,10 @@ INSERT IGNORE INTO `detail_type` (Name, Description, DefaultValue) VALUES
 	('dat_TMS_powerA','Stimulator output in percent','0'),
 	('dat_TMS_powerB','Second intensity in Bistim','0'),
 	('dat_TMS_ISI','TMS ISI in ms','0'),
+	('dat_TMS_coil_x','Coil x-coordinate','0'),
+	('dat_TMS_coil_y','Coil y-coordinate','0'),
+	('dat_TMS_coil_z','Coil z-coordinate','0'),
+	('dat_TMS_coil_rot','Coil rotation','0'),
 	('dat_conditioned_feature_name','Name of feature conditioned','HR_res'),
 	('dat_conditioned_result','Whether the conditioned feature was rewarded','0');
 	-- Maybe I need to add subj_first, subj_last
@@ -168,5 +173,6 @@ INSERT IGNORE INTO `datum_type_has_detail_type` (datum_type_id, detail_type_id)
 	FROM datum_type dat JOIN detail_type det
 	WHERE	(det.Name IN ("dat_ERP_channel_label","dat_ERP_channel_id","dat_BG_start_ms","dat_BG_stop_ms","dat_BG_chan_label"))
 		OR	(dat.Name LIKE "hr_%" AND det.Name IN ("dat_MR_start_ms","dat_MR_stop_ms","dat_HR_start_ms","dat_HR_stop_ms","dat_MR_chan_label","dat_HR_chan_label","dat_Nerve_stim_output"))
-		OR	(dat.Name LIKE "mep_%" AND det.Name IN ("dat_MEP_start_ms","dat_MEP_stop_ms","dat_MEP_chan_label","dat_TMS_powerA","dat_TMS_powerB","dat_TMS_ISI","dat_MEP_chan_label"))
-		OR	(dat.Name LIKE "%_cond%" AND det.Name IN ("dat_conditioned_feature_name","dat_conditioned_result"));
+		OR	(dat.Name LIKE "mep_%" AND det.Name IN ("dat_MEP_start_ms","dat_MEP_stop_ms","dat_MEP_chan_label","dat_TMS_powerA","dat_MEP_chan_label"))
+		OR	(dat.Name LIKE "%_cond%" AND det.Name IN ("dat_conditioned_feature_name","dat_conditioned_result"))
+		OR	(dat.Name LIKE "mep_hotspot" AND det.Name IN ("dat_TMS_coil_x","dat_TMS_coil_y","dat_TMS_coil_z","dat_TMS_coil_rot"));

@@ -14,7 +14,7 @@ INSERT INTO datum (subject_id, datum_type_id, StartTime, EndTime, span_type)
 	SELECT subject.subject_id, datum_type.datum_type_id, NOW(), NOW()+INTERVAL 1 MONTH, 3
 	FROM subject, datum_type
 	WHERE subject.Name LIKE "CHAD_TEST"
-	AND datum_type.Name IN ("hr_baseline","mep_baseline");
+	AND datum_type.Name IN ("hr_baseline","mep_baseline","mep_hotspot");
 
 -- check that the period has the appropriate detail values (i.e. defaults)
 -- SELECT * FROM eerat.datum_detail_value;
@@ -35,3 +35,5 @@ INSERT INTO datum (subject_id, datum_type_id, StartTime, EndTime, span_type)
 SELECT (Value LIKE "8.9")
 	FROM datum_detail_value ddv INNER JOIN detail_type dt ON (ddv.detail_type_id = dt.detail_type_id)
 	WHERE ddv.datum_id=2 AND dt.Name LIKE "dat_HR_stop_ms";
+	
+DELETE FROM datum WHERE span_type==1;

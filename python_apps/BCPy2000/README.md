@@ -17,4 +17,10 @@ My needs for signal processing and application are not so common, so I need my o
 
 ## Application modules
 
+### MVCApplication
+
+### SICApplication
+
+### MEPHotspotApplication
+
 ### ContingentTriggerApplication
