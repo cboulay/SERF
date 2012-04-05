@@ -22,7 +22,7 @@ Or you can access the data and the add-on API functions directly from a Python c
 
 from EeratAPI.API import *
 my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
-my_subject=get_or_create(Subject, Name='CHAD_TEST', subject_type=my_subj_type, species_type='human')
+my_subject=get_or_create(Subject, Name='CBB_TEST', subject_type=my_subj_type, species_type='human')
 #Assumes data, and that last is a trial. See how to create trials further below.
 temp_store = my_subject.data[-1].store
 x=temp_store['x_vec']
@@ -41,9 +41,12 @@ Many of these are for analyzing periods and the trials within them.
 
 ```python
 
+from EeratAPI.API import *
 from EeratAPI.OnlineAPIExtension import *
-my_dat_type=get_or_create(Datum_type, Name='hr_baseline')
-now_per=my_subject.get_now_period_of_type(my_dat_type)
+my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
+my_subject=get_or_create(Subject, Name='CBB_TEST', subject_type=my_subj_type, species_type='human')
+my_dat_type=get_or_create(Datum_type, Name='mep_baseline')
+now_per = my_subject.get_most_recent_period(datum_type=my_dat_type,delay=12)
 
 ```
 
@@ -65,14 +68,18 @@ Or we can model the ERP's input-output curve for this period and get estimates o
 
 ```python
 #Possible values of model_type are 'halfmax' (default) and 'threshold' 
-parms,parms_err = now_per.model_erp(model_type='threshold')
+parms,parms_err = now_per.model_erp()
 
-x = now_per._get_child_details('dat_Nerve_stim_output')
+x = now_per._get_child_details('dat_TMS_powerA')
 x = x.astype(np.float)
-y = now_per._get_child_features('HR_aaa')
-y_est = my_sigmoid(x,*list(parms))
+y = now_per._get_child_features('MEP_aaa')
+#parms,parms_err = now_per.model_erp(model_type='threshold')
+#y=y>now_per.erp_detection_limit
+#y=y.astype(int)
+x_est = np.arange(min(x),max(x),(max(x)-min(x))/100)
+y_est = my_sigmoid(x_est,*list(parms))
 pylab.plot(x, y, 'o', label='data')
-pylab.plot(x,y_est, label='fit')
+pylab.plot(x_est,y_est, label='fit')
 legend(loc='upper left')
 ```
 

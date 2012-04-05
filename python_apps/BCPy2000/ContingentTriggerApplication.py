@@ -224,8 +224,7 @@ class BciApplication(BciGenericApplication):
 		if period_type_name[:3]=='mep' and self.usingAnalog: raise EndUserError, "MEP period types require Magstim stimulator"
 		
 		my_period_type=get_or_create(Datum_type, Name=period_type_name)
-		self.period = self.subject.get_now_period_of_type(my_period_type)		
-		if not self.period: raise EndUserError, "No current period defined for this subject. Check the eerat-online GUI"
+		self.period = self.subject._get_most_recent_period(datum_type=my_period_type,delay=12)
 		
 		####################
 		# STIMULATOR CHECK #
@@ -409,6 +408,7 @@ class BciApplication(BciGenericApplication):
 			#TODO: Check entry direction condition.
 			self.enterok = True
 			self.states['SignalEnterMet'] = self.enterok
+			self.stimulator.armed=True
 			
 		elif phase == 'intertrial':
 			self.mindur=self.dmin + randint(-1*self.drand,self.drand)#randomized EMG contingency duration
@@ -433,7 +433,7 @@ class BciApplication(BciGenericApplication):
 					#Choose a random intensity in baseline_range
 					stimi=uniform(self.baseline_range[0],self.baseline_range[1])
 			stimi=min(self.baseline_range[1],stimi)#stimi should not exceed the max range
-			self.stimulator.stim_intensity = stimi if self.usingAnalog else int(round(stimi))
+			self.stimulator.intensity = stimi if self.usingAnalog else int(round(stimi))
 			
 		elif phase == 'feedback':
 			#This should begin about 2 blocks after the response window is over.
@@ -444,13 +444,15 @@ class BciApplication(BciGenericApplication):
 			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
 			#TODO: I don't need the stimi and stimerr until the next trial begins, 
 			#can these requests be made asynchronous?
-			for model_type in ['threshold','halfmax']:
-				popt, perr=self.period.model_erp(model_type=model_type)
-				stimi = popt[0]
-				stimerr = perr[0]
-				self.erp_parms[model_type]['est']=stimi
-				self.erp_parms[model_type]['err']=stimerr
-				print "%(model_type)s : %(stimi)s" % {"model_type":model_type, "stimi":str(stimi)}
+			trial_ix = self.states['CurrentTrial']
+			if trial_ix >= self.baseline_trials:
+				for model_type in ['threshold','halfmax']:
+					popt, perr=self.period.model_erp(model_type=model_type)
+					stimi = popt[0]
+					stimerr = perr[0]
+					self.erp_parms[model_type]['est']=stimi
+					self.erp_parms[model_type]['err']=stimerr
+					print "%(model_type)s : %(stimi)s" % {"model_type":model_type, "stimi":str(stimi)}
 					
 	#############################################################
 	
@@ -486,7 +488,7 @@ class BciApplication(BciGenericApplication):
 		####################################
 		# Update the StimulatorReady state #
 		####################################
-		stim_ready = True if not self.params['ReqStimReady'].val else self.stimulator.stim_ready
+		stim_ready = True if not self.params['ReqStimReady'].val else self.stimulator.ready
 		self.states['StimulatorReady'] = stim_ready
 		
 		########################################
@@ -504,7 +506,7 @@ class BciApplication(BciGenericApplication):
 		if phase_inrange or phase_outrange:
 			if now_in_range:
 				if phase_inrange:#phase was correct
-					if self.enterok and isiok and stim_ready and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
+					if self.enterok and isiok and stim_ready and self.stimulator.armed and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
 						self.change_phase('response')
 				else:#phase was wrong
 					self.change_phase('inrange')					
@@ -554,6 +556,9 @@ class BciApplication(BciGenericApplication):
 				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
 				self.triggered = False #We do not need to look for the ERP anymore.
 				
+				per_end = datetime.datetime.now() + datetime.timedelta(minutes=1)
+				self.period.EndTime = self.period.EndTime if self.period.EndTime > per_end else per_end
+				
 				my_trial = get_or_create(Datum\
 				    , subject=self.subject\
 				    , datum_type=self.period.datum_type\
@@ -561,10 +566,10 @@ class BciApplication(BciGenericApplication):
 				    , IsGood=1\
 				    , Number=0)
 				
-				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.stim_intensity)
+				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
 				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
 				#The fature calculation should be asynchronous.
-				self.dbstop()
+				#self.dbstop()
 				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': [self.tch[0],self.params['ERPChan'][0]]}
 		
 		##############################

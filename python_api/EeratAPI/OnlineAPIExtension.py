@@ -38,6 +38,18 @@ def model_sigmoid(x,y):
 		else: perr = np.sqrt(pcov.diagonal())
 		return popt,perr
 	
+def _recent_stream_for_dir(dir):
+		dir=os.path.abspath(dir)
+		files=FileReader.ListDatFiles(d=dir)
+		#The returned list is in ascending order, assume the last is most recent
+		best_stream = None
+		for fn in files:
+			temp_stream = FileReader.bcistream(fn)
+			temp_date = datetime.datetime.fromtimestamp(temp_stream.datestamp)
+			if not best_stream or temp_date > datetime.datetime.fromtimestamp(best_stream.datestamp): 
+				best_stream=temp_stream
+		return best_stream
+	
 def get_obj(name):return eval(name)
 class ExtendInplace(type):#This class enables class definitions here to _extend_ parent classes.
 	#http://code.activestate.com/recipes/412717-extending-classes/
@@ -52,28 +64,39 @@ class ExtendInplace(type):#This class enables class definitions here to _extend_
 class Subject:
 	__metaclass__=ExtendInplace
 	last_mvic = None
-	last_sic = None
 	
-	def _get_most_recent_period(self):
-		#TODO: Hnadle absence of any periods.
+	def get_most_recent_period(self, datum_type=None, delay=999999):
+		#delay specifies how far back, in hours, we will accept a period. Default is ~114 years
 		session = Session.object_session(self)
-		period = session.query(Datum).filter(\
-								Datum.span_type=='period',\
-								Datum.subject_id==self.subject_id,\
-								Datum.IsGood==True)\
-								.order_by(Datum.Number.desc())\
-								.first()
+		td = datetime.timedelta(hours=delay)
+		
+		query = session.query(Datum).filter(\
+					Datum.span_type=='period',\
+					Datum.subject_id==self.subject_id,\
+					Datum.IsGood==True,\
+					Datum.EndTime >= datetime.datetime.now()-td)
+		if datum_type: query=query.filter(Datum.datum_type_id==datum_type.datum_type_id)
+		period = query.order_by(Datum.Number.desc()).first()#Does this return None if there are none?
+		if not period and datum_type:
+			period = get_or_create(Datum, span_type=='period', subject_id==self.subject_id, datum_type=datum_type, IsGood=1, Number=0)
 		return period
 	
 	def _get_last_mvic(self):
-		period = self._get_most_recent_period()
-		self.last_mvic = period._get_mvic()
+		#Online analysis assumes most recent MVIC is relevant. Offline analysis may require date-specific MVIC.
+		#TODO: Make sure the muscle is correct.
+		dir_stub=get_or_create(System, Name='bci_dat_dir').Value
+		mvic_dir=dir_stub + '/' + self.Name + '888/'
+		bci_stream=_recent_stream_for_dir(mvic_dir)
+		sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
+		x_bool = (states['MVC']==1).squeeze()
+		#TODO: Filter/smooth states['Value'] so we only look for sustained contraction, not one-offs.
+		self.last_mvic = np.max(states['Value'][:,x_bool])
 		return self.last_mvic
 	
 class Datum:
 	__metaclass__=ExtendInplace
 	
-	#variable definitions
+	#variable definitions. Do these attach to self?
 	erp_detection_limit = None
 	mvic = None
 	
@@ -124,8 +147,8 @@ class Datum:
 	def _get_detection_limit(self):
 		if self.span_type=='period':
 			dir_stub=get_or_create(System, Name='bci_dat_dir').Value
-			mvic_dir=dir_stub + '/' + self.subject.Name + '999/'
-			bci_stream=self._recent_stream_for_dir(mvic_dir)
+			sic_dir=dir_stub + '/' + self.subject.Name + '999/'
+			bci_stream=_recent_stream_for_dir(sic_dir)
 			sig,states=bci_stream.decode(nsamp='all')
 			sig,chan_labels=bci_stream.spatialfilteredsig(sig)
 			
@@ -153,44 +176,22 @@ class Datum:
 			cut_samps=int(-1*np.shape(sig)[1] % n_samps)
 			if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
 			sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
-			sig=np.abs(sig)
-			vals=np.asarray(np.average(sig,axis=1))
-			vals.sort(axis=0)
+			sig=np.abs(sig)#abs value
+			vals=np.asarray(np.average(sig,axis=1))#average across n_samps to get null erp equivalent
+			vals.sort(axis=0)#sort by size
 			n_vals=vals.shape[0]
-			self.erp_detection_limit=vals[np.ceil(n_vals*0.975),0]
+			self.erp_detection_limit=vals[np.ceil(n_vals*0.975),0]#97.5% is the cutoff
 			return self.erp_detection_limit
-			
-	def _get_mvic(self):
-		if self.span_type=='period':
-			dir_stub=get_or_create(System, Name='bci_dat_dir').Value
-			mvic_dir=dir_stub + '/' + self.subject.Name + '888/'
-			bci_stream=self._recent_stream_for_dir(mvic_dir)
-			sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
-			x_bool = (states['MVC']==1).squeeze()
-			self.mvic = np.max(states['Value'][:,x_bool])
-			return self.mvic
-		
-	def _recent_stream_for_dir(self, dir):
-		dir=os.path.abspath(dir)
-		files=FileReader.ListDatFiles(d=dir)
-		#The returned list is in ascending order, assume the last is most recent
-		best_stream = None
-		for fn in files:
-			temp_stream = FileReader.bcistream(fn)
-			temp_date = datetime.datetime.fromtimestamp(temp_stream.datestamp)
-			if temp_date >= self.StartTime and temp_date <= self.EndTime:
-				best_stream=temp_stream
-		return best_stream
 			
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
 	def update_store(self):
 		if self.span_type=='period':
 			session = Session.object_session(self)
-			#Assume x_vec, n_channels, n_samples, channel_labels are all the same.
+			#Assume x_vec, n_channels, n_samples, channel_labels are all the same across trials.
 			#Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
 			#Getting the last_trial this way is slower for the first call to update_store but is faster for subsequent calls than using the more explicit query.
 			last_trial_id = session.query("datum_id")\
-				.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 ORDER BY Number DESC")\
+				.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 AND span_type=1 ORDER BY Number DESC")\
 				.params(period_id=self.datum_id).first()
 			last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
 			
@@ -223,7 +224,7 @@ class Datum:
 			self.store={\
 				'x_vec':last_store['x_vec']\
 				, 'data':avg_data\
-				, 'channel_labels':last_store.channel_labels}
+				, 'channel_labels':last_store['channel_labels']}
 		
 	def model_erp(self,model_type='halfmax'):
 		if self.span_type=='period':
@@ -238,10 +239,12 @@ class Datum:
 			x=x.astype(np.float)
 			y=self._get_child_features(erp_name)
 			if model_type=='threshold':
+				if not self.erp_detection_limit: self._get_detection_limit()
 				y=y>self.erp_detection_limit
 				y=y.astype(int)
 			#Should data be scaled/standardized?
-			n_trials = x.shape[0]
+			n_trials = 1 if x.size==1 else x.shape[0]
+			#n_trials = x.shape[0]
 			if n_trials>4:
 				return model_sigmoid(x,y)
 			else: return None,None

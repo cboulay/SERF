@@ -124,7 +124,7 @@ class BciApplication(BciGenericApplication):
 	#############################################################
 	
 	def Initialize(self, indim, outdim):
-	
+		
 		##########
 		# SCREEN #
 		##########

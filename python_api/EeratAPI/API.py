@@ -113,8 +113,10 @@ class Datum(Base):
 			temp_data=numpy.frombuffer(temp_data, dtype=float)
 			temp_data.flags.writeable=True
 			temp_data=temp_data.reshape([self.n_channels,self.n_samples])
-		chan_labels = self.channel_labels.split(',')
+		chan_labels = self.channel_labels.split(',') if self.channel_labels else None
 		return {'x_vec':temp_x, 'data':temp_data, 'channel_labels':chan_labels}
+		#datum.store is a dict. store['x_vec'] and store['data'] are arrays.
+		#datum.store['channel_labels'] is a list
 			
 	def _set_store(self, dict_in):
 		#Take a dict input and set the storage item
@@ -123,8 +125,9 @@ class Datum(Base):
 		self.x_vec=dict_in['x_vec'].tostring() #always float?
 		self.erp=dict_in['data'].tostring() #always float?
 		#self.erp=numpy.getbuffer(dict_in['data'])
-		#Assume dict_in['channel_labels'] is a list, not a string.
-		temp_string=",".join(dict_in['channel_labels'])
+		
+		ch_lab = dict_in['channel_labels']
+		temp_string = ch_lab if isinstance(ch_lab,str) else ",".join(dict_in['channel_labels'])
 		self.channel_labels=temp_string.strip().replace(' ','')
 		#TODO: Feature calculation should be asynchronous
 		self.calculate_all_features()
@@ -218,7 +221,7 @@ class Subject(Base):
 							, creator = lambda k, v: Subject_detail_value(detail_name=k, Value=v)
 							)
 	def get_now_period_of_type(self,type):
-		session=Session()
+		session = Session.object_session(self)
 		per_id = session.query("period_id")\
 			.from_statement("SELECT getNowPeriodIdForSubjectIdDatumTypeId(:subject_id,:datum_type_id) AS period_id")\
 			.params(subject_id=self.subject_id,datum_type_id=type.datum_type_id).one()

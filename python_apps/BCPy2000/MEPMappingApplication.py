@@ -67,12 +67,9 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Display 	int		FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
 			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
 			
-			#
 			"PythonApp:Magstim	string		SerialPort= COM4 % % % // Serial port for controlling Magstim",
 			"PythonApp:Magstim	int			TriggerType= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
 			"PythonApp:Magstim	int 		ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
-			"PythonApp:Magstim	int 		StimIntensity= 40 40 0 100 // Magstim Intensity",
-			"PythonApp:Magstim	floatmatrix CoilPosition= (9) (X Y Z Rot) 0 -5 -10 0 -5 -10 0 -5 -10 0 0 0 -5 -5 -5 -10 -10 -10 0 0 0 0 0 0 0 -100 100 // Coil location",
 			
 			"PythonApp:ERP	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
             "PythonApp:ERP	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
@@ -81,7 +78,7 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Screen   int    ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Screen   float  WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
 			
-			#Can we assume a SubjectType given the subject name? Maybe not
+			#SubjectType is necessary for identifying subjects with common names.
 			"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 	// Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)",
 			
 		]
@@ -185,19 +182,6 @@ class BciApplication(BciGenericApplication):
 		if erpwin[1]<0: raise EndUserError, "ERPWindow must include up to at least 0 msec after stimulus onset"
 		self.erpwin=erpwin
 		
-		############################
-		# ANALYSIS INTERFACE CHECK #
-		############################
-		subj_type_name={0:'BCPy_healthy', 1:'BCPy_stroke', 2:'E3rat_emg_eeg'}.get(int(self.params['SubjectType']))
-		my_subj_type=get_or_create(Subject_type, Name=subj_type_name)
-		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
-		
-		#Make sure the period_type matches the stimulator type.
-		period_type_name='mep_hotspot'
-		my_period_type=get_or_create(Datum_type, Name=period_type_name)
-		self.period = self.subject.get_now_period_of_type(my_period_type)		
-		if not self.period: raise EndUserError, "No current period defined for this subject. Check the eerat-online GUI"
-		
 		####################
 		# STIMULATOR CHECK #
 		####################
@@ -208,11 +192,23 @@ class BciApplication(BciGenericApplication):
 	
 	def Initialize(self, indim, outdim):
 		
+		######################
+		# ANALYSIS INTERFACE #
+		######################
+		subj_type_name={0:'BCPy_healthy', 1:'BCPy_stroke', 2:'E3rat_emg_eeg'}.get(int(self.params['SubjectType']))
+		my_subj_type=get_or_create(Subject_type, Name=subj_type_name)
+		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		
+		period_type_name='mep_mapping'
+		my_period_type=get_or_create(Datum_type, Name=period_type_name)
+		#Find the period for this subject x type
+		self.period = self.subject._get_most_recent_period(datum_type=my_period_type,delay=12)
+		
 		############
 		# GET MVIC #
 		############
 		#This is a little slow because it loads a full BCI2000.dat file
-		self.mvic = self.subject._get_last_mvic()#Assumes last_mvic file is for the same muscle as current.
+		self.mvic = self.subject._get_last_mvic()
 		
 		##########
 		# SCREEN #
@@ -261,6 +257,7 @@ class BciApplication(BciGenericApplication):
 		from Magstim.MagstimInterface import Magstim
 		serPort=self.params['SerialPort'].val
 		self.stimulator=Magstim(port=serPort, trigbox=trigbox)
+		self.stimulator.remocon=False
 		#Then we can use self.stimulator.trigger()
 		
 		##################
@@ -270,11 +267,6 @@ class BciApplication(BciGenericApplication):
 		self.pre_stim_samples = SigTools.msec2samples(np.abs(self.erpwin[0]), self.eegfs)
 		#Initialize the ring buffer. It will be passed the raw data (relabeled as EDC) and the erp.
 		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), 2, leaky=True)
-
-		######################
-		# ANALYSIS INTERFACE #
-		######################
-		#self.ana_subject and self.ana_period are initialized in PreFlight
 			
 		################################
 		# State monitors for debugging #
@@ -359,13 +351,14 @@ class BciApplication(BciGenericApplication):
 			#TODO: Check entry direction condition.
 			self.enterok = True
 			self.states['SignalEnterMet'] = self.enterok
+			#Turn on remocon, make sure it is armed, turn off remocon
+			self.stimulator.remocon=True
+			self.stimulator.armed=True
+			self.stimulator.remocon=False
 			
 		elif phase == 'intertrial':
 			self.mindur=self.dmin + randint(-1*self.drand,self.drand)#randomized EMG contingency duration
 			self.triggered = False #each new trial has not yet been triggered.
-			
-			#Set this trial's stim intensity
-			self.stimulator.stim_intensity = self.params['StimIntensity'].val
 			
 		elif phase == 'feedback':
 			pass
@@ -404,7 +397,7 @@ class BciApplication(BciGenericApplication):
 		####################################
 		# Update the StimulatorReady state #
 		####################################
-		stim_ready = True if not self.params['ReqStimReady'].val else self.stimulator.stim_ready
+		stim_ready = True if not self.params['ReqStimReady'].val else self.stimulator.ready
 		self.states['StimulatorReady'] = stim_ready
 		
 		########################################
@@ -422,7 +415,7 @@ class BciApplication(BciGenericApplication):
 		if phase_inrange or phase_outrange:
 			if now_in_range:
 				if phase_inrange:#phase was correct
-					if self.enterok and isiok and stim_ready and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
+					if self.enterok and isiok and stim_ready and self.stimulator.armed and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
 						self.change_phase('response')
 				else:#phase was wrong
 					self.change_phase('inrange')					
@@ -472,6 +465,9 @@ class BciApplication(BciGenericApplication):
 				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
 				self.triggered = False #We do not need to look for the ERP anymore.
 				
+				per_end = datetime.datetime.now() + datetime.timedelta(minutes=1)
+				self.period.EndTime = self.period.EndTime if self.period.EndTime > per_end else per_end
+				
 				my_trial = get_or_create(Datum\
 				    , subject=self.subject\
 				    , datum_type=self.period.datum_type\
@@ -479,23 +475,15 @@ class BciApplication(BciGenericApplication):
 				    , IsGood=1\
 				    , Number=0)
 				
-				#TODO: Get the x/y/z/rot from params
-				self.dbstop()
-				my_trial.detail_values['dat_TMS_powerA']=str(self.stimulator.stim_intensity)
-				my_trial.detail_values['dat_TMS_coil_x']=self.params['CoilPosition']
-				my_trial.detail_values['dat_TMS_coil_y']=self.params['CoilPosition']
-				my_trial.detail_values['dat_TMS_coil_z']=self.params['CoilPosition']
-				my_trial.detail_values['dat_TMS_coil_rot']=self.params['CoilPosition']
+				#Stim intensity will be taken from the stimulator.
+				#Coil positions from exported Brainsight session will be inserted by offline mapping tool
+				my_trial.detail_values['dat_TMS_powerA']=str(self.stimulator.intensity)
 				
 				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
 				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': [self.tch[0],self.params['ERPChan'][0]]}
 		
-		##############################
-		# Response from ERP analysis #
-		##############################
 		elif self.in_phase('feedback'):
-			#TODO: If providing feedback, get feedback value
-			#TODO: If providing feedback, update feedback display
+			#Since we don't have the coil locations, it's impossible to show a map in real-time.
 			pass			
 			
 	#############################################################

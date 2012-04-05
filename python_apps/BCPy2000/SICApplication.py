@@ -70,7 +70,7 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Screen   int    ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Screen   float  WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
 			
-			#Subject should already be in db.
+			#Subject should already be in db. SubjectType is necessary because it helps identify subjects if they have the same name.
 			"PythonApp:Analysisdb	string	SubjectType= 'BCPy healthy' // Name of subject type",
 			
 		]
@@ -144,6 +144,7 @@ class BciApplication(BciGenericApplication):
 		############
 		# GET MVIC #
 		############
+		
 		#This is a little slow because it loads a full BCI2000.dat file
 		self.mvic = self.subject._get_last_mvic()
 	
