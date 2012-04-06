@@ -94,44 +94,49 @@ class Datum(Base):
 	#subject = relationship(Subject, backref=backref("data", cascade="all, delete-orphan"))
 	#datum_type = relationship(Datum_type, backref=backref("data", cascade="all, delete-orphan"))
 	#_store				= relationship(Datum_store, uselist=False, backref="datum")
+	datum_id			= Column(Integer, primary_key=True)
 	type_name			= association_proxy("datum_type","Name") #A shortcut to the type name.
-	erp 				= association_proxy("_store","erp")
-	x_vec				= association_proxy("_store","x_vec")
-	n_channels 			= association_proxy("_store","n_channels")
-	n_samples 			= association_proxy("_store","n_samples")
-	channel_labels 		= association_proxy("_store","channel_labels")
+	#erp, x_vec, channel_labels should only be accessed through datum.store
+	#erp 				= association_proxy("_store","erp")
+	#x_vec				= association_proxy("_store","x_vec")
+	#channel_labels 	= association_proxy("_store","channel_labels")
+	#n_channels and n_samples should only be accessed through datum._store
+	#n_channels 		= association_proxy("_store","n_channels")
+	#n_samples 			= association_proxy("_store","n_samples")
+	
 	feature_values 		= association_proxy("datum_feature_value","Value",
 							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
 	detail_values 		= association_proxy("datum_detail_value","Value",
 							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
+	trials 			= relationship("Datum", order_by="Datum.Number", backref=backref('period', remote_side=[datum_id]))
+	
 	def _get_store(self):
-		temp_x=self.x_vec
-		temp_data=self.erp
+		temp_x=self._store.x_vec
+		temp_data=self._store.erp
 		if temp_x and temp_data:
 			temp_x=numpy.frombuffer(temp_x, dtype=float)
 			temp_x.flags.writeable=True
 			temp_data=numpy.frombuffer(temp_data, dtype=float)
 			temp_data.flags.writeable=True
-			temp_data=temp_data.reshape([self.n_channels,self.n_samples])
-		chan_labels = self.channel_labels.split(',') if self.channel_labels else None
+			temp_data=temp_data.reshape([self._store.n_channels,self._store.n_samples])
+		chan_labels = self._store.channel_labels.split(',') if self._store.channel_labels else None
 		return {'x_vec':temp_x, 'data':temp_data, 'channel_labels':chan_labels}
-		#datum.store is a dict. store['x_vec'] and store['data'] are arrays.
-		#datum.store['channel_labels'] is a list
-			
 	def _set_store(self, dict_in):
 		#Take a dict input and set the storage item
 		#ERP from numpyarray of [chans x samps] to database blob
-		self.n_channels,self.n_samples=numpy.shape(dict_in['data'])
-		self.x_vec=dict_in['x_vec'].tostring() #always float?
-		self.erp=dict_in['data'].tostring() #always float?
+		self._store.n_channels,self._store.n_samples=numpy.shape(dict_in['data'])
+		self._store.x_vec=dict_in['x_vec'].tostring() #always float?
+		self._store.erp=dict_in['data'].tostring() #always float?
 		#self.erp=numpy.getbuffer(dict_in['data'])
-		
 		ch_lab = dict_in['channel_labels']
 		temp_string = ch_lab if isinstance(ch_lab,str) else ",".join(dict_in['channel_labels'])
-		self.channel_labels=temp_string.strip().replace(' ','')
+		self._store.channel_labels=temp_string.strip().replace(' ','')
 		#TODO: Feature calculation should be asynchronous
 		self.calculate_all_features()
 	store = property(_get_store, _set_store)
+		#datum.store is a dict with keys 'x_vec', 'data', 'channel_labels'
+		#x_vec and data are np.arrays. channel_labels is a list.
+		#When setting store, it will accept a dict. channel_labels may be a comma-separated string.
 	
 	def calculate_all_features(self):
 		#Should calculation of trial features such as residuals use period model prior to inclusion of the current trial?
@@ -143,14 +148,15 @@ class Datum(Base):
 				self.calculate_value_for_feature_name(fname, refdatum=None)
 		else:
 			#Use the parent period's detail values.
-			period_id = session.query("period_id")\
-				.from_statement("SELECT getParentPeriodIdForDatumId(:datum_id) AS period_id")\
-				.params(datum_id=self.datum_id).one()
-			refdatum = session.query(Datum).filter(Datum.datum_id==period_id[0]).one()
+			#period_id = session.query("period_id")\
+			#	.from_statement("SELECT getParentPeriodIdForDatumId(:datum_id) AS period_id")\
+			#	.params(datum_id=self.datum_id).one()
+			#refdatum = session.query(Datum).filter(Datum.datum_id==period_id[0]).one()
 			
 			#First calculate the trial/day's values
 			for fname in self.feature_values.iterkeys():
-				self.calculate_value_for_feature_name(fname, refdatum=refdatum)
+				#self.calculate_value_for_feature_name(fname, refdatum=refdatum)
+				self.calculate_value_for_feature_name(fname, refdatum=self.period)
 		
 		#I would prefer not to need this... is there anything else that needs triggers or the db?
 		session.flush()
@@ -220,6 +226,11 @@ class Subject(Base):
 	details 			= association_proxy("subject_detail_value", "Value"
 							, creator = lambda k, v: Subject_detail_value(detail_name=k, Value=v)
 							)
+	periods				= relationship(Datum
+							, cascade="all, delete-orphan"
+							, order_by="Datum.datum_id"
+							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type==3)")
+	
 	def get_now_period_of_type(self,type):
 		session = Session.object_session(self)
 		per_id = session.query("period_id")\
@@ -230,6 +241,14 @@ class Subject(Base):
 			return session.query(Datum).filter(Datum.datum_id==per_id[0]).one()
 		else:
 			return None
+		
+#	def _get_periods(self):
+#		session = Session.object_session(self)
+#		periods = session.query(Datum).filter(\
+#					Datum.subject_id==self.subject_id,\
+#					Datum.span_type==3).order_by(Datum.Number).all()
+#	def _set_periods(self): pass #Read-only. 
+#	periods = property(_get_periods, _set_periods)
 				
 class Subject_type(Base):
 	subjects 			= relationship(Subject, backref=backref("subject_type", lazy="joined")

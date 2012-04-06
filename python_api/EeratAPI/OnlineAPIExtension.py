@@ -65,8 +65,8 @@ class Subject:
 	__metaclass__=ExtendInplace
 	last_mvic = None
 	
-	def get_most_recent_period(self, datum_type=None, delay=999999):
-		#delay specifies how far back, in hours, we will accept a period. Default is ~114 years
+	def get_most_recent_period(self, datum_type=None, delay=99999):
+		#delay specifies how far back, in hours, we will accept a period. Default is ~11 years
 		session = Session.object_session(self)
 		td = datetime.timedelta(hours=delay)
 		
@@ -78,6 +78,7 @@ class Subject:
 		if datum_type: query=query.filter(Datum.datum_type_id==datum_type.datum_type_id)
 		period = query.order_by(Datum.Number.desc()).first()#Does this return None if there are none?
 		if not period and datum_type:
+			#If we did not find a period, then create one with default settings.
 			period = get_or_create(Datum, span_type=='period', subject_id==self.subject_id, datum_type=datum_type, IsGood=1, Number=0)
 		return period
 	
@@ -170,10 +171,10 @@ class Datum:
 			
 			#Figure out how many samples per calculation
 			fs=bci_stream.samplingfreq_hz
-			n_samps=np.ceil(fs*(x_stop-x_start)/1000)
+			n_samps=int(np.ceil(fs*(x_stop-x_start)/1000))
 			
 			#Divide our sig into equal blocks of n_samps
-			cut_samps=int(-1*np.shape(sig)[1] % n_samps)
+			cut_samps=int(np.shape(sig)[1] % n_samps)
 			if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
 			sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
 			sig=np.abs(sig)#abs value
@@ -186,16 +187,17 @@ class Datum:
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
 	def update_store(self):
 		if self.span_type=='period':
-			session = Session.object_session(self)
-			#Assume x_vec, n_channels, n_samples, channel_labels are all the same across trials.
-			#Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
-			#Getting the last_trial this way is slower for the first call to update_store but is faster for subsequent calls than using the more explicit query.
-			last_trial_id = session.query("datum_id")\
-				.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 AND span_type=1 ORDER BY Number DESC")\
-				.params(period_id=self.datum_id).first()
-			last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
+			#session = Session.object_session(self)
+			  #Assume x_vec, n_channels, n_samples, channel_labels are all the same across trials.
+			  #Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
+			  #Getting the last_trial this way is slower for the first call to update_store but is faster for subsequent calls than using the more explicit query.
+			#last_trial_id = session.query("datum_id")\
+			#	.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 AND span_type=1 ORDER BY Number DESC")\
+			#	.params(period_id=self.datum_id).first()
+			#last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
+			last_trial=self.trials[-1]
 			
-			n_channels,n_samples=[last_trial._store.n_channels,last_trial._store.n_samples]
+			#n_channels,n_samples=[last_trial._store.n_channels,last_trial._store.n_samples]
 			
 			#A couple options here:
 			#1) Fetch all trials, put them in an array, then avg
@@ -203,19 +205,19 @@ class Datum:
 			#Try 2 - uses less memory
 			#Using more explicit query is faster than using stored function to get period.
 			n_trials=0
-			running_sum=np.zeros([n_channels,n_samples], dtype=float)
-			for ds in session.query(Datum_store).join(Datum).filter(\
-				Datum.span_type=='trial', \
-				Datum.subject_id==self.subject_id, \
-				Datum.datum_type_id==self.datum_type_id, \
-				Datum.IsGood==True, \
-				Datum.StartTime>=self.StartTime, \
-				Datum.EndTime<=self.EndTime):
-				
-				temp_data=np.frombuffer(ds.erp, dtype=float)
-				temp_data.flags.writeable=True
-				temp_data=temp_data.reshape([n_channels,n_samples])
-				running_sum=running_sum+temp_data
+			running_sum=np.zeros([last_trial._store.n_channels,last_trial._store.n_samples], dtype=float)
+			#for ds in session.query(Datum_store).join(Datum).filter(\
+			#	Datum.span_type=='trial', \
+			#	Datum.subject_id==self.subject_id, \
+			#	Datum.datum_type_id==self.datum_type_id, \
+			#	Datum.IsGood==True, \
+			#	Datum.StartTime>=self.StartTime, \
+			#	Datum.EndTime<=self.EndTime):
+			for ds in self.trials:
+				#temp_data=np.frombuffer(ds.erp, dtype=float)
+				#temp_data.flags.writeable=True
+				#temp_data=temp_data.reshape([n_channels,n_samples])
+				running_sum=running_sum+ds.store['data']
 				n_trials=n_trials+1
 			avg_data = running_sum/n_trials
 			

@@ -224,7 +224,7 @@ class BciApplication(BciGenericApplication):
 		if period_type_name[:3]=='mep' and self.usingAnalog: raise EndUserError, "MEP period types require Magstim stimulator"
 		
 		my_period_type=get_or_create(Datum_type, Name=period_type_name)
-		self.period = self.subject._get_most_recent_period(datum_type=my_period_type,delay=12)
+		self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=12)
 		
 		####################
 		# STIMULATOR CHECK #
@@ -556,13 +556,11 @@ class BciApplication(BciGenericApplication):
 				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
 				self.triggered = False #We do not need to look for the ERP anymore.
 				
-				per_end = datetime.datetime.now() + datetime.timedelta(minutes=1)
-				self.period.EndTime = self.period.EndTime if self.period.EndTime > per_end else per_end
-				
 				my_trial = get_or_create(Datum\
 				    , subject=self.subject\
 				    , datum_type=self.period.datum_type\
 				    , span_type='trial'\
+				    , period=self.period\
 				    , IsGood=1\
 				    , Number=0)
 				

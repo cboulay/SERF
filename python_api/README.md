@@ -23,8 +23,8 @@ Or you can access the data and the add-on API functions directly from a Python c
 from EeratAPI.API import *
 my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
 my_subject=get_or_create(Subject, Name='CBB_TEST', subject_type=my_subj_type, species_type='human')
-#Assumes data, and that last is a trial. See how to create trials further below.
-temp_store = my_subject.data[-1].store
+#Assumes there is a last period and that it has trials. See how to create trials further below.
+temp_store = my_subject.periods[-1].trials[-1].store
 x=temp_store['x_vec']
 y=temp_store['data']
 chan_labels=temp_store['channel_labels']
@@ -47,11 +47,11 @@ my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
 my_subject=get_or_create(Subject, Name='CBB_TEST', subject_type=my_subj_type, species_type='human')
 my_dat_type=get_or_create(Datum_type, Name='mep_baseline')
 now_per = my_subject.get_most_recent_period(datum_type=my_dat_type,delay=12)
+#This will create a period if it does not find a match.
 
 ```
 
 now_per is a Datum (period) instance for the provided Datum_type (my_dat_type).
-
 We can update the period store as the average of its (good) trials:
 
 ```python
@@ -67,6 +67,11 @@ legend(plots,chan_labels)
 Or we can model the ERP's input-output curve for this period and get estimates of its parameters.
 
 ```python
+
+#If you want changed the ERP window and want to recalculate. It's a bit slow.
+#for t in now_per.trials:
+#	t.calculate_all_features()
+	
 #Possible values of model_type are 'halfmax' (default) and 'threshold' 
 parms,parms_err = now_per.model_erp()
 
