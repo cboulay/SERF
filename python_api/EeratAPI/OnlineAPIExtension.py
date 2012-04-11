@@ -12,28 +12,31 @@ import BCPy2000.BCI2000Tools.FileReader as FileReader
 #sigmoid function used for fitting response data
 def my_sigmoid(x, x0, k, a, c): return a / (1 + np.exp(-1*k*(x-x0))) + c
 #x0 = half-max, k = slope, a = max, c = min
-
-#I'm not actually using this.
-def my_inv_sigmoid(y,x0,k,a,c):
-	x = (x0 - ln(-1 + (a/(y-c))))/k
-	return x
+def my_simp_sigmoid(x, x0, k): return 1 / (1 + np.exp(-1*k*(x-x0)))
 	
 #Calculate and return _halfmax and _halfmax err
-def model_sigmoid(x,y):
+def model_sigmoid(x,y, mode=None):
 	#Fit a sigmoid to those values for trials in this period.
 	n_trials = x.shape[0]
 	if n_trials>4:
-		p0=(np.median(x),0.1,np.max(y)-np.min(y),np.min(y)) #x0, k, a, c
-		try: popt, pcov = curve_fit(my_sigmoid, x, y, p0=p0)
+		if not mode or mode=='halfmax':
+			sig_func = my_sigmoid
+			p0=(np.median(x),0.1,np.max(y)-np.min(y),np.min(y)) #x0, k, a, c
+			nvars = 4
+		elif mode=="threshold":
+			sig_func = my_simp_sigmoid
+			p0=(np.median(x),0.1) #x0, k
+			nvars = 2
+		try: popt, pcov = curve_fit(sig_func, x, y, p0=p0)
 		except RuntimeError:
 			print("Error - curve_fit failed")
-			popt=np.empty((4,))
+			popt=np.empty((nvars,))
 			popt.fill(np.NAN)
 			pcov = np.Inf #So the err is set to nan
 		#popt = x0, k, a, c
 		#diagonal pcov is variance of parameter estimates.
 		if np.isinf(pcov).all():
-			perr=np.empty((4,))
+			perr=np.empty((nvars,))
 			perr.fill(np.NAN)
 		else: perr = np.sqrt(pcov.diagonal())
 		return popt,perr
@@ -248,5 +251,5 @@ class Datum:
 			n_trials = 1 if x.size==1 else x.shape[0]
 			#n_trials = x.shape[0]
 			if n_trials>4:
-				return model_sigmoid(x,y)
+				return model_sigmoid(x,y,mode=model_type)
 			else: return None,None

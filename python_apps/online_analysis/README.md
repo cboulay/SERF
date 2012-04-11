@@ -1,7 +1,7 @@
 Some useful functions are provided in [Eerat.OnlineAPIExtension](https://github.com/cboulay/EERAT/blob/master/python_api/EeratAPI/OnlineAPIExtension.py)
 The present directory is for GUI-based applications.
 
-## GUI-based applications for onlline analysis of EERAT data
+## GUI-based applications for online analysis of EERAT data
 
 * Subject (Also New and Delete)
     * Attributes (subject_type_id, Name, DateOfBirth, IsMale, Weight, Notes, species_type)
