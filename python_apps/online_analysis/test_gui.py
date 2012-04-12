@@ -9,6 +9,7 @@ from EeratAPI.API import *
 from EeratAPI.OnlineAPIExtension import *
 from sqlalchemy.orm import *
 from sqlalchemy import *
+from ListBoxChoice import ListBoxChoice
 import random
 
 def reset_frame(frame):
@@ -50,7 +51,7 @@ def def_render_func(item):
     return item.Name
 
 class ListFrame:
-    def __init__(self, frame=None, title_text=None, list_data=None, list_render_func=def_render_func, item_class=None, edit_frame='embed', new_item_func=None, open_item_func=None):
+    def __init__(self, frame=None, title_text=None, list_data=None, list_render_func=def_render_func, item_class=None, edit_frame='embed', new_item_func=None, del_item_func=None, open_item_func=None):
         #Sanitize the input
         if not frame: frame = Toplevel()
         self.frame = frame
@@ -103,27 +104,36 @@ class ListFrame:
  
     def new_press(self):
         #Instantiate the item
-        #TODO: If we want to use default values, then this should be persisted to db immediately.
-        if not self.new_item_func: item=self.item_class()
-        else: item=self.new_item_func(self)
-        item.Name='test'
+        if not self.new_item_func:
+            #TODO: If we want to use default values,
+            #then this should be persisted to db immediately with get_or_create
+            #but then we must supply all key attributes.
+            #item = get_or_create(self.item_class, Name="New")
+            item=self.item_class(Name="New")
+            self.list_data.append(item)
+        else:
+            item=self.new_item_func(self)
+        #item.Name=None
         #Insert it into list_data and listbox.
-        self.list_data.append(item)
+        
         self.lb.insert(END, self.list_render_func(item))
         self.lb.see(self.lb.size())
         self.lb.selection_clear(0,END)
         self.lb.selection_set(END)
         #Show the item in the edit frame
-        self.open_item_func(item)
+        #self.open_item_func(item)
     
     def del_press(self):
         curs = self.lb.curselection()
         for dd in curs:
             instance = self.list_data[int(dd)]
-            session = Session.object_session(instance)
-            #session.delete(instance)
-            print "Disabled db delete of"
-            print instance
+            if not self.del_item_func:
+                session = Session.object_session(instance)
+                #session.delete(instance)
+                #session.flush()
+                print "Disabled db delete of ", instance
+            else:
+                self.del_item_func(instance)
             self.list_data.pop(int(dd))
             self.lb.delete(int(dd))#Remove the index from the listbox
     
@@ -180,13 +190,17 @@ class EditFrame:
             dv_entry = Entry(dv_frame, textvariable=dv_var)
             dv_entry.pack(side = RIGHT, fill = X)
             
-        #TODO: Associations (datum_type_has_feature_type)
-            
         #Further attributes require separate frames.
         if hasattr(item, 'DateOfBirth'):
             ss_frame = Frame(frame)
             ss_frame.pack(side = TOP)
             SubjectFrame(frame=ss_frame, subject=item)
+            
+        #TODO: detail type list box.
+        if hasattr(item, 'detail_types'):
+            dt_frame = Frame(frame)
+            dt_frame.pack(side=TOP)
+            DetailListFrame(frame=dt_frame, parent=item)
     
     def update_name(self, name_var):
         self.item.Name = name_var.get()
@@ -207,6 +221,18 @@ class SubjectFrame:
         self.subject = subject
         if not frame: frame=Toplevel()
         self.frame = frame
+        
+        sp_names=['human','rat']#I wish there was a way I could figure out what the enum possibilities were.
+        
+        self.sub_types = get_or_create(Subject_type,all=True)
+        if not self.subject.subject_type: #implies subject not in db
+            self.subject.subject_type = self.sub_types[0]
+            session = Session.object_session(self.subject)
+            session.flush() #This should change the details associated wit the subject.
+            
+        #if not self.subject or not self.subject.Name:
+        #   #Name is nn and unique, so if it's missing assume we were passed a non-persisted subject.
+        #    self.subject = get_or_create(Subject, Name="NewSubject", subject_type=self.sub_types[0])
         
         det_frame = Frame(frame)
         det_frame.pack(side=LEFT, fill=Y)
@@ -252,21 +278,35 @@ class SubjectFrame:
         
         #TODO: Notes
         
-        #species_type (spinbox)
-        sp_frame = Frame(det_frame)
-        sp_frame.pack(side=TOP, fill=X)
-        sp_label = Label(sp_frame, text="Species Type")
-        sp_label.pack(side=LEFT)
-        self.sp_var = StringVar(sp_frame)
-        self.sp_var.set(self.subject.species_type)
-        sp_sb = Spinbox(sp_frame, values=('rat','human'), command=self.update_species)
-        sp_sb.configure(textvariable=self.sp_var)
-        sp_sb.pack(side=RIGHT, fill=X)
+        #species_type (OptionMenu)
+        spt_frame = Frame(det_frame)
+        spt_frame.pack(side=TOP, fill=X)
+        sptype_label = Label(spt_frame, text="Species type:")
+        sptype_label.pack(side=LEFT)
+        sptype_var = StringVar()
+        sptype_var.set(self.subject.species_type)
+        sptype_var.trace("w", lambda name, index, mode, sptype_var=sptype_var: self.update_species(sptype_var))
+        sp_names = [spn for spn in sp_names if spn != self.subject.species_type]
+        spt_menu = OptionMenu(spt_frame, sptype_var, self.subject.species_type, *sp_names)
+        spt_menu.pack(side=LEFT)
         
-        #TODO: subject_type spinbox
+        #subject_type (OptionMenu) requires subject to have a subject_type
+        sbt_frame = Frame(det_frame)
+        sbt_frame.pack(side=TOP, fill=X)
+        sbtype_label = Label(sbt_frame, text="Subject type:")
+        sbtype_label.pack(side=LEFT)
+        sbtype_var = StringVar()
+        sbtype_var.set(self.subject.subject_type.Name)
+        sbtype_var.trace("w", lambda name, index, mode, sbtype_var=sbtype_var: self.update_subject_type(sbtype_var))
+        st_names = [st.Name for st in self.sub_types if st.subject_type_id != self.subject.subject_type_id]
+        st_menu = OptionMenu(sbt_frame, sbtype_var, self.subject.subject_type.Name, *st_names)
+        st_menu.pack(side=LEFT)
         
         #TODO: Each detail for this subject_type - do as a function that can change if subject_type changes
         #self.subject.details is a kv struct.
+        self.details_frame = Frame(det_frame)
+        self.details_frame.pack(side=TOP, fill=X)
+        self.render_details()
         
         #TODO: MVIC preview
         
@@ -287,14 +327,67 @@ class SubjectFrame:
         self.subject.IsMale = self.gender_var.get()
     def update_weight(self, wt_var):
         self.subject.Weight=float(wt_var.get())
-    def update_species(self):
-        self.subject.species_type=self.sp_var.get()
+    def update_species(self, type_var):
+        self.subject.species_type=type_var.get()
+    def update_subject_type(self, type_var):
+        #Find the subject type that matches
+        stname = type_var.get()
+        self.subject.subject_type_id = [st.subject_type_id for st in self.sub_types if st.Name==stname][0]
+        session = Session.object_session(self.subject)
+        session.flush() #This should change the details associated wit the subject.
+        self.render_details()
+    def render_details(self):
+        sdvs=self.subject.subject_detail_value
+        self.details_frame=reset_frame(self.details_frame)
+        for sdv in sdvs.itervalues():
+            self.render_sdv(sdv,self.details_frame)
+    def render_sdv(self,sdv,frame):
+        parent = Frame(frame)
+        parent.pack(side=TOP, fill=X)
+        lab = Label(parent, text=sdv.detail_name)
+        lab.pack(side=LEFT)
+        str_var = StringVar(parent)
+        str_var.set(sdv.Value)
+        str_var.trace("w", lambda name, index, mode, str_var=str_var: self.update_sdv(ddv,str_var))
+        entry = Entry(parent, textvariable=str_var)
+        entry.pack(side=RIGHT)
+    def update_sdv(self,sdv,str_var):
+        sdv.Value=str_var.get()
     def toggle_periods(self):
         frame=reset_frame(self.per_list_frame)
         self.showing_periods = not self.showing_periods
         self.pb_button.configure(text="Periods <<" if self.showing_periods else "Periods >>")
         if self.showing_periods:
             PerListFrame(frame=frame, subject=self.subject)
+            
+class DetailListFrame:#For setting X_type associations
+    def __init__(self, frame=None, parent=None):
+        if not frame: frame=Toplevel()
+        self.frame = frame
+        self.parent = parent
+        
+        lf = ListFrame(frame, title_text="Detail Types", list_data=self.parent.detail_types\
+                  , item_class=Detail_type\
+                  , edit_frame=None\
+                  , new_item_func=self.add_dt\
+                  , del_item_func=self.rem_dt)
+        
+    def add_dt(self, lf):
+        #self is DetailListFrame, lf is ListFrame
+        #self.parent is the item we wish to add an association to.
+        #We must return a detail_type to add to the list. Get detail_types we don't already have.
+        dts = get_or_create(Detail_type, all=True)
+        dts = [dt for dt in dts if dt not in self.parent.detail_types]
+        #Modal list box to choose. I hope this is blocking.
+        det_to_add = ListBoxChoice(self.frame, "Detail Types", "Pick a detail type to add", dts).returnValue()
+        #Using this det_to_add, create a new association with the parent. Since this is a many-to-many,
+        #sqlalchemy does not seem to want to.
+        return 
+    def rem_dt(self, instance):
+        #self.parent is the item with the association
+        #instance is the item to be disassociated
+        #We don't actually want to delete the item, just its association with its parent
+        pass
         
 class PerListFrame:
     def __init__(self, frame=None, subject=None):
@@ -354,8 +447,7 @@ class PeriodFrame:
         type_var = StringVar()
         type_var.set(self.period.datum_type.Name)
         type_var.trace("w", lambda name, index, mode, type_var=type_var: self.update_type(type_var))
-        session = Session.object_session(self.period)
-        datum_types = session.query(Datum_type).all()
+        datum_types = get_or_create(Datum_type,all=True)
         dt_names = [dt.Name for dt in datum_types]
         dt_menu = OptionMenu(id_frame, type_var, self.period.datum_type.Name, *dt_names)
         dt_menu.pack(side=LEFT)
@@ -428,13 +520,17 @@ class PeriodFrame:
         #get y data from up to 100 trials.
         trials = self.period.trials
         if len(trials)>100:
-            trials=random.sample(trials,100)
+            #trials=random.sample(trials,100)
+            trials=trials[:-100]
         y_trials = np.zeros((x_vec.shape[0],n_chans * len(trials)))
         tt=0
         for tr in trials:
             store=tr.store
             dat=store['data'].T[:,chan_bool]
-            y_trials[:,2*tt:2*tt+1]=dat
+            if n_chans>1:
+                y_trials[:,n_chans*tt:n_chans*tt+n_chans-1]=dat
+            else:
+                y_trials[:,tt]=dat.T
             tt=tt+1
             
         #Find values for axvline
@@ -484,8 +580,7 @@ class PeriodFrame:
         #TODO: flush
     def recalc_features(self):
         self.period._get_detection_limit()#Reget detection limit
-        print "calculate_all_features does not seem to recalulate values using newly set details"
-        self.period.calculate_all_features#Recalculate features. This flushes the transaction.
+        self.period.recalculate_child_feature_values#Recalculate features. This flushes the transaction.
 
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -493,15 +588,19 @@ class ModelFrame:
         if not frame: frame=Toplevel()
         self.frame = frame
         
-        io_plot_frame=Frame(frame)
+        io_frame=Frame(frame)
+        io_frame.pack(side=LEFT, fill=X)
+        io_plot_frame=Frame(io_frame)
         io_plot_frame.pack(side=TOP, fill=X)
-        self.io_label_frame=Frame(frame)
+        self.io_label_frame=Frame(io_frame)
         self.io_label_frame.pack(side=TOP, fill=X)
-        thresh_plot_frame=Frame(frame)
+        thresh_frame=Frame(frame)
+        thresh_frame.pack(side=LEFT, fill=X)
+        thresh_plot_frame=Frame(thresh_frame)
         thresh_plot_frame.pack(side=TOP, fill=X)
-        self.thresh_label_frame=Frame(frame)
+        self.thresh_label_frame=Frame(thresh_frame)
         self.thresh_label_frame.pack(side=TOP, fill=X)
-        button_frame=Frame(frame)
+        button_frame=Frame(thresh_frame)
         button_frame.pack(side=TOP, fill=X)
         
         #Plot IO
@@ -578,10 +677,10 @@ class ModelFrame:
         fig.canvas.draw()
         
         #Display the model parameters x0, k, a, c
-        
         i=0
         for ln in l_names:
-            lab = Label(l_frame, text=ln + ": " + str(parms[i]) + "+/- " + str(parms_err[i]) + "(" + str(100*parms_err[i]/parms[i]) + "%)")
+            lab_str = '{0}: {1:.2f} +/- {2:.2f} ( {3:.2%})'.format(ln, parms[i], parms_err[i], parms_err[i]/parms[i])
+            lab = Label(l_frame, text=lab_str)
             lab.pack(side=TOP)
             i=i+1
     

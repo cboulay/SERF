@@ -22,10 +22,13 @@ import feature_functions
 
 #The following gets or creates a model into the db but also persists it.
 #Only use this method when we can describe all arguments.
-def get_or_create(model, **kwargs):
+def get_or_create(model, all=False, **kwargs):
 	#http://stackoverflow.com/questions/2546207/does-sqlalchemy-have-an-equivalent-of-djangos-get-or-create
 	session=Session()
-	instance = session.query(model).filter_by(**kwargs).first()
+	if all:
+		instance = session.query(model).filter_by(**kwargs).all()
+	else:
+		instance = session.query(model).filter_by(**kwargs).first()
 	if instance: return instance
 	else:
 		instance = model(**kwargs)
@@ -137,27 +140,23 @@ class Datum(Base):
 		#datum.store is a dict with keys 'x_vec', 'data', 'channel_labels'
 		#x_vec and data are np.arrays. channel_labels is a list.
 		#When setting store, it will accept a dict. channel_labels may be a comma-separated string.
+		
+	#method definitions
+	def recalculate_child_feature_values(self):
+		if self.span_type=='period':
+			for tr in self.trials:
+				tr.calculate_all_features();
 	
 	def calculate_all_features(self):
+		#TODO: It might be faster to calculate multiple features simultaneously per trial.
 		#Should calculation of trial features such as residuals use period model prior to inclusion of the current trial?
 		
 		#session=Session()
 		session = Session.object_session(self)
-		if self.datum_type=='period':
-			for fname in self.feature_values.iterkeys():
-				self.calculate_value_for_feature_name(fname, refdatum=None)
-		else:
-			#Use the parent period's detail values.
-			#period_id = session.query("period_id")\
-			#	.from_statement("SELECT getParentPeriodIdForDatumId(:datum_id) AS period_id")\
-			#	.params(datum_id=self.datum_id).one()
-			#refdatum = session.query(Datum).filter(Datum.datum_id==period_id[0]).one()
+		refdatum = None if self.datum_type=='period' else self.period
+		for fname in self.feature_values.iterkeys():
+			self.calculate_value_for_feature_name(fname, refdatum=refdatum)
 			
-			#First calculate the trial/day's values
-			for fname in self.feature_values.iterkeys():
-				#self.calculate_value_for_feature_name(fname, refdatum=refdatum)
-				self.calculate_value_for_feature_name(fname, refdatum=self.period)
-		
 		#I would prefer not to need this... is there anything else that needs triggers or the db?
 		session.flush()
 			
@@ -186,11 +185,15 @@ class Datum_type(Base):
 #							, secondary="datum_type_has_feature_type"
 #							, backref="feature_types"
 #							)
-	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type"
+	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
 #							,creator = lambda k, v: Datum_type_has_feature_type(_feature_name=k, feature_type=v)
-							)
+#							)
+
+	#Datum_type.detail_types is an array of items of class Detail_type
+	#we can append to this array with another item of the same type if we set the creator
+	#to accept that input type.
 	detail_types 		= association_proxy("datum_type_has_detail_type", "detail_type"
-#							,creator = lambda k, v: Datum_type_has_detail_type(_detail_name=k, detail_type=v)
+							,creator = lambda det: Datum_type_has_detail_type(datum_type=self, detail_type=det)
 							)
 							
 class Datum_detail_value(Base):
@@ -199,11 +202,11 @@ class Datum_detail_value(Base):
 							cascade="all, delete-orphan", lazy="joined")
 							, lazy="joined"
 							)
-	detail_type		= relationship(Detail_type, 
+	detail_type			= relationship(Detail_type, 
 							backref=backref("datum_detail_value", cascade="all, delete-orphan")
 							, lazy="joined"
 							)
-	detail_name		= association_proxy('detail_type','Name')
+	detail_name			= association_proxy('detail_type','Name')
 	
 class Datum_feature_value(Base):
 	datum 				= relationship(Datum, backref=backref("datum_feature_value",
@@ -287,9 +290,9 @@ class Subject_type_has_detail_type(Base):
 #	
 class Datum_type_has_detail_type(Base):
 	datum_type 			= relationship(Datum_type, 
-							backref=backref("_datum_type_has_detail_type", cascade="all, delete-orphan"
+							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
 #							,collection_class = attribute_mapped_collection("detail_name")
-							))
+#							))
 	detail_type 		= relationship(Detail_type, 
 							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
 #	_datum_name 		= association_proxy("datum_type","Name")

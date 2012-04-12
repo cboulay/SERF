@@ -46,6 +46,8 @@ from EeratAPI.OnlineAPIExtension import *
 my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
 my_subject=get_or_create(Subject, Name='CBB_TEST', subject_type=my_subj_type, species_type='human')
 my_dat_type=get_or_create(Datum_type, Name='mep_baseline')
+my_det_type=get_or_create(Detail_type, Name='dat_TMS_powerB')
+my_dat_type.detail_types.append(my_det_type)
 now_per = my_subject.get_most_recent_period(datum_type=my_dat_type,delay=12)
 #This will create a period if it does not find a match.
 

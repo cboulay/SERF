@@ -104,8 +104,6 @@ class Datum:
 	erp_detection_limit = None
 	mvic = None
 	
-	#method definitions
-	
 	#get feature values from all child trials
 	def _get_child_features(self, feature_name):
 		#e.g., 'HR_aaa'
@@ -184,7 +182,7 @@ class Datum:
 			vals=np.asarray(np.average(sig,axis=1))#average across n_samps to get null erp equivalent
 			vals.sort(axis=0)#sort by size
 			n_vals=vals.shape[0]
-			self.erp_detection_limit=vals[np.ceil(n_vals*0.975),0]#97.5% is the cutoff
+			self.erp_detection_limit=vals[np.ceil(n_vals*0.99),0]#97.5% is the cutoff
 			return self.erp_detection_limit
 			
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
