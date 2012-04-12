@@ -87,11 +87,13 @@ class System(Base):
 	pass
 
 class Detail_type(Base):
-	datum_types 		= association_proxy("datum_type_has_detail_type","datum_type")
-	subject_types 		= association_proxy("subject_type_has_detail_type","subject_type")
+	pass
+	#datum_types 		= association_proxy("datum_type_has_detail_type","datum_type")
+	#subject_types 		= association_proxy("subject_type_has_detail_type","subject_type")
 	
 class Feature_type(Base):
-	datum_types 		= association_proxy("datum_type_has_feature_type","datum_type")
+	pass
+	#datum_types 		= association_proxy("datum_type_has_feature_type","datum_type")
 
 class Datum(Base):
 	#subject = relationship(Subject, backref=backref("data", cascade="all, delete-orphan"))
@@ -178,23 +180,20 @@ class Datum_type(Base):
 							, backref=backref("datum_type", lazy="joined")
 							, cascade="all, delete-orphan"
 							)
-#	detail_types		= relationship(Datum_type_has_detail_type
-#							, backref="datum_types"
-#							)
-#	feature_types		= relationship(Feature_type
-#							, secondary="datum_type_has_feature_type"
-#							, backref="feature_types"
-#							)
-	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
+	detail_types		= relationship(Detail_type
+							, secondary="datum_type_has_detail_type"
+							, backref="datum_types" 
+							, lazy="joined")
+	feature_types		= relationship(Feature_type
+							, secondary="datum_type_has_feature_type"
+							, backref="feature_types"
+							, lazy="joined")
+#	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
 #							,creator = lambda k, v: Datum_type_has_feature_type(_feature_name=k, feature_type=v)
 #							)
-
-	#Datum_type.detail_types is an array of items of class Detail_type
-	#we can append to this array with another item of the same type if we set the creator
-	#to accept that input type.
-	detail_types 		= association_proxy("datum_type_has_detail_type", "detail_type"
-							,creator = lambda det: Datum_type_has_detail_type(datum_type=self, detail_type=det)
-							)
+#	detail_types 		= association_proxy("datum_type_has_detail_type", "detail_type"
+#							,creator = lambda det: Datum_type_has_detail_type(datum_type=self, detail_type=det)
+#							)
 							
 class Datum_detail_value(Base):
 	datum 				= relationship(Datum, backref=backref("datum_detail_value",
@@ -256,11 +255,11 @@ class Subject(Base):
 class Subject_type(Base):
 	subjects 			= relationship(Subject, backref=backref("subject_type", lazy="joined")
 							, cascade="all, delete-orphan")
-#	detail_types		= relationship(Detail_type
-#							, secondary="subject_type_has_detail_type"
-#							, backref="subject_types"
-#							)
-	detail_types 		= association_proxy("subject_type_has_detail_type","detail_type")
+	detail_types		= relationship(Detail_type
+							, secondary="subject_type_has_detail_type"
+							, backref="subject_types" 
+							, lazy="joined")
+#	detail_types 		= association_proxy("subject_type_has_detail_type","detail_type")
 	
 	
 class Subject_detail_value(Base):
@@ -278,34 +277,36 @@ class Subject_detail_value(Base):
 	detail_name 		= association_proxy("detail_type", "Name")
 
 #
-#Do I need the below association tables as association objects?
+#Do I need the below association tables as association objects? What about using secondaries?
 #
 class Subject_type_has_detail_type(Base):
-	subject_type 		= relationship(Subject_type, 
-							backref=backref("subject_type_has_detail_type", cascade="all, delete-orphan"))
-	detail_type 		= relationship(Detail_type, 
-							backref=backref("subject_type_has_detail_type", cascade="all, delete-orphan"))
+	pass
+#	subject_type 		= relationship(Subject_type, 
+#							backref=backref("subject_type_has_detail_type", cascade="all, delete-orphan"))
+#	detail_type 		= relationship(Detail_type, 
+#							backref=backref("subject_type_has_detail_type", cascade="all, delete-orphan"))
 #	_subject_type_name 	= association_proxy("subject_type","Name")
 #	_detail_name 		= association_proxy("detail_type","Name")
 #	
 class Datum_type_has_detail_type(Base):
-	datum_type 			= relationship(Datum_type, 
-							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
+	pass
+#	datum_type 			= relationship(Datum_type, 
+#							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
 #							,collection_class = attribute_mapped_collection("detail_name")
 #							))
-	detail_type 		= relationship(Detail_type, 
-							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
+#	detail_type 		= relationship(Detail_type, 
+#							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
 #	_datum_name 		= association_proxy("datum_type","Name")
 #	_detail_name 		= association_proxy("detail_type","Name")
 #	
 class Datum_type_has_feature_type(Base):
 	pass
-	datum_type 			= relationship(Datum_type, 
-							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"
+#	datum_type 			= relationship(Datum_type, 
+#							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"
 #							,collection_class = attribute_mapped_collection("feature_name")
-							))
-	feature_type 		= relationship(Feature_type, 
-							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"))
+#							))
+#	feature_type 		= relationship(Feature_type, 
+#							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"))
 #	_datum_name 		= association_proxy("datum_type","Name")
 #	_feature_name 		= association_proxy("feature_type","Name")
 		

@@ -56,7 +56,7 @@ class ListFrame:
         if not frame: frame = Toplevel()
         self.frame = frame
         self.title_text=title_text
-        if not list_data:
+        if list_data is None:
             session = Session()
             list_data = session.query(item_class).all()
         self.list_data=list_data
@@ -73,6 +73,7 @@ class ListFrame:
         self.edit_frame=edit_frame
         #Parent has the option of passing in new_func (useful for setting associations)
         self.new_item_func = new_item_func
+        self.del_item_func = del_item_func
         #Parent has the option of passing in show_func (useful if new or double-click should spawn non-standard edit window)
         if not open_item_func: open_item_func=self.show_item
         self.open_item_func = open_item_func
@@ -380,9 +381,8 @@ class DetailListFrame:#For setting X_type associations
         dts = [dt for dt in dts if dt not in self.parent.detail_types]
         #Modal list box to choose. I hope this is blocking.
         det_to_add = ListBoxChoice(self.frame, "Detail Types", "Pick a detail type to add", dts).returnValue()
-        #Using this det_to_add, create a new association with the parent. Since this is a many-to-many,
-        #sqlalchemy does not seem to want to.
-        return 
+        self.parent.detail_types.append(det_to_add)
+        return det_to_add
     def rem_dt(self, instance):
         #self.parent is the item with the association
         #instance is the item to be disassociated
@@ -493,8 +493,9 @@ class PeriodFrame:
         recalc_button.pack(side=LEFT)  
         
     def update_type(self, type_var):
-        session = Session.object_session(self.period)
-        self.period.datum_type = session.query(Datum_type).filter(Name==type_var.get()).first()
+        self.period.datum_type = get_or_create(Datum_type, Name=type_var.get())
+        #session = Session.object_session(self.period)
+        #self.period.datum_type = session.query(Datum_type).filter(Name==type_var.get()).first()
         #TODO: flush
         self.render_details()
         self.num_label.configure(text="Number: " + str(self.period.Number))
