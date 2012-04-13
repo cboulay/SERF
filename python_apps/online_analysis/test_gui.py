@@ -7,8 +7,8 @@ from matplotlib.figure import Figure
 from Tkinter import *
 from EeratAPI.API import *
 from EeratAPI.OnlineAPIExtension import *
-from sqlalchemy.orm import *
-from sqlalchemy import *
+#from sqlalchemy.orm import *
+#from sqlalchemy import *
 from ListBoxChoice import ListBoxChoice
 import random
 
@@ -57,8 +57,8 @@ class ListFrame:
         self.frame = frame
         self.title_text=title_text
         if list_data is None:
-            session = Session()
-            list_data = session.query(item_class).all()
+            #session = Session()
+            list_data = Session().query(item_class).all()
         self.list_data=list_data
         self.list_render_func=list_render_func
         self.item_class = item_class
@@ -111,9 +111,9 @@ class ListFrame:
             #but then we must supply all key attributes.
             #item = get_or_create(self.item_class, Name="New")
             item=self.item_class(Name="New")
-            self.list_data.append(item)
         else:
             item=self.new_item_func(self)
+        self.list_data.append(item)
         #item.Name=None
         #Insert it into list_data and listbox.
         
@@ -129,13 +129,12 @@ class ListFrame:
         for dd in curs:
             instance = self.list_data[int(dd)]
             if not self.del_item_func:
-                session = Session.object_session(instance)
-                #session.delete(instance)
-                #session.flush()
-                print "Disabled db delete of ", instance
+                #Session.delete(instance)
+                print "Disabled db delete of", instance
             else:
+                #Specify a delete function when we don't want the object deleted.
+                #e.g., removing an association/relationship
                 self.del_item_func(instance)
-            self.list_data.pop(int(dd))
             self.lb.delete(int(dd))#Remove the index from the listbox
     
     def dbl_click(self,ev):
@@ -225,10 +224,10 @@ class SubjectFrame:
         
         sp_names=['human','rat']#I wish there was a way I could figure out what the enum possibilities were.
         
-        self.sub_types = get_or_create(Subject_type,all=True)
+        session = Session.object_session(self.subject)
+        self.sub_types = get_or_create(Subject_type, all=True, sess=session)
         if not self.subject.subject_type: #implies subject not in db
             self.subject.subject_type = self.sub_types[0]
-            session = Session.object_session(self.subject)
             session.flush() #This should change the details associated wit the subject.
             
         #if not self.subject or not self.subject.Name:
@@ -334,8 +333,9 @@ class SubjectFrame:
         #Find the subject type that matches
         stname = type_var.get()
         self.subject.subject_type_id = [st.subject_type_id for st in self.sub_types if st.Name==stname][0]
-        session = Session.object_session(self.subject)
-        session.flush() #This should change the details associated wit the subject.
+        #session = Session.object_session(self.subject)
+        #session.flush() #This should change the details associated wit the subject.
+        Session.commit()
         self.render_details()
     def render_details(self):
         sdvs=self.subject.subject_detail_value
@@ -377,17 +377,18 @@ class DetailListFrame:#For setting X_type associations
         #self is DetailListFrame, lf is ListFrame
         #self.parent is the item we wish to add an association to.
         #We must return a detail_type to add to the list. Get detail_types we don't already have.
-        dts = get_or_create(Detail_type, all=True)
+        session = Session.object_session(self.parent)
+        dts = get_or_create(Detail_type, all=True, sess=session)
         dts = [dt for dt in dts if dt not in self.parent.detail_types]
         #Modal list box to choose. I hope this is blocking.
         det_to_add = ListBoxChoice(self.frame, "Detail Types", "Pick a detail type to add", dts).returnValue()
-        self.parent.detail_types.append(det_to_add)
+        #self.parent.detail_types.append(det_to_add)
         return det_to_add
     def rem_dt(self, instance):
         #self.parent is the item with the association
         #instance is the item to be disassociated
         #We don't actually want to delete the item, just its association with its parent
-        pass
+        self.parent.detail_types.remove(instance)
         
 class PerListFrame:
     def __init__(self, frame=None, subject=None):
@@ -403,12 +404,15 @@ class PerListFrame:
                   , open_item_func=self.open_per)
         
     #period instantiation requires keys, 
-    #thus we need a custom new_per function that creates the persists immediately.
+    #thus we need a custom new_per function that creates the period.
     def new_per(self,lf):
         #self is PerListFrame, lf is ListFrame
-        period = get_or_create(Datum\
+        session = Session.object_session(self.subject)
+        dat_types = get_or_create(Datum_type, all=True)
+        #Where do we want the datum_type from?
+        period = get_or_create(Datum, sess=session\
             , subject=self.subject\
-            , datum_type=my_dat_type\
+            , datum_type=dat_types[0]\
             , span_type='period'\
             , IsGood=1\
             , Number=0)
@@ -423,6 +427,8 @@ class PeriodFrame:
         self.period = period
         if not frame: frame=Toplevel()
         self.frame = frame
+        
+        session = Session.object_session(self.period)
         
         id_frame = Frame(frame)
         id_frame.pack(side=TOP, fill=X)
@@ -447,7 +453,7 @@ class PeriodFrame:
         type_var = StringVar()
         type_var.set(self.period.datum_type.Name)
         type_var.trace("w", lambda name, index, mode, type_var=type_var: self.update_type(type_var))
-        datum_types = get_or_create(Datum_type,all=True)
+        datum_types = get_or_create(Datum_type,all=True,sess=session)
         dt_names = [dt.Name for dt in datum_types]
         dt_menu = OptionMenu(id_frame, type_var, self.period.datum_type.Name, *dt_names)
         dt_menu.pack(side=LEFT)
@@ -493,7 +499,8 @@ class PeriodFrame:
         recalc_button.pack(side=LEFT)  
         
     def update_type(self, type_var):
-        self.period.datum_type = get_or_create(Datum_type, Name=type_var.get())
+        session = Session.object_session(self.period)
+        self.period.datum_type = get_or_create(Datum_type, sess=session, Name=type_var.get())
         #session = Session.object_session(self.period)
         #self.period.datum_type = session.query(Datum_type).filter(Name==type_var.get()).first()
         #TODO: flush
@@ -685,8 +692,8 @@ class ModelFrame:
             lab.pack(side=TOP)
             i=i+1
     
-engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
-Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
+#engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
+#Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
 root = Tk() #Creating the root widget. There must be and can be only one.
 app = App(root)
 root.mainloop() #Event loops

@@ -22,18 +22,20 @@ import feature_functions
 
 #The following gets or creates a model into the db but also persists it.
 #Only use this method when we can describe all arguments.
-def get_or_create(model, all=False, **kwargs):
+def get_or_create(model, all=False, sess=None, **kwargs):
 	#http://stackoverflow.com/questions/2546207/does-sqlalchemy-have-an-equivalent-of-djangos-get-or-create
-	session=Session()
+	
+	if not sess: sess=Session()
 	if all:
-		instance = session.query(model).filter_by(**kwargs).all()
+		instance = sess.query(model).filter_by(**kwargs).all()
 	else:
-		instance = session.query(model).filter_by(**kwargs).first()
+		instance = sess.query(model).filter_by(**kwargs).first()
 	if instance: return instance
 	else:
 		instance = model(**kwargs)
-		session.add(instance)
-		session.flush()
+		sess.add(instance)
+		#session.flush()
+		sess.commit()
 		return instance
 
 class MyBase(object):
@@ -160,7 +162,8 @@ class Datum(Base):
 			self.calculate_value_for_feature_name(fname, refdatum=refdatum)
 			
 		#I would prefer not to need this... is there anything else that needs triggers or the db?
-		session.flush()
+		#session.flush()
+		session.commit()
 			
 	def calculate_value_for_feature_name(self, fname, refdatum=None):
 		#use refdatum to get the required details.
@@ -309,9 +312,9 @@ class Datum_type_has_feature_type(Base):
 #							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"))
 #	_datum_name 		= association_proxy("datum_type","Name")
 #	_feature_name 		= association_proxy("feature_type","Name")
-		
+
 engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
 metadata = MetaData(bind=engine)#Base's metadata needs to reflect before I can call prepare.
 metadata.reflect() #http://docs.sqlalchemy.org/en/latest/core/schema.html#reflecting-all-tables-at-once
 Base.prepare(engine)
-Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
+Session = scoped_session(sessionmaker(bind=engine, autoflush=True))

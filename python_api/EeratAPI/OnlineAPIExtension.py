@@ -5,7 +5,7 @@ import numpy as np
 import time, os, datetime
 from scipy.optimize import curve_fit
 from EeratAPI.API import *
-from sqlalchemy.orm import Session, query
+from sqlalchemy.orm import query
 from sqlalchemy import desc
 import BCPy2000.BCI2000Tools.FileReader as FileReader
 
@@ -82,13 +82,14 @@ class Subject:
 		period = query.order_by(Datum.Number.desc()).first()#Does this return None if there are none?
 		if not period and datum_type:
 			#If we did not find a period, then create one with default settings.
-			period = get_or_create(Datum, span_type=='period', subject_id==self.subject_id, datum_type=datum_type, IsGood=1, Number=0)
+			period = get_or_create(Datum, sess=session, span_type='period', subject_id=self.subject_id, datum_type=datum_type, IsGood=1, Number=0)
 		return period
 	
 	def _get_last_mvic(self):
 		#Online analysis assumes most recent MVIC is relevant. Offline analysis may require date-specific MVIC.
 		#TODO: Make sure the muscle is correct.
-		dir_stub=get_or_create(System, Name='bci_dat_dir').Value
+		session = Session.object_session(self)
+		dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
 		mvic_dir=dir_stub + '/' + self.Name + '888/'
 		bci_stream=_recent_stream_for_dir(mvic_dir)
 		sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
@@ -148,7 +149,8 @@ class Datum:
 	#Get the statistical detection limit for MEP, M-wave (not used?), H-reflex
 	def _get_detection_limit(self):
 		if self.span_type=='period':
-			dir_stub=get_or_create(System, Name='bci_dat_dir').Value
+			session = Session.object_session(self)
+			dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
 			sic_dir=dir_stub + '/' + self.subject.Name + '999/'
 			bci_stream=_recent_stream_for_dir(sic_dir)
 			sig,states=bci_stream.decode(nsamp='all')
