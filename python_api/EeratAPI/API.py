@@ -34,8 +34,8 @@ def get_or_create(model, all=False, sess=None, **kwargs):
 	else:
 		instance = model(**kwargs)
 		sess.add(instance)
-		#session.flush()
-		sess.commit()
+		#sess.flush()
+		#sess.commit()
 		return instance
 
 class MyBase(object):
@@ -158,6 +158,8 @@ class Datum(Base):
 		#session=Session()
 		session = Session.object_session(self)
 		refdatum = None if self.datum_type=='period' else self.period
+		
+		#TODO: Adding a feature to a type after an instance of the type exists does not create a default value.
 		for fname in self.feature_values.iterkeys():
 			self.calculate_value_for_feature_name(fname, refdatum=refdatum)
 			
@@ -189,7 +191,7 @@ class Datum_type(Base):
 							, lazy="joined")
 	feature_types		= relationship(Feature_type
 							, secondary="datum_type_has_feature_type"
-							, backref="feature_types"
+							, backref="datum_types"
 							, lazy="joined")
 #	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
 #							,creator = lambda k, v: Datum_type_has_feature_type(_feature_name=k, feature_type=v)

@@ -180,8 +180,17 @@ class Datum:
 			cut_samps=int(np.shape(sig)[1] % n_samps)
 			if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
 			sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
-			sig=np.abs(sig)#abs value
-			vals=np.asarray(np.average(sig,axis=1))#average across n_samps to get null erp equivalent
+			
+			#aaa or p2p
+			fts = self.datum_type.feature_types
+			isp2p = any([ft for ft in fts if 'p2p' in ft.Name])
+			
+			if isp2p:
+				vals = np.asarray(np.max(sig,axis=1)-np.min(sig,axis=1))
+			else:
+				sig=np.abs(sig)#abs value
+				vals=np.asarray(np.average(sig,axis=1))#average across n_samps to get null erp equivalent
+			
 			vals.sort(axis=0)#sort by size
 			n_vals=vals.shape[0]
 			self.erp_detection_limit=vals[np.ceil(n_vals*0.99),0]#97.5% is the cutoff
@@ -233,12 +242,16 @@ class Datum:
 		
 	def model_erp(self,model_type='halfmax'):
 		if self.span_type=='period':
+			
+			fts = self.datum_type.feature_types
+			isp2p = any([ft for ft in fts if 'p2p' in ft.Name])
+			
 			if 'hr' in self.type_name:
 				stim_det_name='dat_Nerve_stim_output'
-				erp_name='HR_aaa'
+				erp_name= 'HR_p2p' if isp2p else 'HR_aaa'
 			elif 'mep' in self.type_name:
 				stim_det_name='dat_TMS_powerA'
-				erp_name='MEP_aaa'
+				erp_name= 'MEP_p2p' if isp2p else 'MEP_aaa'
 			#get xy_array as dat_TMS_powerA, MEP_aaa
 			x=self._get_child_details(stim_det_name)
 			x=x.astype(np.float)
@@ -251,5 +264,5 @@ class Datum:
 			n_trials = 1 if x.size==1 else x.shape[0]
 			#n_trials = x.shape[0]
 			if n_trials>4:
-				return model_sigmoid(x,y,mode=model_type)
-			else: return None,None
+				return model_sigmoid(x,y,mode=model_type) + (x,) + (y,)
+			else: return None,None,None,None

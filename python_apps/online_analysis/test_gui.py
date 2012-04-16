@@ -58,7 +58,7 @@ class ListFrame:
         self.title_text=title_text
         if list_data is None:
             #session = Session()
-            list_data = Session().query(item_class).all()
+            list_data = Session.query(item_class).all()
         self.list_data=list_data
         self.list_render_func=list_render_func
         self.item_class = item_class
@@ -109,11 +109,13 @@ class ListFrame:
             #TODO: If we want to use default values,
             #then this should be persisted to db immediately with get_or_create
             #but then we must supply all key attributes.
-            #item = get_or_create(self.item_class, Name="New")
-            item=self.item_class(Name="New")
+            item = get_or_create(self.item_class, Name="New")
+            #item=self.item_class(Name="New")
         else:
             item=self.new_item_func(self)
         self.list_data.append(item)
+        Session.commit()
+        
         #item.Name=None
         #Insert it into list_data and listbox.
         
@@ -201,14 +203,21 @@ class EditFrame:
             dt_frame = Frame(frame)
             dt_frame.pack(side=TOP)
             DetailListFrame(frame=dt_frame, parent=item)
+            
+        if hasattr(item, 'feature_types'):
+            ft_frame = Frame(frame)
+            ft_frame.pack(side=TOP)
+            FeatureListFrame(frame=ft_frame, parent=item)
     
     def update_name(self, name_var):
         self.item.Name = name_var.get()
-        #Should flush right away?
+        #session = Session.object_session(self.item)
+        Session.commit()
                 
     def update_description(self, desc_var):
         self.item.Description = desc_var.get()
-        #Should flush right away?
+        #session = Session.object_session(self.item)
+        Session.commit()
         
     def update_defaultvalue(self, dv_var):
         if isinstance(item.DefaultValue,str):
@@ -389,6 +398,35 @@ class DetailListFrame:#For setting X_type associations
         #instance is the item to be disassociated
         #We don't actually want to delete the item, just its association with its parent
         self.parent.detail_types.remove(instance)
+        
+class FeatureListFrame:#For setting X_type associations
+    def __init__(self, frame=None, parent=None):
+        if not frame: frame=Toplevel()
+        self.frame = frame
+        self.parent = parent
+        
+        lf = ListFrame(frame, title_text="Feature Types", list_data=self.parent.feature_types\
+                  , item_class=Feature_type\
+                  , edit_frame=None\
+                  , new_item_func=self.add_ft\
+                  , del_item_func=self.rem_ft)
+        
+    def add_ft(self, lf):
+        #self is DetailListFrame, lf is ListFrame
+        #self.parent is the item we wish to add an association to.
+        #We must return a detail_type to add to the list. Get detail_types we don't already have.
+        session = Session.object_session(self.parent)
+        fts = get_or_create(Feature_type, all=True, sess=session)
+        fts = [ft for ft in fts if ft not in self.parent.feature_types]
+        #Modal list box to choose. I hope this is blocking.
+        feat_to_add = ListBoxChoice(self.frame, "Feature Types", "Pick a feature type to add", fts).returnValue()
+        #self.parent.detail_types.append(det_to_add)
+        return feat_to_add
+    def rem_ft(self, instance):
+        #self.parent is the item with the association
+        #instance is the item to be disassociated
+        #We don't actually want to delete the item, just its association with its parent
+        self.parent.feature_types.remove(instance)
         
 class PerListFrame:
     def __init__(self, frame=None, subject=None):
@@ -588,7 +626,7 @@ class PeriodFrame:
         #TODO: flush
     def recalc_features(self):
         self.period._get_detection_limit()#Reget detection limit
-        self.period.recalculate_child_feature_values#Recalculate features. This flushes the transaction.
+        self.period.recalculate_child_feature_values()#Recalculate features. This flushes the transaction.
 
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -642,18 +680,18 @@ class ModelFrame:
     def plot_thresh(self):
         self.plot_either(mode='threshold')
     def plot_either(self,mode=None):
-        parms,parms_err = self.period.model_erp(model_type=mode)
+        parms,parms_err,x,y = self.period.model_erp(model_type=mode)
         
-        if 'hr' in self.period.type_name:
-            stim_det_name='dat_Nerve_stim_output'
-            erp_name='HR_aaa'
-        elif 'mep' in self.period.type_name:
-            stim_det_name='dat_TMS_powerA'
-            erp_name='MEP_aaa'
+        #if 'hr' in self.period.type_name:
+        #    stim_det_name='dat_Nerve_stim_output'
+        #    erp_name='HR_aaa'
+        #elif 'mep' in self.period.type_name:
+        #    stim_det_name='dat_TMS_powerA'
+        #    erp_name='MEP_aaa'
             
-        x = self.period._get_child_details(stim_det_name)
-        x = x.astype(np.float)
-        y = self.period._get_child_features(erp_name)
+        #x = self.period._get_child_details(stim_det_name)
+        #x = x.astype(np.float)
+        #y = self.period._get_child_features(erp_name)
         
         if not mode:#Default to io
             fig = self.io_fig
@@ -662,8 +700,8 @@ class ModelFrame:
             l_names = ['x0','k','a','c']
             sig_func = my_sigmoid
         elif mode=='threshold':
-            y=y>self.period.erp_detection_limit
-            y=y.astype(int)
+        #    y=y>self.period.erp_detection_limit
+        #    y=y.astype(int)
             fig = self.thresh_fig
             ylabel = "EP DETECTED"
             l_frame = reset_frame(self.thresh_label_frame)
@@ -691,6 +729,10 @@ class ModelFrame:
             lab = Label(l_frame, text=lab_str)
             lab.pack(side=TOP)
             i=i+1
+        if mode=='threshold':
+            lab_str = 'Threshold: {0:.2f}'.format(self.period.erp_detection_limit)
+            lab = Label(l_frame, text=lab_str)
+            lab.pack(side=TOP)
     
 #engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
 #Session = scoped_session(sessionmaker(bind=engine, autocommit=True))

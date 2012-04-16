@@ -1,7 +1,7 @@
 import numpy as np
 
 #helper functions
-def get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label):
+def get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label):
 	temp_store=datum.store
 	x_vec=temp_store['x_vec']
 	y_mat=temp_store['data']
@@ -9,11 +9,18 @@ def get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label):
 	chan_list=temp_store['channel_labels']
 	chan_bool=np.asarray([cl==chan_label for cl in chan_list])
 	sub_mat=y_mat[chan_bool,x_bool]
+	return sub_mat
+	
+def get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label):
+	sub_mat=get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label)
 	sub_mat=np.abs(sub_mat)
-	if sub_mat.ndim==2:
-		return np.average(sub_mat,axis=1)
-	else:
-		return np.average(sub_mat)
+	ax_ind = 1 if sub_mat.ndim==2 else 0
+	return np.average(sub_mat,axis=ax_ind)
+	
+def get_p2p_for_datum_start_stop(datum,x_start,x_stop,chan_label):
+	sub_mat=get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label)
+	ax_ind = 1 if sub_mat.ndim==2 else 0
+	return np.nanmax(sub_mat,axis=ax_ind)-np.nanmin(sub_mat,axis=ax_ind)
 
 #feature_functions
 def BEMG_aaa(datum, refdatum=None):
@@ -47,6 +54,13 @@ def MEP_aaa(datum, refdatum=None):
 	x_stop=float(refdatum.detail_values['dat_MEP_stop_ms'])
 	chan_label=refdatum.detail_values['dat_MEP_chan_label']
 	return get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label)
+
+def MEP_p2p(datum, refdatum=None):
+	if refdatum is None: refdatum=datum
+	x_start=float(refdatum.detail_values['dat_MEP_start_ms'])
+	x_stop=float(refdatum.detail_values['dat_MEP_stop_ms'])
+	chan_label=refdatum.detail_values['dat_MEP_chan_label']
+	return get_p2p_for_datum_start_stop(datum,x_start,x_stop,chan_label)
 
 def HR_res(datum, refdatum=None):
 	print "TODO: HR_res"
