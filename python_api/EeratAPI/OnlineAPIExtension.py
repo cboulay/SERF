@@ -8,6 +8,7 @@ from EeratAPI.API import *
 from sqlalchemy.orm import query
 from sqlalchemy import desc
 import BCPy2000.BCI2000Tools.FileReader as FileReader
+from matplotlib.mlab import find
 
 #sigmoid function used for fitting response data
 def my_sigmoid(x, x0, k, a, c): return a / (1 + np.exp(-1*k*(x-x0))) + c
@@ -90,7 +91,7 @@ class Subject:
 		#TODO: Make sure the muscle is correct.
 		session = Session.object_session(self)
 		dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
-		mvic_dir=dir_stub + '/' + self.Name + '888/'
+		mvic_dir=dir_stub + '/' + self.subject.Name + '/' + self.subject.Name + '888/'
 		bci_stream=_recent_stream_for_dir(mvic_dir)
 		sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
 		x_bool = (states['MVC']==1).squeeze()
@@ -102,8 +103,8 @@ class Datum:
 	__metaclass__=ExtendInplace
 	
 	#variable definitions. Do these attach to self?
-	erp_detection_limit = None
-	mvic = None
+	#erp_detection_limit = None
+	#mvic = None
 	
 	#get feature values from all child trials
 	def _get_child_features(self, feature_name):
@@ -151,7 +152,7 @@ class Datum:
 		if self.span_type=='period':
 			session = Session.object_session(self)
 			dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
-			sic_dir=dir_stub + '/' + self.subject.Name + '999/'
+			sic_dir=dir_stub + '/' + self.subject.Name + '/' + self.subject.Name + '999/'
 			bci_stream=_recent_stream_for_dir(sic_dir)
 			sig,states=bci_stream.decode(nsamp='all')
 			sig,chan_labels=bci_stream.spatialfilteredsig(sig)
@@ -266,3 +267,26 @@ class Datum:
 			if n_trials>4:
 				return model_sigmoid(x,y,mode=model_type) + (x,) + (y,)
 			else: return None,None,None,None
+			
+	def assign_coords(self, space='brainsight'):
+		if self.span_type=='period' and self.datum_type.Name=='mep_mapping':
+			#Find and load the brainsight file
+			dir_stub=get_or_create(System, Name='bci_dat_dir').Value
+			bs_file_loc=dir_stub + '/' + self.subject.Name + '/mapping/' + str(self.Number) + '_' + space + '.txt'
+			#Parse the brainsight file for X-Y coordinates
+			data = [line.split('\t') for line in file(bs_file_loc)]
+			data = [line for line in data if 'Sample' in line[0]]
+			starti = find(['#' in line[0] for line in data])[0]
+			data = data[starti:]
+			headers = data[0]
+			data = data[1:]
+			x_ind = find(['Loc. X' in col for col in headers])[0]
+			y_ind = find(['Loc. Y' in col for col in headers])[0]
+			z_ind = find(['Loc. Z' in col for col in headers])[0]
+			
+			i = 0
+			for tt in self.trials:
+				tt.detail_values['dat_TMS_coil_x']=float(data[i][x_ind])
+				tt.detail_values['dat_TMS_coil_y']=float(data[i][y_ind])
+				tt.detail_values['dat_TMS_coil_z']=float(data[i][z_ind])
+				i = i+1

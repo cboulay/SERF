@@ -529,10 +529,24 @@ class PeriodFrame:
         refr_button.pack(side=TOP, fill=X)
         reavg_button = Button(pbutton_frame, text="ReAvg ERP", command=self.period.update_store)
         reavg_button.pack(side=TOP, fill=X)
-        model_button = Button(pbutton_frame, text="Model IO", command=self.show_model)
-        model_button.pack(side=TOP, fill=X)
-        mapping_button = Button(pbutton_frame, text="MEP Mapping", command=self.mep_map)
-        mapping_button.pack(side=TOP, fill=X)
+        if 'mapping' in self.period.type_name:
+            mapping_button = Button(pbutton_frame, text="MEP Mapping", command=self.mep_map)
+            mapping_button.pack(side=TOP, fill=X)
+            xy_button = Button(pbutton_frame, text="Get XY", command=self.get_xy)
+            xy_button.pack(side=TOP, fill=X)
+            #space_type (OptionMenu)
+            spt_frame = Frame(pbutton_frame)
+            spt_frame.pack(side=TOP, fill=X)
+            sptype_label = Label(spt_frame, text="Brainsight Space:")
+            sptype_label.pack(side=LEFT)
+            self.sptype_var = StringVar()
+            self.sptype_var.set('brainsight')
+            #sptype_var.trace("w", lambda name, index, mode, sptype_var=sptype_var: self.update_space(sptype_var))
+            spt_menu = OptionMenu(spt_frame, self.sptype_var, 'brainsight','mni')
+            spt_menu.pack(side=LEFT)
+        else:
+            model_button = Button(pbutton_frame, text="Model IO", command=self.show_model)
+            model_button.pack(side=TOP, fill=X)
         recalc_button = Button(pbutton_frame, text="Recalculate", command=self.recalc_features)
         recalc_button.pack(side=LEFT)  
         
@@ -599,7 +613,7 @@ class PeriodFrame:
     def show_model(self):
         ModelFrame(period=self.period)
     def mep_map(self):
-        pass
+        MapFrame(period=self.period)
         
     def render_details(self):
         self.detail_frame=reset_frame(self.detail_frame)
@@ -627,6 +641,8 @@ class PeriodFrame:
     def recalc_features(self):
         self.period._get_detection_limit()#Reget detection limit
         self.period.recalculate_child_feature_values()#Recalculate features. This flushes the transaction.
+    def get_xy(self):
+        self.period.assign_coords(space=self.sptype_var.get())
 
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -733,6 +749,75 @@ class ModelFrame:
             lab_str = 'Threshold: {0:.2f}'.format(self.period.erp_detection_limit)
             lab = Label(l_frame, text=lab_str)
             lab.pack(side=TOP)
+            
+class MapFrame:
+    def __init__(self, frame=None, period=None):
+        self.period = period
+        if not frame: frame=Toplevel()
+        self.frame = frame
+        
+        map_frame=Frame(frame)
+        map_frame.pack(side=LEFT, fill=X)
+        map_plot_frame=Frame(map_frame)
+        map_plot_frame.pack(side=TOP, fill=X)
+        self.map_label_frame=Frame(map_frame)
+        self.map_label_frame.pack(side=TOP, fill=X)
+        button_frame=Frame(map_frame)
+        button_frame.pack(side=TOP, fill=X)
+        
+        #Plot Map
+        self.map_fig = Figure()
+        map_canvas = FigureCanvasTkAgg(self.map_fig, master=map_plot_frame)
+        map_canvas.show()
+        map_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        toolbar = NavigationToolbar2TkAgg( map_canvas, map_plot_frame )
+        toolbar.update()
+        map_canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
+        self.plot_map()
+        
+        #Buttons
+        #map_button = Button(button_frame, text="REDO", command=self.plot_map)
+        #map_button.pack(side=LEFT)
+        
+    def plot_map(self):
+        fig = self.map_fig
+        l_frame = reset_frame(self.map_label_frame)
+        
+        fts = self.period.datum_type.feature_types
+        isp2p = any([ft for ft in fts if 'p2p' in ft.Name])
+        erp_name= 'MEP_p2p' if isp2p else 'MEP_aaa'
+        
+        x = self.period._get_child_details('dat_TMS_coil_x').astype(float)
+        y = self.period._get_child_details('dat_TMS_coil_y').astype(float)
+        z = self.period._get_child_features(erp_name)
+        
+        tx=np.linspace(min(x),max(x),100)
+        ty=np.linspace(min(y),max(y),100)
+        XI, YI = np.meshgrid(tx,ty)
+        
+        #http://docs.scipy.org/doc/scipy/reference/tutorial/interpolate-7.py
+        from scipy.interpolate import Rbf
+        rbf = Rbf(x, y, z, esplison=2)
+        ZI = rbf(XI, YI)
+        id = find(ZI==np.max(ZI))[0]
+        best_x = XI.flatten()[id]
+        best_y = YI.flatten()[id]
+
+        #Plot model estimate and actual values
+        map_ax = fig.gca()
+        map_ax.clear()
+        map_ax = fig.add_subplot(111)
+        abc = map_ax.pcolor(XI,YI,ZI)
+        fig.colorbar(abc)
+        map_ax.scatter(x,y,100,z)
+        map_ax.scatter(best_x,best_y,100,marker='x')
+        map_ax.set_xlabel('X')
+        map_ax.set_ylabel('Y')
+        fig.canvas.draw()
+        
+        #Display the Map hotspot
+        lab = Label(l_frame, text='HOTSPOT: X {0:.2f}, Y {1:.2f}'.format(best_x,best_y))
+        lab.pack(side=TOP)
     
 #engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
 #Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
