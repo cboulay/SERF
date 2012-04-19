@@ -91,7 +91,7 @@ class Subject:
 		#TODO: Make sure the muscle is correct.
 		session = Session.object_session(self)
 		dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
-		mvic_dir=dir_stub + '/' + self.subject.Name + '/' + self.subject.Name + '888/'
+		mvic_dir=dir_stub + '/' + self.Name + '/' + self.Name + '888/'
 		bci_stream=_recent_stream_for_dir(mvic_dir)
 		sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
 		x_bool = (states['MVC']==1).squeeze()
@@ -103,8 +103,8 @@ class Datum:
 	__metaclass__=ExtendInplace
 	
 	#variable definitions. Do these attach to self?
-	#erp_detection_limit = None
-	#mvic = None
+	erp_detection_limit = None
+	mvic = None
 	
 	#get feature values from all child trials
 	def _get_child_features(self, feature_name):

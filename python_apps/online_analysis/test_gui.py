@@ -565,50 +565,51 @@ class PeriodFrame:
         #TODO: Check that it matches 'YYYY-MM-DD hh:mm:ss'
         self.period.EndTime = end_var.get()
     def plot_erps(self):
-        per_store=self.period.store
-        
-        #Find any channel that appears in period.detail_values
-        chans_list = [pdv for pdv in self.period.detail_values.itervalues() if pdv in per_store['channel_labels']]
-        chans_list = list(set(chans_list))#make unique
-        #Boolean array to index the data.
-        chan_bool = np.array([cl in chans_list for cl in per_store['channel_labels']])
-        n_chans = sum(chan_bool)
-        
-        x_vec = per_store['x_vec']
-        y_avg = per_store['data'].T[:,chan_bool]
-        
-        #get y data from up to 100 trials.
-        trials = self.period.trials
-        if len(trials)>100:
-            #trials=random.sample(trials,100)
-            trials=trials[:-100]
-        y_trials = np.zeros((x_vec.shape[0],n_chans * len(trials)))
-        tt=0
-        for tr in trials:
-            store=tr.store
-            dat=store['data'].T[:,chan_bool]
-            if n_chans>1:
-                y_trials[:,n_chans*tt:n_chans*tt+n_chans-1]=dat
-            else:
-                y_trials[:,tt]=dat.T
-            tt=tt+1
+        if len(self.period.trials)>0:
+            per_store=self.period.store
             
-        #Find values for axvline
-        window_lims = [pdv for pdk,pdv in self.period.detail_values.iteritems() if '_ms' in pdk]
-        
-        erp_ax = self.erp_fig.gca()
-        #self.erp_fig.delaxes(erp_ax)
-        erp_ax.clear()
-        erp_ax = self.erp_fig.add_subplot(111)
-        
-        erp_ax.plot(x_vec, y_trials)
-        erp_ax.plot(x_vec, y_avg, linewidth=3.0, label='avg')
-        for ll  in window_lims:
-            erp_ax.axvline(x=float(ll))
-        erp_ax.set_xlim([-10,100])
-        erp_ax.set_xlabel('TIME AFTER STIM (ms)')
-        erp_ax.set_ylabel('AMPLITUDE (uV)')
-        self.erp_fig.canvas.draw()
+            #Find any channel that appears in period.detail_values
+            chans_list = [pdv for pdv in self.period.detail_values.itervalues() if pdv in per_store['channel_labels']]
+            chans_list = list(set(chans_list))#make unique
+            #Boolean array to index the data.
+            chan_bool = np.array([cl in chans_list for cl in per_store['channel_labels']])
+            n_chans = sum(chan_bool)
+            
+            x_vec = per_store['x_vec']
+            y_avg = per_store['data'].T[:,chan_bool]
+            
+            #get y data from up to 100 trials.
+            trials = self.period.trials
+            if len(trials)>100:
+                #trials=random.sample(trials,100)
+                trials=trials[:-100]
+            y_trials = np.zeros((x_vec.shape[0],n_chans * len(trials)))
+            tt=0
+            for tr in trials:
+                store=tr.store
+                dat=store['data'].T[:,chan_bool]
+                if n_chans>1:
+                    y_trials[:,n_chans*tt:n_chans*tt+n_chans-1]=dat
+                else:
+                    y_trials[:,tt]=dat.T
+                tt=tt+1
+                
+            #Find values for axvline
+            window_lims = [pdv for pdk,pdv in self.period.detail_values.iteritems() if '_ms' in pdk]
+            
+            erp_ax = self.erp_fig.gca()
+            #self.erp_fig.delaxes(erp_ax)
+            erp_ax.clear()
+            erp_ax = self.erp_fig.add_subplot(111)
+            
+            erp_ax.plot(x_vec, y_trials)
+            erp_ax.plot(x_vec, y_avg, linewidth=3.0, label='avg')
+            for ll  in window_lims:
+                erp_ax.axvline(x=float(ll))
+            erp_ax.set_xlim([-10,100])
+            erp_ax.set_xlabel('TIME AFTER STIM (ms)')
+            erp_ax.set_ylabel('AMPLITUDE (uV)')
+            self.erp_fig.canvas.draw()
         
     def show_model(self):
         ModelFrame(period=self.period)

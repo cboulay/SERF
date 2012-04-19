@@ -74,10 +74,10 @@ class BciApplication(BciGenericApplication):
 			#There are two ways to use this app: with TMS or with nerve stimulation.
 			"PythonApp:Stimulator	int		StimulatorType= 0 0 0 1 // Stimulator type: 0 Magstim, 1 analog (enumeration)",
 			"PythonApp:Stimulator	int		TriggerType= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
-			"PythonApp:Stimulator	int 	ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
 			
 			#Some parameters are Magstim specific
 			"PythonApp:Magstim		string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
+			"PythonApp:Stimulator	int 	ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
 			
 			#"PythonApp:ERP	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
 			"PythonApp:ERP	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
