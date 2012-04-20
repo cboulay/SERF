@@ -82,8 +82,8 @@ class Subject:
 		if datum_type: query=query.filter(Datum.datum_type_id==datum_type.datum_type_id)
 		period = query.order_by(Datum.Number.desc()).first()#Does this return None if there are none?
 		if not period and datum_type:
-			#If we did not find a period, then create one with default settings.
-			period = get_or_create(Datum, sess=session, span_type='period', subject_id=self.subject_id, datum_type=datum_type, IsGood=1, Number=0)
+			#If we did not find a period, then create one with default settings, including StartTime and EndTime
+			period = get_or_create(Datum, sess=session, span_type='period', subject=self, datum_type=datum_type, IsGood=1, Number=0)
 		return period
 	
 	def _get_last_mvic(self):

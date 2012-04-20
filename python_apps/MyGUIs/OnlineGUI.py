@@ -819,9 +819,10 @@ class MapFrame:
         #Display the Map hotspot
         lab = Label(l_frame, text='HOTSPOT: X {0:.2f}, Y {1:.2f}'.format(best_x,best_y))
         lab.pack(side=TOP)
-    
-#engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
-#Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
-root = Tk() #Creating the root widget. There must be and can be only one.
-app = App(root)
-root.mainloop() #Event loops
+
+if __name__ == "__main__":
+    #engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
+    #Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
+    root = Tk() #Creating the root widget. There must be and can be only one.
+    app = App(root)
+    root.mainloop() #Event loops
