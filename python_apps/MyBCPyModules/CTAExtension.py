@@ -5,8 +5,6 @@ class MEP(object):
 			"PythonApp:Magstim		string	SerialPort= COM4 % % % // Serial port for controlling Magstim",
 			"PythonApp:Magstim		int 	ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
 			"PythonApp:Magstim		int 	SerialTrigger= 0 0 0 1 // Use serial port to trigger: 0 no, 1 yes (boolean)",
-			
-			#TODO: SICI
 		]
 	states = [
 			"StimulatorReady 1 0 0 0", #Whether or not the stimulator returns ready
@@ -18,16 +16,29 @@ class MEP(object):
 			from Caio.TriggerBox import TTL
 			trigbox=TTL()#Initializing this trigbox also sends out a 0V TTL on channel1
 		else: trigbox=None
-		#TODO: Bistim
-		from Magstim.MagstimInterface import Magstim
+		from Magstim.MagstimInterface import Bistim
 		serPort=app.params['SerialPort'].val
-		app.stimulator=Magstim(port=serPort, trigbox=trigbox)
+		app.stimulator=Bistim(port=serPort, trigbox=trigbox)
 		app.intensity_detail_name = 'dat_TMS_powerA'
 	@classmethod
 	def transition(cls,app,phase):
 		if phase == 'inrange':
 			app.stimulator.armed=True
-		
+
+class SICI(object):
+	params = [
+			"PythonApp:Magstim		int 	StimIntensityB= 0 0 0 100 // Test stimulus intensity",
+			"PythonApp:Magstim		float 	PulseInterval= 0 0 0 100 // Double-pulse interval in ms",
+		]
+	states = [
+			"StimulatorIntensityB 16 0 0 0", #Intensity of StimB for Bistim
+			"ISIx10 16 0 0 0", #Double-pulse ISI in 0.1ms
+		]
+	@classmethod
+	def initialize(cls,app):
+		app.stimulator.intensityb = app.params['StimIntensityB'].val
+		app.stimulator.ISI = app.params['PulseInterval'].val
+			
 class HR(object):
 	params = []
 	states = []
@@ -38,8 +49,6 @@ class HR(object):
 		from Caio.VirtualStimulatorInterface import Virtual
 		trigbox._caio.fs=10000
 		trigbox.set_TTL(width=1, channel=2)#Use a shorter TTL width, since the TTL drives the stimulator.
-		
-		#TODO: Show the stim intensity GUI
 		app.stimulator=Virtual(trigbox=trigbox)
 		app.intensity_detail_name = 'dat_Nerve_stim_output'
 		
@@ -107,6 +116,7 @@ class IOCURVE(object):
 					stimi=uniform(app.baseline_range[0],app.baseline_range[1])
 			stimi=min(app.baseline_range[1],stimi)#stimi should not exceed the max range
 			app.stimulator.intensity = stimi
+			self.states['StimulatorIntensity']=int(round(stimi))
 			
 		elif phase == 'feedback':
 			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
@@ -122,4 +132,3 @@ class IOCURVE(object):
 					app.erp_parms[model_type]['est']=stimi
 					app.erp_parms[model_type]['err']=stimerr
 					print "%(model_type)s : %(stimi)s" % {"model_type":model_type, "stimi":str(stimi)}
-					

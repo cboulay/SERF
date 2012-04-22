@@ -80,6 +80,7 @@ class BciApplication(BciGenericApplication):
 			
 			#Specify how this will be used.
 			"PythonApp:Method	int			ExperimentType= 0 0 0 4 // Experiment Type: 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment (enumeration)",
+			"PythonApp:Method	float	 	StimIntensity= 30 30 0 100 // Stim Intensity if single-pulse, Cond Intensity if Bistim",
 			"PythonApp:Method	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
 			"PythonApp:Method	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
 			#"PythonApp:Method   int			UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
@@ -224,7 +225,7 @@ class BciApplication(BciGenericApplication):
 		if int(self.params['ShowLastERP']):
 		#	import matplotlib.pyplot as plt
 		#	self.erp_fig = plt.figure(1)
-			import Pyro4
+			import Pyro4 #TODO: This causes a runtime error but the error seems to not matter.
 			uri='PYRO:plot_maker@localhost:4567'#TODO: Make this a parameter.
 			self.plot_maker=Pyro4.Proxy(uri)
 			#self.plot_maker=Pyro4.Proxy("PYRONAME:example.greeting")#if using nameserver
@@ -320,7 +321,9 @@ class BciApplication(BciGenericApplication):
 		if exp_type in [1,4]: IOCURVE.initialize(self)#Detection limit and baseline trials
 		elif exp_type == 0: MAPPING.initialize(self)#Subtle differences for controlling stimulator.
 		if exp_type in [0,1,2]: MEP.initialize(self)#Stimulator
+		if exp_type == 2: SICI.initialize(self)#Stimulator
 		elif exp_type in [3,4]: HR.initialize(self)
+		app.stimulator.intensity = app.params['StimIntensity'].val
 		
 	#############################################################
 	
@@ -363,6 +366,7 @@ class BciApplication(BciGenericApplication):
 			self.remember('stim_trig')
 			self.states['SignalCriteriaMetBlocks']=0#Reset the number of blocks
 			self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
+			self.states['StimulatorIntensity'] = app.stimulator.intensity
 		elif phase == 'outrange':
 			self.stimuli['target_box'].color = [1, 0, 0]
 			#self.states['SignalEnterMet'] = False
@@ -379,15 +383,6 @@ class BciApplication(BciGenericApplication):
 			#This should begin about 2 blocks after the response window is over.
 			#Hopefully Process has detected the trigger and stored the data by now.
 			#TODO: If rewarding, reward
-			#TODO: If plotting the last ERP, plot it.
-			#if int(self.params['ShowLastERP']):
-			#	trial = self.period.trials[-1]
-			#	store = trial.store
-			#	chan_bool = np.array([cl in self.params['ERPChan'] for cl in store['channel_labels']])
-			#	x_vec = store['x_vec']
-			#	y = store['data'].T[:,chan_bool]
-			#	plt.figure(self.erp_fig)
-			#	plt.plot(x_vec,y)#TODO: append instead of replace?
 			pass
 		
 		if int(self.params['ExperimentType']) in [0,1,2]: MEP.transition(self,phase)
@@ -457,7 +452,7 @@ class BciApplication(BciGenericApplication):
 		####################
 		# Trigger Response #
 		####################
-		if self.triggered:#Only bother wasting CPU cycles if we have sent a trigger
+		if self.triggered:#Only search for a trigger response if we have sent a trigger
 			startx = None
 			
 			#
@@ -503,11 +498,11 @@ class BciApplication(BciGenericApplication):
 					, IsGood=1\
 					, Number=0\
 					, sess=Session.object_session(self.period))
-				#Need to do something here that commits this to the db.
-				Session.object_session(my_trial).commit()
+				Session.object_session(my_trial).commit()#Need to do something here that commits this to the db.
 				#Session.object_session(my_trial).flush()
 				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
-				#TODO: SICI intensity.
+				if int(self.params['ExperimentType']) == 2:#SICI intensity
+					my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
 				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
 				#The fature calculation should be asynchronous.
 				chlbs = self.params['TriggerInputChan'] if self.trigchan else []
@@ -515,8 +510,7 @@ class BciApplication(BciGenericApplication):
 				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': chlbs}
 				
 				if int(self.params['ShowLastERP'])==1:
-					#SigTools.plot(x_vec,x,hold=True,drawnow=True) #Doesn't actually render probably due to threading.
-					#TODO: only pass the ERP channel
+					#Pass the plot off to a remote object so it doesn't kill this' rendering.
 					ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in chlbs])
 					self.plot_maker.plot_data(x_vec,x[ch_bool,:].T)
 		##############################
