@@ -115,15 +115,16 @@ class Datum:
 				Datum.span_type=='trial'\
 				, Datum.subject_id==self.subject_id\
 				, Datum.datum_type_id==self.datum_type_id\
-				, Datum.IsGood==True
-				, Datum.StartTime>=self.StartTime\
-				, Datum.EndTime<=self.EndTime\
+				, Datum.IsGood==True\
+				, Datum.parent_datum_id==self.datum_id\
 				, Datum_feature_value.datum_id==Datum.datum_id\
 				, Datum_feature_value.feature_type_id==Feature_type.feature_type_id\
 				, Feature_type.Name==feature_name\
 				, Datum_feature_value.Value != None)\
 				.order_by(Datum.Number)\
 				.all()
+				#, Datum.StartTime>=self.StartTime\
+				#, Datum.EndTime<=self.EndTime\
 			return np.squeeze(np.asarray(features).astype(np.float))
 			
 	#get detail values from all child trials.
@@ -136,9 +137,8 @@ class Datum:
 				Datum.span_type=='trial'\
 				, Datum.subject_id==self.subject_id\
 				, Datum.datum_type_id==self.datum_type_id\
-				, Datum.IsGood==True
-				, Datum.StartTime>=self.StartTime\
-				, Datum.EndTime<=self.EndTime\
+				, Datum.IsGood==True\
+				, Datum.parent_datum_id==self.datum_id\
 				, Datum_detail_value.datum_id==Datum.datum_id\
 				, Datum_detail_value.detail_type_id==Detail_type.detail_type_id\
 				, Detail_type.Name==detail_name\
@@ -230,6 +230,7 @@ class Datum:
 				#temp_data=np.frombuffer(ds.erp, dtype=float)
 				#temp_data.flags.writeable=True
 				#temp_data=temp_data.reshape([n_channels,n_samples])
+				#TODO: Only use IsGood trials. self.trials does not discriminate (I don't think, check API).
 				running_sum=running_sum+ds.store['data']
 				n_trials=n_trials+1
 			avg_data = running_sum/n_trials
@@ -261,11 +262,16 @@ class Datum:
 				if not self.erp_detection_limit: self._get_detection_limit()
 				y=y>self.erp_detection_limit
 				y=y.astype(int)
+				x_bool = ~np.isnan(x)
+			elif 'hr' in self.type_name:#Not threshold, and hr, means cut off trials > h-max
+				h_max = max(y)
+				y_max_ind = find(y==h_max)
+				x_at_h_max = x[y_max_ind]
+				x_bool = x <= x_at_h_max
+			n_trials = 1 if x.size==1 else x[x_bool].shape[0]
 			#Should data be scaled/standardized?
-			n_trials = 1 if x.size==1 else x.shape[0]
-			#n_trials = x.shape[0]
 			if n_trials>4:
-				return model_sigmoid(x,y,mode=model_type) + (x,) + (y,)
+				return model_sigmoid(x[x_bool],y[x_bool],mode=model_type) + (x,) + (y,)
 			else: return None,None,None,None
 			
 	def assign_coords(self, space='brainsight'):

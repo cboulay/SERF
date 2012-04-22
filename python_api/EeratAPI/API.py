@@ -35,7 +35,7 @@ def get_or_create(model, all=False, sess=None, **kwargs):
 		instance = model(**kwargs)
 		sess.add(instance)
 		#sess.flush()
-		#sess.commit()
+		sess.commit()
 		return instance
 
 class MyBase(object):
@@ -116,6 +116,7 @@ class Datum(Base):
 	detail_values 		= association_proxy("datum_detail_value","Value",
 							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
 	trials 			= relationship("Datum", order_by="Datum.Number", backref=backref('period', remote_side=[datum_id]))
+	#TODO: trials should be filtered by IsGood
 	
 	def _get_store(self):
 		temp_x=self._store.x_vec

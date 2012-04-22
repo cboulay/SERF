@@ -11,6 +11,7 @@ from EeratAPI.OnlineAPIExtension import *
 #from sqlalchemy import *
 from ListBoxChoice import ListBoxChoice
 import random
+import time
 
 def reset_frame(frame):
     for ww in frame.pack_slaves():
@@ -548,7 +549,7 @@ class PeriodFrame:
             model_button = Button(pbutton_frame, text="Model IO", command=self.show_model)
             model_button.pack(side=TOP, fill=X)
         recalc_button = Button(pbutton_frame, text="Recalculate", command=self.recalc_features)
-        recalc_button.pack(side=LEFT)  
+        recalc_button.pack(side=LEFT)
         
     def update_type(self, type_var):
         session = Session.object_session(self.period)
@@ -644,7 +645,7 @@ class PeriodFrame:
         self.period.recalculate_child_feature_values()#Recalculate features. This flushes the transaction.
     def get_xy(self):
         self.period.assign_coords(space=self.sptype_var.get())
-
+        
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
         self.period = period
@@ -750,7 +751,7 @@ class ModelFrame:
             lab_str = 'Threshold: {0:.2f}'.format(self.period.erp_detection_limit)
             lab = Label(l_frame, text=lab_str)
             lab.pack(side=TOP)
-            
+                    
 class MapFrame:
     def __init__(self, frame=None, period=None):
         self.period = period

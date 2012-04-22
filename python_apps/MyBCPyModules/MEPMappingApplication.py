@@ -22,7 +22,7 @@
 # This application provides feedback about the amplitude of a specific
 # (processed) input channel. Whenever some criteria are met, then
 # a trigger is sent out through a stimulator. The evoked response
-# is trapped and passed off to an external application. The stimulator and external application are configurable.
+# is trapped and passed off to an external application.
 import numpy as np
 from random import randint, uniform
 from math import ceil
@@ -32,20 +32,11 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-from EeratAPI.API import *
-from EeratAPI.OnlineAPIExtension import *
-from CTAExtension import MEP, HR, MAPPING, IOCURVE
+from EeratAPI.API import Subject_type, Datum_type, get_or_create
+from EeratAPI.OnlineAPIExtension import Subject, Datum
 
 class BciApplication(BciGenericApplication):
-	#At the moment, this app is used for:
-	#    1 - MEP mapping (no real-time map until Brainsight has API for coordinates)
-	#    2 - MEP recruitment curve
-	#    3 - MEP SICI
-	#    4 - H-reflex hunting (assist finding ideal stim location)
-	#    5 - H-reflex recruitment curve
-	#
-	#In the future, I hope this app can be used for operant conditioning too.
-			
+	
 	#############################################################
 	
 	def Description(self):
@@ -60,43 +51,37 @@ class BciApplication(BciGenericApplication):
 		params = [
 			#"Tab:SubSection DataType Name= Value DefaultValue LowRange HighRange // Comment (identifier)",
 			#See further details http://bci2000.org/wiki/index.php/Technical_Reference:Parameter_Definition
-			"PythonApp:Contingency  float 		ISIMin= 5 5 2 % // Minimum time s between stimuli",
+			
+			"PythonApp:Design float ISIMin= 4.5 4.5 2 % // Minimum time s between stimuli",
+			
 			"PythonApp:Contingency 	list 		ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent.",
 			"PythonApp:Contingency 	float 		DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before triggering",
 			"PythonApp:Contingency 	float 		DurationRand= 0.3 0.3 0 % // Randomization s around the duration",
-			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 05 10 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria",
-			#TODO: Some applications might want to trigger only when the signal enters the range in a certain direction.
-			#"PythonApp:Contingency 	int 		RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
-			
+			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 05 15 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria",
+			"PythonApp:Contingency 	int 		RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
+						
 			"PythonApp:Display 	string 	CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
 			"PythonApp:Display 	string 	CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
 			"PythonApp:Display 	string 	BGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background (color)",
 			"PythonApp:Display 	string	InRangeBGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background indicating target range (color)",
 			"PythonApp:Display 	int		FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
-			"PythonApp:Display  int		ShowLastERP=  1 1 0 1  // plot the last trial's ERP (boolean)",
 			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
-			"PythonApp:Display  int		ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
-			"PythonApp:Display  float	WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
 			
-			#Specify how this will be used.
-			"PythonApp:Method	int			ExperimentType= 0 0 0 4 // Experiment Type: 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment (enumeration)",
-			"PythonApp:Method	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
-			"PythonApp:Method	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
-			#"PythonApp:Method   int			UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
-			"PythonApp:Method	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
-			"PythonApp:Method	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
+			"PythonApp:Magstim	string		SerialPort= COM4 % % % // Serial port for controlling Magstim",
+			"PythonApp:Magstim	int			TriggerType= 0 0 0 2 // Send stimulus as: 0 Contec AIO, 1 soundcard, 2 serial command (enumeration)",
+			"PythonApp:Magstim	int 		ReqStimReady= 1 1 0 1 // Require ready response: 0 no, 1 yes (boolean)",
 			
-			#Subjects will be created in the db ahead of time. It is possible for subjects to be named the same thing but be of
-			#different types, but for now assume unique subject names and therefore we can infer the type from the name.
-			#"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 	// Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)",
-			#PeriodType will be determined by ExperimentType
-			#"PythonApp:Analysisdb 	int		PeriodType= 2 2 0 3 	// Period type: 0 hr_baseline, 1 hr_cond, 2 mep_baseline, 3 mep_cond (enumeration)",
-			]
-		#The ExperimentType determines the stimulator, its parameters, the trial criteria, and the data structure.
-		#Many of these can be automatic but they also have their own parameters that may need to be set.
-		params.extend(MEP.params)
-		params.extend(IOCURVE.params)
+			"PythonApp:ERP	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
+            "PythonApp:ERP	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
+			"PythonApp:ERP	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
 			
+			"PythonApp:Screen   int    ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
+			"PythonApp:Screen   float  WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
+			
+			#SubjectType is necessary for identifying subjects with common names.
+			"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 	// Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)",
+			
+		]
 		states = [
 			#Name Length(nBits up to 32) Value ByteLocation(in state vector) BitLocation(0 to 7) CRLF
 			#http://bci2000.org/wiki/index.php/Technical_Reference:State_Definition
@@ -105,12 +90,12 @@ class BciApplication(BciGenericApplication):
 			
 			"Intertrial 1 0 0 0",
 			"Inrange 1 0 0 0", #1 for Inrange, 0 for Outrange. This is not a phase state, but actually reflects the signal.
-			#"SignalEnterMet 1 0 0 0",
+			"SignalEnterMet 1 0 0 0",
 			"SignalCriteriaMetBlocks 16 0 0 0", #in blocks, 16-bit is max 65536
 			"ISIExceeded 1 0 0 0",
-			"StimulatorIntensity 16 0 0 0", #So it is saved off-line analysis
-			"StimulatorReady 1 0 0 0", #Whether or not stimulator is ready to trigger.
-			"Trigger 1 0 0 0",
+			"StimulatorReady 1 0 0 0", #Whether or not the stimulator returns ready
+			#TODO: "StimulatorIntensity 16 0 0 0", #So it is saved off-line analysis
+			#"Trigger 1 0 0 0",
 			"Response 1 0 0 0",
 			"Feedback 1 0 0 0",
 		]
@@ -120,12 +105,19 @@ class BciApplication(BciGenericApplication):
 	#############################################################
 	
 	def Preflight(self, sigprops):
-		#TODO: Warn if ISIMin is less than ITI as determined by phases.
 
 		#Not yet supported
-		#if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
+		if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
 		
-		#Setup screen
+		#TODO: TrialsPerBlock -> Inf
+		
+		##############################################
+		# http://visionegg.org/manual/visionegg.html #
+		##############################################
+		# Here is where you would set VisionEgg.config parameters,
+		# either using self.screen.setup(), or (for more advanced
+		# options) directly like, e.g. this to make the window draggable:
+		#VisionEgg.config.VISIONEGG_FRAMELESS_WINDOW = 0  # gives the window a title bar
 		siz = float(self.params['WindowSize'])
 		screenid = int(self.params['ScreenId'])  # ScreenId 0 is the first screen, 1 the second, -1 the last
 		fullscreen(scale=siz, id=screenid, frameless_window=(siz==1)) # only use a borderless window if the window is set to fill the whole screen
@@ -133,7 +125,7 @@ class BciApplication(BciGenericApplication):
 		###############################
 		# CONTINGENCY PARAMETER CHECK #
 		###############################
-		
+
 		# Make sure ContingentChannel is in the list of channels.
 		chn = self.inchannels()
 		pch = self.params['ContingentChannel'].val
@@ -155,26 +147,18 @@ class BciApplication(BciGenericApplication):
 		if len(amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
 		if amprange[0]>amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
 		self.amprange=np.asarray(amprange,dtype='float64')
-		
+				
 		#############
 		# ERP CHECK #
 		#############
 		self.trigchan=None
-		#tch = self.params['TriggerInputChan'].val
-		tch = self.params['TriggerInputChan']
-		if len(tch) != 0:
-			if False in [isinstance(x, int) for x in tch]:
-				nf = filter(lambda x: not str(x) in chn, tch)
-				if len(nf): raise EndUserError, "TriggerChannel %s not in module's list of input channel names" % str(nf)
-				self.trigchan = [chn.index(str(x)) for x in tch]
-			else:
-				nf = [x for x in tch if x < 1 or x > len(chn) or x != round(x)]
-				if len(nf): raise EndUserError, "Illegal TriggerChannel: %s" %str(nf)
-				self.trigchan = [x-1 for x in tch]
-		if self.trigchan:
-			trigthresh=self.params['TriggerThreshold'].val
-			self.tch=tch #This is used for storing the channel labels.
-			self.trigthresh=trigthresh
+		self.tch = ['TMSTrig']
+		if False in [isinstance(x, int) for x in tch]:
+			nf = filter(lambda x: not str(x) in chn, tch)
+			if len(nf): raise EndUserError, "TriggerChannel %s not in module's list of input channel names" % str(nf)
+			self.trigchan = [chn.index(str(x)) for x in tch]
+		self.trigthresh=self.params['TriggerThreshold'].val
+		
 		#Check the ERP channel.
 		erpch = self.params['ERPChan'].val
 		erpch = [ec + "_RAW" for ec in erpch]
@@ -190,9 +174,6 @@ class BciApplication(BciGenericApplication):
 				self.erpchan = [x-1 for x in erpch]
 		else:
 			raise EndUserError, "Must supply ERPChan"
-		
-		#Get the list of stored channel ids
-		self.stored_chan_ids = self.trigchan + self.erpchan if self.trigchan else self.erpchan
 			
 		#Check the ERP window.
 		erpwin = self.params['ERPWindow'].val
@@ -200,41 +181,37 @@ class BciApplication(BciGenericApplication):
 		if erpwin[0]>erpwin[1]: raise EndUserError, "ERPWindow must be in increasing order"
 		if erpwin[1]<0: raise EndUserError, "ERPWindow must include up to at least 0 msec after stimulus onset"
 		self.erpwin=erpwin
-		if self.params['ExperimentType'].val in [1,4]: IOCURVE.preflight(self)
+		
+		####################
+		# STIMULATOR CHECK #
+		####################
+		if int(self.params['TriggerType'])==1:
+			raise EndUserError, "Audio Trigger not yet supported."
 		
 	#############################################################
 	
 	def Initialize(self, indim, outdim):
-		#######################################################
-		# Get our subject and its current period from the ORM #
-		#######################################################
-		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], species_type='human')
-		#Determine period_type from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
-		period_type_name={0:'mep_mapping', 1:'mep_io', 2:'mep_sici', 3:'hr_hunting', 4:'hr_io'}.get(int(self.params['ExperimentType']))
-		my_period_type=get_or_create(Datum_type, Name=period_type_name)
-		self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=12)#Will create period if it does not exist.
 		
-		################
-		# PERIOD FRAME #
-		################
-		#I would like to launch the period frame for this period, but the TKInter locks up BCPy2000.
-		#Instead I will try using a simple matplotlib
-		#self.root = Tk()
-		#self.per_frame = PeriodFrame(frame=self.gui_thread.root, period=self.period)
-		if int(self.params['ShowLastERP']):
-		#	import matplotlib.pyplot as plt
-		#	self.erp_fig = plt.figure(1)
-			import Pyro4
-			uri='PYRO:plot_maker@localhost:4567'#TODO: Make this a parameter.
-			self.plot_maker=Pyro4.Proxy(uri)
-			#self.plot_maker=Pyro4.Proxy("PYRONAME:example.greeting")#if using nameserver
+		######################
+		# ANALYSIS INTERFACE #
+		######################
+		subj_type_name={0:'BCPy_healthy', 1:'BCPy_stroke', 2:'E3rat_emg_eeg'}.get(int(self.params['SubjectType']))
+		my_subj_type=get_or_create(Subject_type, Name=subj_type_name)
+		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		
+		period_type_name='mep_mapping'
+		my_period_type=get_or_create(Datum_type, Name=period_type_name)
+		#Find the period for this subject x type
+		#We could do [x for x in self.subject.periods if x.datum_type==my_period_type][-1]
+		#But the following custom function is probably faster and can set a time limit,
+		#and creates a period if none is found.
+		self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=12)
 		
 		############
 		# GET MVIC #
 		############
-		#We always need an MVIC because we need to know where to put the target bar.
 		#This is a little slow because it loads a full BCI2000.dat file
-		self.mvic = self.subject._get_last_mvic()#Assumes last_mvic file is for the same muscle as current.
+		self.mvic = self.subject._get_last_mvic()
 		
 		##########
 		# SCREEN #
@@ -273,14 +250,27 @@ class BciApplication(BciGenericApplication):
 		self.enterok=False #Init to False
 		self.block_dur= 1000*spb/self.eegfs#duration (ms) of a sample block
 		
+		##############
+		# Stimulator #
+		##############
+		if int(self.params['TriggerType'])==0: #If we are using the CONTEC device to trigger
+			from Caio.TriggerBox import TTL
+			trigbox=TTL()#Initializing this trigbox also sends out a 0V TTL on channel1
+		else: trigbox=None
+		from Magstim.MagstimInterface import Magstim
+		serPort=self.params['SerialPort'].val
+		self.stimulator=Magstim(port=serPort, trigbox=trigbox)
+		self.stimulator.remocon=False
+		#Then we can use self.stimulator.trigger()
+		
 		##################
 		# Buffer the ERP #
 		##################
 		self.post_stim_samples = SigTools.msec2samples(self.erpwin[1], self.eegfs)
 		self.pre_stim_samples = SigTools.msec2samples(np.abs(self.erpwin[0]), self.eegfs)
 		#Initialize the ring buffer. It will be passed the raw data (relabeled as EDC) and the erp.
-		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), len(self.stored_chan_ids), leaky=True)
-
+		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), 2, leaky=True)
+			
 		################################
 		# State monitors for debugging #
 		################################
@@ -291,10 +281,10 @@ class BciApplication(BciGenericApplication):
 			addstatemonitor(self, 'CurrentTrial')
 			addstatemonitor(self, 'Intertrial')
 			addstatemonitor(self, 'Inrange')
-			#addstatemonitor(self, 'SignalEnterMet')
+			addstatemonitor(self, 'SignalEnterMet')
 			addstatemonitor(self, 'SignalCriteriaMetBlocks')
 			addstatemonitor(self, 'ISIExceeded')
-			addstatemonitor(self, 'Trigger')
+			#addstatemonitor(self, 'Trigger')
 			addstatemonitor(self, 'Response')
 			addstatemonitor(self, 'Feedback')
 						
@@ -314,23 +304,15 @@ class BciApplication(BciGenericApplication):
 			m.pargs = (self,)
 
 			self.stimuli['bartext_1'].color=[0,1,0]
-			
-		#from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
-		exp_type = int(self.params['ExperimentType'])		
-		if exp_type in [1,4]: IOCURVE.initialize(self)#Detection limit and baseline trials
-		elif exp_type == 0: MAPPING.initialize(self)#Subtle differences for controlling stimulator.
-		if exp_type in [0,1,2]: MEP.initialize(self)#Stimulator
-		elif exp_type in [3,4]: HR.initialize(self)
 		
 	#############################################################
 	
 	def StartRun(self):
 		#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
-		self.transient("Trigger")
 		self.forget('stim_trig')
 		self.trailingsample = None#Used for trigger monitoring
+		self.erp_parms = {"halfmax": {"est":np.nan, "err": np.nan}, "threshold": {"est":np.nan, "err": np.nan}}
 		self.triggered = False #each new trial has not yet been triggered.
-		if int(self.params['ExperimentType']) in [1,4]: IOCURVE.startrun(self)
 		
 	#############################################################
 	
@@ -339,6 +321,8 @@ class BciApplication(BciGenericApplication):
 		self.phase(name='intertrial', next='outrange', duration=500)#TODO Replace this duration with some parameter
 		self.phase(name='outrange', next='inrange', duration=None)
 		self.phase(name='inrange', next='response', duration=None)
+		#self.phase(name='trigger', next='response', duration=1)#This will lead to multiple transitions per packet... but that's OK!
+		
 		self.phase(name='response', next='feedback'\
 				, duration=self.params['ERPWindow'].val[1]+(2*self.block_dur)+1)
 				#Includes trigger onset. Extra 2 blocks to make sure the response has been captured.
@@ -355,43 +339,32 @@ class BciApplication(BciGenericApplication):
 		#self.states['Trigger'] = int(phase in ['trigger'])
 		self.states['Response']  = int(phase in ['response'])
 		self.states['Feedback']  = int(phase in ['feedback'])
-		#Note: The Inrange state depends on the signal, not on the phase.
+		#The Inrange state depends on the signal, not on the phase.
 		
-		if phase == 'response':
+		if phase == 'response':#Move trigger to the top so it is processed first.
 			self.stimulator.trigger()
-			self.states['Trigger'] = 1
 			self.remember('stim_trig')
 			self.states['SignalCriteriaMetBlocks']=0#Reset the number of blocks
 			self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
 		elif phase == 'outrange':
 			self.stimuli['target_box'].color = [1, 0, 0]
-			#self.states['SignalEnterMet'] = False
+			self.states['SignalEnterMet'] = False
 		elif phase == 'inrange':
 			self.stimuli['target_box'].color = [0, 1, 0]
 			#TODO: Check entry direction condition.
-			#self.enterok = True
-			#self.states['SignalEnterMet'] = self.enterok
+			self.enterok = True
+			self.states['SignalEnterMet'] = self.enterok
+			#Turn on remocon, make sure it is armed, turn off remocon
+			self.stimulator.remocon=True
+			self.stimulator.armed=True
+			self.stimulator.remocon=False
+			
 		elif phase == 'intertrial':
 			self.mindur=self.dmin + randint(-1*self.drand,self.drand)#randomized EMG contingency duration
 			self.triggered = False #each new trial has not yet been triggered.
 			
 		elif phase == 'feedback':
-			#This should begin about 2 blocks after the response window is over.
-			#Hopefully Process has detected the trigger and stored the data by now.
-			#TODO: If rewarding, reward
-			#TODO: If plotting the last ERP, plot it.
-			#if int(self.params['ShowLastERP']):
-			#	trial = self.period.trials[-1]
-			#	store = trial.store
-			#	chan_bool = np.array([cl in self.params['ERPChan'] for cl in store['channel_labels']])
-			#	x_vec = store['x_vec']
-			#	y = store['data'].T[:,chan_bool]
-			#	plt.figure(self.erp_fig)
-			#	plt.plot(x_vec,y)#TODO: append instead of replace?
 			pass
-		
-		if int(self.params['ExperimentType']) in [0,1,2]: MEP.transition(self,phase)
-		if int(self.params['ExperimentType']) in [1,4]: IOCURVE.transition(self,phase)
 					
 	#############################################################
 	
@@ -417,7 +390,7 @@ class BciApplication(BciGenericApplication):
 		self.states['Inrange'] = now_in_range #update state
 		self.states['SignalCriteriaMetBlocks'] = self.states['SignalCriteriaMetBlocks'] +1 if now_in_range else 0#increment the state tracking for how many blocks we are in range.
 		#this state also gets reset to 0 when triggering
-		
+
 		################################
 		# Update the ISIExceeded state #
 		################################
@@ -435,7 +408,7 @@ class BciApplication(BciGenericApplication):
 		# Do this every block, no matter what. #
 		########################################
 		#self.leaky_trap.process(sig[self.erpchan,:])
-		self.leaky_trap.process(sig[self.stored_chan_ids,:]) #Debug trigger timing
+		self.leaky_trap.process(sig[np.hstack((self.trigchan,self.erpchan)),:]) #Debug trigger timing
 		
 		##############################################
 		# Manually change out of inrange or outrange #
@@ -445,8 +418,7 @@ class BciApplication(BciGenericApplication):
 		if phase_inrange or phase_outrange:
 			if now_in_range:
 				if phase_inrange:#phase was correct
-					#if self.enterok and isiok and stim_ready and self.stimulator.armed and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
-					if isiok and stim_ready and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
+					if self.enterok and isiok and stim_ready and self.stimulator.armed and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
 						self.change_phase('response')
 				else:#phase was wrong
 					self.change_phase('inrange')					
@@ -471,7 +443,7 @@ class BciApplication(BciGenericApplication):
 				tr = np.concatenate((prev,tr)) #prepend this packet with the last sample of the previous packet
 				tr = np.asarray(tr > self.trigthresh, np.int8) #booleans representing whether or not the trigger was above threshold
 				tr = np.argwhere(np.diff(tr) > 0)  #find any indices where the trigger crossed threshold
-				if len(tr): #If we have a crossing
+				if len(tr):
 					startx = tr[0,0] #n_samples when the trigger first crossed threshold
 			elif self.changed('Response', 1):# Software trigger:
 				#Trigger onset was when we changed phase to Response
@@ -495,35 +467,25 @@ class BciApplication(BciGenericApplication):
 				#The ERP buffer should begin at precisely the pre-stim window so read n_erp_samples
 				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
 				self.triggered = False #We do not need to look for the ERP anymore.
-				my_trial = get_or_create(Datum\
-					, subject=self.subject\
-					, datum_type=self.period.datum_type\
-					, span_type='trial'\
-					, period=self.period\
-					, IsGood=1\
-					, Number=0\
-					, sess=Session.object_session(self.period))
-				#Need to do something here that commits this to the db.
-				Session.object_session(my_trial).commit()
-				#Session.object_session(my_trial).flush()
-				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
-				#TODO: SICI intensity.
-				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
-				#The fature calculation should be asynchronous.
-				chlbs = self.params['TriggerInputChan'] if self.trigchan else []
-				chlbs.extend(self.params['ERPChan'])
-				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': chlbs}
 				
-				if int(self.params['ShowLastERP'])==1:
-					#SigTools.plot(x_vec,x,hold=True,drawnow=True) #Doesn't actually render probably due to threading.
-					#TODO: only pass the ERP channel
-					ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in chlbs])
-					self.plot_maker.plot_data(x_vec,x[ch_bool,:].T)
-		##############################
-		# Response from ERP analysis #
-		##############################
+				my_trial = get_or_create(Datum\
+				    , subject=self.subject\
+				    , datum_type=self.period.datum_type\
+				    , span_type='trial'\
+				    , period=self.period\
+				    , IsGood=1\
+				    , Number=0)
+				
+				#Stim intensity will be taken from the stimulator.
+				#Coil positions from exported Brainsight session will be inserted by offline mapping tool
+				my_trial.detail_values['dat_TMS_powerA']=str(self.stimulator.intensity)
+				
+				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
+				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': [self.tch[0],self.params['ERPChan'][0]]}
+		
 		elif self.in_phase('feedback'):
-			pass
+			#Since we don't have the coil locations, it's impossible to show a map in real-time.
+			pass			
 			
 	#############################################################
 	
@@ -535,8 +497,11 @@ class BciApplication(BciGenericApplication):
 	
 	def Event(self, phase, event):
 		# respond to pygame keyboard and mouse events
-		# Manually increase/decrease stimulator intensity.
-		pass
+		import pygame.locals
+		if event.type == pygame.locals.KEYDOWN:
+			if event.key == ord('r'): self.color[:] = [1,0,0]
+			if event.key == ord('g'): self.color[:] = [0,1,0]
+			if event.key == ord('b'): self.color[:] = [0,0,1]
 		
 	#############################################################
 	
