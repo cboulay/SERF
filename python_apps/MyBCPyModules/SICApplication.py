@@ -35,8 +35,8 @@ from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
 import BCPy2000.BCI2000Tools.FileReader as FileReader
-from EeratAPI.API import Subject_type, get_or_create
-from EeratAPI.OnlineAPIExtension import Subject, Datum
+from EeratAPI.API import *
+from EeratAPI.OnlineAPIExtension import *
 
 class BciApplication(BciGenericApplication):
 	
@@ -69,10 +69,6 @@ class BciApplication(BciGenericApplication):
 			
 			"PythonApp:Screen   int    ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Screen   float  WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
-			
-			#Subject should already be in db. SubjectType is necessary because it helps identify subjects if they have the same name.
-			"PythonApp:Analysisdb	string	SubjectType= 'BCPy healthy' // Name of subject type",
-			
 		]
 		states = [
 			#Name Length(nBits up to 32) Value ByteLocation(in state vector) BitLocation(0 to 7) CRLF
@@ -134,8 +130,7 @@ class BciApplication(BciGenericApplication):
 		###################################
 		# Get the subject in the database #
 		###################################
-		my_subj_type=get_or_create(Subject_type, Name=self.params['SubjectType'])
-		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], subject_type=my_subj_type, species_type='human')
+		self.subject=get_or_create(Subject, Name=self.params['SubjectName'])#Should crash if subject not in db.
 		
 	#############################################################
 	

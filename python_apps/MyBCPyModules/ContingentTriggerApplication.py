@@ -34,7 +34,8 @@ from AppTools.Shapes import Block
 import AppTools.Meters
 from EeratAPI.API import *
 from EeratAPI.OnlineAPIExtension import *
-from CTAExtension import MEP, HR, MAPPING, IOCURVE
+from CTAExtension import MEP, HR, MAPPING, IOCURVE, SICI
+import pygame, pygame.locals
 
 class BciApplication(BciGenericApplication):
 	#At the moment, this app is used for:
@@ -68,6 +69,15 @@ class BciApplication(BciGenericApplication):
 			#TODO: Some applications might want to trigger only when the signal enters the range in a certain direction.
 			#"PythonApp:Contingency 	int 		RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
 			
+			#Specify how this will be used.
+			"PythonApp:Method	int			ExperimentType= 0 0 0 4 // Experiment Type: 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment (enumeration)",
+			"PythonApp:Method	float	 	StimIntensity= 30 30 0 100 // 0-50 for DS5, 0-100 for Single-Pulse, 0-100 for Bistim Cond",
+			"PythonApp:Method	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
+			"PythonApp:Method	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
+			#"PythonApp:Method   int			UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
+			"PythonApp:Method	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
+			"PythonApp:Method	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
+			
 			"PythonApp:Display 	string 	CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
 			"PythonApp:Display 	string 	CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
 			"PythonApp:Display 	string 	BGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background (color)",
@@ -77,25 +87,11 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
 			"PythonApp:Display  int		ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Display  float	WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
-			
-			#Specify how this will be used.
-			"PythonApp:Method	int			ExperimentType= 0 0 0 4 // Experiment Type: 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment (enumeration)",
-			"PythonApp:Method	float	 	StimIntensity= 30 30 0 100 // Stim Intensity if single-pulse, Cond Intensity if Bistim",
-			"PythonApp:Method	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
-			"PythonApp:Method	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
-			#"PythonApp:Method   int			UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
-			"PythonApp:Method	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
-			"PythonApp:Method	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
-			
-			#Subjects will be created in the db ahead of time. It is possible for subjects to be named the same thing but be of
-			#different types, but for now assume unique subject names and therefore we can infer the type from the name.
-			#"PythonApp:Analysisdb 	int		SubjectType= 0 0 0 2 	// Subject type: 0 BCPy_healthy, 1 BCPy_stroke, 2 E3rat_emg_eeg (enumeration)",
-			#PeriodType will be determined by ExperimentType
-			#"PythonApp:Analysisdb 	int		PeriodType= 2 2 0 3 	// Period type: 0 hr_baseline, 1 hr_cond, 2 mep_baseline, 3 mep_cond (enumeration)",
 			]
 		#The ExperimentType determines the stimulator, its parameters, the trial criteria, and the data structure.
 		#Many of these can be automatic but they also have their own parameters that may need to be set.
 		params.extend(MEP.params)
+		params.extend(SICI.params)
 		params.extend(IOCURVE.params)
 			
 		states = [
@@ -115,6 +111,8 @@ class BciApplication(BciGenericApplication):
 			"Response 1 0 0 0",
 			"Feedback 1 0 0 0",
 		]
+		states.extend(MEP.states)
+		states.extend(SICI.states)
 		
 		return params,states
 		
@@ -317,13 +315,17 @@ class BciApplication(BciGenericApplication):
 			self.stimuli['bartext_1'].color=[0,1,0]
 			
 		#from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
-		exp_type = int(self.params['ExperimentType'])		
+		exp_type = int(self.params['ExperimentType'])
+		if exp_type in [0,1,2]: MEP.initialize(self)#Stimulator
+		elif exp_type in [3,4]: HR.initialize(self)
+		if exp_type == 2: SICI.initialize(self)
 		if exp_type in [1,4]: IOCURVE.initialize(self)#Detection limit and baseline trials
 		elif exp_type == 0: MAPPING.initialize(self)#Subtle differences for controlling stimulator.
-		if exp_type in [0,1,2]: MEP.initialize(self)#Stimulator
-		if exp_type == 2: SICI.initialize(self)#Stimulator
-		elif exp_type in [3,4]: HR.initialize(self)
-		app.stimulator.intensity = app.params['StimIntensity'].val
+		self.stimulator.intensity = self.params['StimIntensity'].val#This might be overwritten in inter-trial (e.g. by IOCURVE)
+		
+		self.x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
+		self.chlbs = self.params['TriggerInputChan'] if self.trigchan else []
+		self.chlbs.extend(self.params['ERPChan'])
 		
 	#############################################################
 	
@@ -366,7 +368,7 @@ class BciApplication(BciGenericApplication):
 			self.remember('stim_trig')
 			self.states['SignalCriteriaMetBlocks']=0#Reset the number of blocks
 			self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
-			self.states['StimulatorIntensity'] = app.stimulator.intensity
+			self.states['StimulatorIntensity'] = self.stimulator.intensity
 		elif phase == 'outrange':
 			self.stimuli['target_box'].color = [1, 0, 0]
 			#self.states['SignalEnterMet'] = False
@@ -503,16 +505,13 @@ class BciApplication(BciGenericApplication):
 				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
 				if int(self.params['ExperimentType']) == 2:#SICI intensity
 					my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
-				x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
 				#The fature calculation should be asynchronous.
-				chlbs = self.params['TriggerInputChan'] if self.trigchan else []
-				chlbs.extend(self.params['ERPChan'])
-				my_trial.store={'x_vec':x_vec, 'data':x, 'channel_labels': chlbs}
+				my_trial.store={'x_vec':self.x_vec, 'data':x, 'channel_labels': self.chlbs}
 				
 				if int(self.params['ShowLastERP'])==1:
 					#Pass the plot off to a remote object so it doesn't kill this' rendering.
-					ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in chlbs])
-					self.plot_maker.plot_data(x_vec,x[ch_bool,:].T)
+					ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in self.chlbs])
+					self.plot_maker.plot_data(self.x_vec,x[ch_bool,:].T)
 		##############################
 		# Response from ERP analysis #
 		##############################
@@ -528,10 +527,11 @@ class BciApplication(BciGenericApplication):
 	#############################################################
 	
 	def Event(self, phase, event):
-		# respond to pygame keyboard and mouse events
-		# Manually increase/decrease stimulator intensity.
-		pass
-		
+		if event.type == pygame.locals.KEYDOWN:
+			if event.key == pygame.K_UP:
+				self.stimulator.intensity = self.stimulator.intensity + 1
+			if event.key == pygame.K_DOWN:
+				self.stimulator.intensity = self.stimulator.intensity - 1
 	#############################################################
 	
 	def StopRun(self):

@@ -86,8 +86,6 @@ class IOCURVE(object):
 		n_start = app.baseline_trials
 		app.starting_intensities = np.r_[start:stop:n_start+0j]
 		np.random.shuffle(app.starting_intensities)
-		
-		#TODO: Open up the period GUI
 			
 	@classmethod
 	def startrun(cls,app):
@@ -109,14 +107,14 @@ class IOCURVE(object):
 				elif np.isnan(_hm['err']) or _hm['err']>=(0.05*_hm['est']):
 					model_type="halfmax"
 				else:
-					app.states['CurrentTrial']=999
+					app.states['CurrentTrial']=500
 				stimi = app.erp_parms[model_type]['est']
 				if (not stimi) or np.isnan(stimi):#In case NaN or None
 					#Choose a random intensity in baseline_range
 					stimi=uniform(app.baseline_range[0],app.baseline_range[1])
 			stimi=min(app.baseline_range[1],stimi)#stimi should not exceed the max range
 			app.stimulator.intensity = stimi
-			self.states['StimulatorIntensity']=int(round(stimi))
+			app.states['StimulatorIntensity']=int(round(stimi))
 			
 		elif phase == 'feedback':
 			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
@@ -126,7 +124,7 @@ class IOCURVE(object):
 			if trial_ix >= app.baseline_trials:
 				#TODO: Request this of the GUI
 				for model_type in ['threshold','halfmax']:
-					popt, perr=app.period.model_erp(model_type=model_type)
+					popt, perr, x, y=app.period.model_erp(model_type=model_type)
 					stimi = popt[0]
 					stimerr = perr[0]
 					app.erp_parms[model_type]['est']=stimi

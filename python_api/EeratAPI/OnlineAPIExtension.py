@@ -257,15 +257,15 @@ class Datum:
 			#get xy_array as dat_TMS_powerA, MEP_aaa
 			x=self._get_child_details(stim_det_name)
 			x=x.astype(np.float)
+			x_bool = ~np.isnan(x)
 			y=self._get_child_features(erp_name)
 			if model_type=='threshold':
 				if not self.erp_detection_limit: self._get_detection_limit()
 				y=y>self.erp_detection_limit
 				y=y.astype(int)
-				x_bool = ~np.isnan(x)
 			elif 'hr' in self.type_name:#Not threshold, and hr, means cut off trials > h-max
-				h_max = max(y)
-				y_max_ind = find(y==h_max)
+				h_max = np.max(y)
+				y_max_ind = find(y==h_max)[0]
 				x_at_h_max = x[y_max_ind]
 				x_bool = x <= x_at_h_max
 			n_trials = 1 if x.size==1 else x[x_bool].shape[0]

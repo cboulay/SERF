@@ -568,7 +568,7 @@ class PeriodFrame:
     def plot_erps(self):
         if len(self.period.trials)>0:
             per_store=self.period.store
-            
+            if not per_store['channel_labels']: self.period.update_store()
             #Find any channel that appears in period.detail_values
             chans_list = [pdv for pdv in self.period.detail_values.itervalues() if pdv in per_store['channel_labels']]
             chans_list = list(set(chans_list))#make unique

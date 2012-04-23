@@ -2,12 +2,16 @@
 #Data are passed to this object over the network
 #and this object plots the data. Simple, but
 #necessary to get around GUI threading issues.
+import pylab
+import numpy as np
 import Pyro4
 from BCPy2000 import SigTools
 
 class PlotMaker(object):
     def plot_data(self,x,y):
-        SigTools.plot(x,y,hold=True,drawnow=True)
+        x_bool = x > 5
+        SigTools.plot(x[x_bool],y[x_bool,:], hold = True, drawnow = True)
+        print "Why isn't this rendering anymore?"
         
 if __name__ == "__main__":
     plot_maker=PlotMaker()
