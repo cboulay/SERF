@@ -83,7 +83,7 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Display 	string 	BGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background (color)",
 			"PythonApp:Display 	string	InRangeBGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background indicating target range (color)",
 			"PythonApp:Display 	int		FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
-			"PythonApp:Display  int		ShowLastERP=  1 1 0 1  // plot the last trial's ERP (boolean)",
+			#"PythonApp:Display  int		ShowLastERP=  1 1 0 1  // plot the last trial's ERP (boolean)",
 			"PythonApp:Display 	int		RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
 			"PythonApp:Display  int		ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Display  float	WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
@@ -220,13 +220,13 @@ class BciApplication(BciGenericApplication):
 		#Instead I will try using a simple matplotlib
 		#self.root = Tk()
 		#self.per_frame = PeriodFrame(frame=self.gui_thread.root, period=self.period)
-		if int(self.params['ShowLastERP']):
+		#if int(self.params['ShowLastERP']):
 		#	import matplotlib.pyplot as plt
 		#	self.erp_fig = plt.figure(1)
-			import Pyro4 #TODO: This causes a runtime error but the error seems to not matter.
-			uri='PYRO:plot_maker@localhost:4567'#TODO: Make this a parameter.
-			self.plot_maker=Pyro4.Proxy(uri)
-			#self.plot_maker=Pyro4.Proxy("PYRONAME:example.greeting")#if using nameserver
+		#	import Pyro4 #TODO: This causes a runtime error but the error seems to not matter.
+		#	uri='PYRO:plot_maker@localhost:4567'#TODO: Make this a parameter.
+		#	self.plot_maker=Pyro4.Proxy(uri)
+		#	#self.plot_maker=Pyro4.Proxy("PYRONAME:example.greeting")#if using nameserver
 		
 		############
 		# GET MVIC #
@@ -508,10 +508,10 @@ class BciApplication(BciGenericApplication):
 				#The fature calculation should be asynchronous.
 				my_trial.store={'x_vec':self.x_vec, 'data':x, 'channel_labels': self.chlbs}
 				
-				if int(self.params['ShowLastERP'])==1:
+				#if int(self.params['ShowLastERP'])==1:
 					#Pass the plot off to a remote object so it doesn't kill this' rendering.
-					ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in self.chlbs])
-					self.plot_maker.plot_data(self.x_vec,x[ch_bool,:].T)
+				#	ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in self.chlbs])
+				#	self.plot_maker.plot_data(self.x_vec,x[ch_bool,:].T)
 		##############################
 		# Response from ERP analysis #
 		##############################

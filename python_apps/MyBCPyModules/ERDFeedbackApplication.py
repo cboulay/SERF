@@ -35,25 +35,28 @@ class BciApplication(BciGenericApplication):
 
     def Construct(self):
         self.define_param(
-			"PythonApp:Design   int    AlternateTargets=    0     0     0   1  // alternate target classes rather than choosing randomly (boolean)",
-			"PythonApp:Design   int    ShowFixation=        0     0     0   1  // show a fixation point in the center (boolean)",
-			"PythonApp:Screen   int    ScreenId=            -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
-	        "PythonApp:Screen   float  WindowSize=          0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
-			"PythonApp:Stimuli  float  TargetSize=          0.08   0.08   0.0 0.5 // thickness of the target rectangles relative to the screen height",
-			"PythonApp:Feedback int    CursorFeedback=      1     1     0   1  // show online feedback cursor (boolean)",
-			"PythonApp:Feedback int    AudioFeedback=       1     0     0   1  // play continuous sounds? (boolean)",
-            "PythonApp:Feedback matrix FeedbackWavs=        3 1 feedback-drums.wav feedback-piano.wav feedback-strings.wav % % % // feedback wavs",
-            "PythonApp:Feedback int    HandboxFeedback=     1     0     0   1  // move handbox? (boolean)",
-            "PythonApp:Feedback string SerialPort=          COM7 % % %         // Serial port for controlling Magstim",
-            "PythonApp:Feedback float  FeedbackDuration=    8    8    1 20 // Feedback duration in seconds",
+            "PythonApp:Design    int    AlternateTargets=    0     0     0   1  // alternate target classes rather than choosing randomly (boolean)",
+            "PythonApp:Design    int    ShowFixation=        0     0     0   1  // show a fixation point in the center (boolean)",
+            "PythonApp:Screen    int    ScreenId=            -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
+            "PythonApp:Screen    float    WindowSize=          0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
+            "PythonApp:Stimuli    float    TargetSize=          0.08   0.08   0.0 0.5 // thickness of the target rectangles relative to the screen height",
+            "PythonApp:Feedback    int    CursorFeedback=      1     1     0   1  // show online feedback cursor (boolean)",
+            "PythonApp:Feedback    int    AudioFeedback=       1     0     0   1  // play continuous sounds? (boolean)",
+            "PythonApp:Feedback    matrix FeedbackWavs=        2 1 feedback-drums.wav feedback-piano.wav % % % // feedback wavs",
+            "PythonApp:Feedback    int    HandboxFeedback=     1     0     0   1  // move handbox? (boolean)",
+            "PythonApp:Feedback    string HBPort=              COM7 % % %         // Serial port for controlling Handbox",
+            "PythonApp:Feedback    int    FNMESFeedback=       0 % % %         // Enable neuromuscular stim feedback? (boolean)",
+            "PythonApp:Feedback    string FNMESPort=            COM8 % % %         // Serial port for controlling FNMES",
+            
+            "PythonApp:Feedback float  FeedbackDuration=    6    6    1 20 // Feedback duration in seconds",
 			
 		)
         self.define_state(
 			"Baseline   1 0 0 0",
 			"StartCue   1 0 0 0",
-			"Feedback   1 0 0 0",   # bells? whistles?
+			"Feedback   1 0 0 0",
 			"StopCue    1 0 0 0",
-			"TargetCode	2 0 0 0",   # should the subject be imagining feet (1), left hand (2), right hand (3), or resting (0 during 'baseline' phase) ?
+			"TargetCode	2 0 0 0", # should the subject be imagining feet (1), left hand (2), right hand (3), or resting (0 during 'baseline' phase) ?
             "Value     16 0 0 0", #in blocks, 16-bit is max 65536
 		)
 
@@ -131,37 +134,48 @@ class BciApplication(BciGenericApplication):
         
         # set up the strings that are going to be presented in the 'cue' stimulus
         self.cuetext = ['pause', 'rest', 'imagery']
-        
-        # load, and silently start, the continuous feedback sounds
-        self.sounds = []
-        if int(self.params['AudioFeedback']):
-        	wavmat = self.params['FeedbackWavs']
-        	for i in range(len(wavmat)):
-        		wavlist = wavmat[i]
-        		if len(wavlist) != 1: raise EndUserError, 'FeedbackWavs matrix should have 1 column'
-        		try: snd = WavTools.player(wavlist[0])
-        		except IOError: raise EndUserError, 'failed to load "%s"'%wavlist[0]
-        		self.sounds.append(snd)
-        		snd.vol = 0
-        		snd.play(-1)
 
         eegfs=self.nominal['SamplesPerSecond'] #Sampling rate
         spb=self.nominal['SamplesPerPacket'] #Samples per block
         fbdur = self.params['FeedbackDuration'].val #feedback duration
         fbblks = fbdur * eegfs / spb #feedback blocks
         
+        #Set cursor speed so that it takes entire feedback duration to go from bottom to top at amplitude 1
+        if int(self.params['CursorFeedback']):
+            top_t = self.p[1,1]
+            bottom_t = self.p[0,1]
+            self.curs_speed = (top_t - bottom_t) / fbblks #pixels per block
+            
+        # load, and silently start, the continuous feedback sounds
+        self.sounds = []
+        if int(self.params['AudioFeedback']):
+            wavmat = self.params['FeedbackWavs']
+            for i in range(len(wavmat)):
+                wavlist = wavmat[i]
+                if len(wavlist) != 1: raise EndUserError, 'FeedbackWavs matrix should have 1 column'
+                try: snd = WavTools.player(wavlist[0])
+                except IOError: raise EndUserError, 'failed to load "%s"'%wavlist[0]
+                self.sounds.append(snd)
+                snd.vol = 0
+                snd.play(-1)
+            #Set the speed at which the fader can travel from -1 (ERS) to +1 (ERD)
+            self.fader_speed = 2 / fbblks
+        
         if int(self.params['HandboxFeedback']):
             from Handbox.HandboxInterface import Handbox
-            serPort=self.params['SerialPort'].val
+            serPort=self.params['HBPort'].val
             self.handbox=Handbox(port=serPort)
             #When x is +1, we have ERD relative to baseline
             #It should take fbblks at x=+1 to travel from 90 to 0
             self.hand_speed = -90 / fbblks #hand speed in degrees per block when x=+1
             
-        #Set cursor speed so that it takes entire feedback duration to go from bottom to top at amplitude 1
-        top_t = self.p[1,1]
-        bottom_t = self.p[0,1]
-        self.curs_speed = (top_t - bottom_t) / fbblks #pixels per block
+        if int(self.params['FNMESFeedback']):
+            from Handbox.FNMESInterface import FNMES
+            serPort=self.params['FNMESPort'].val
+            self.fnmes=FNMES(port=serPort)
+            #I seem to be getting a shock whenever I turn on the device.
+            #It should take fbblks at x=+1 to get intensity from 0 to 15
+            self.fnmes_speed = 16 / fbblks #fnmes intensity rate of change per block when x=+1
         
         # finally, some fancy stuff from AppTools.StateMonitors, for the developer to check
         # that everything's working OK
@@ -192,14 +206,16 @@ class BciApplication(BciGenericApplication):
         self.stimuli['cursor1'].position = self.positions['origin'].A.ravel().tolist()
         if int(self.params['ShowFixation']):
 			self.stimuli['fixation'].on = True
+        self.fader_val = 0
+        self.fnmes_i = 0
 
     def Phases(self):
         self.phase(name='intertrial',   next='baseline',    duration=randint(1000,3000))
         self.phase(name='baseline',     next='startcue',    duration=3000)
         self.phase(name='startcue',     next='gap',         duration=1000)
         self.phase(name='gap',          next='imagine',     duration=800)
-        self.phase(name='imagine',      next='stopcue',     duration=1000*self.params['FeedbackDuration'].val) # The 'Learn' state won't be set just yet...
-        self.phase(name='stopcue',      next='intertrial',  duration=800)
+        self.phase(name='imagine',      next='stopcue',     duration=1000*self.params['FeedbackDuration'].val)
+        self.phase(name='stopcue',      next='intertrial',  duration=200)
         
         self.design(start='intertrial', new_trial='baseline', interblock='idle')
 
@@ -223,7 +239,17 @@ class BciApplication(BciGenericApplication):
             self.stimuli['cue'].text = self.cuetext[t]
             self.stimuli['arrow'].color = map(lambda x:int(x==t), [1,2,3])
             self.stimuli['arrow'].angle = 180*(t - 1)
-
+            if int(self.params['AudioFeedback']): self.sounds[t-1].vol = 1
+        
+        if phase == 'gap':
+            pass
+            
+        if phase == 'imagine':
+            #Reset fader to middle at beginning of feedback
+            self.fader_val = 0
+            #Reset fnmes to middle at beginning of feedback
+            self.fnmes_i = 7
+            
         if phase == 'stopcue':
             self.stimuli['cue'].text = self.cuetext[0]
 
@@ -231,8 +257,6 @@ class BciApplication(BciGenericApplication):
         #Normalizer is set such that sig will be mean 0 and variance = 1 relative to baseline
         #Convert x to a measure of excitability (ERD) from -3 to +3 SDs.
         x = -1*sig.A.ravel()[0]/3
-        
-        #TODO: audio volume for each sound
         
         fdbk = int(self.states['Feedback']) != 0
         if int(self.params['CursorFeedback']):
@@ -242,14 +266,27 @@ class BciApplication(BciGenericApplication):
             new_pos[1] = min(new_pos[1],self.p[1,1])
             new_pos[1] = max(new_pos[1],self.p[0,1])
             self.stimuli['cursor1'].position = new_pos if fdbk else self.positions['origin'].A.ravel().tolist()
-        #if int(self.params['AudioFeedback']):
-        #    for i in range(min(len(self.sounds), len(col))):
-        #        self.sounds[i].vol = col[i]
+        
+        if int(self.params['AudioFeedback']):
+            #self.sounds[0] is drums = ERS. self.sounds[1] is piano = ERD
+            #self.fader_val from -1 to +1
+            #can increment or decrement at self.fader_speed
+            self.fader_val = self.fader_val + self.fader_speed * x
+            self.fader_val = min(1, self.fader_val)
+            self.fader_val = max(-1, self.fader_val)
+            self.sounds[0].vol = 0.5 * (1 - self.fader_val) if fdbk else 0
+            self.sounds[1].vol = 0.5 * (1 + self.fader_val) if fdbk else 0
+        
         if int(self.params['HandboxFeedback']):
             angle = self.handbox.position
             angle = angle + self.hand_speed * x
             self.handbox.position = angle if fdbk else 45
-
+            
+        if int(self.params['FNMESFeedback']):
+            self.fnmes_i = self.fnmes_i + self.fnmes_speed * x
+            self.fnmes_i = min(self.fnmes_i, 15)
+            self.fnmes_i = max(self.fnmes_i, 0)
+            self.fnmes.intensity = int(round(self.fnmes_i)) if fdbk else 7
 
     def StopRun(self):
 		
