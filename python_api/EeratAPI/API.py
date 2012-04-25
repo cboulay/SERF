@@ -175,7 +175,7 @@ class Datum(Base):
 				
 class Datum_store(Base):
 	datum				= relationship(Datum
-							, backref=backref("_store", cascade="all, delete-orphan", uselist=False)
+							, backref=backref("_store", cascade="all, delete-orphan", uselist=False, lazy="joined")
 							, innerjoin=True
 							, lazy="joined"
 							)
@@ -188,12 +188,10 @@ class Datum_type(Base):
 							)
 	detail_types		= relationship(Detail_type
 							, secondary="datum_type_has_detail_type"
-							, backref="datum_types" 
-							, lazy="joined")
+							, backref="datum_types")
 	feature_types		= relationship(Feature_type
 							, secondary="datum_type_has_feature_type"
-							, backref="datum_types"
-							, lazy="joined")
+							, backref="datum_types")
 #	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
 #							,creator = lambda k, v: Datum_type_has_feature_type(_feature_name=k, feature_type=v)
 #							)
@@ -204,32 +202,29 @@ class Datum_type(Base):
 class Datum_detail_value(Base):
 	datum 				= relationship(Datum, backref=backref("datum_detail_value",
 							collection_class=attribute_mapped_collection("detail_name"),
-							cascade="all, delete-orphan", lazy="joined")
-							, lazy="joined"
+							cascade="all, delete-orphan", lazy="subquery")
 							)
 	detail_type			= relationship(Detail_type, 
 							backref=backref("datum_detail_value", cascade="all, delete-orphan")
-							, lazy="joined"
-							)
+							, lazy="joined")
 	detail_name			= association_proxy('detail_type','Name')
 	
 class Datum_feature_value(Base):
 	datum 				= relationship(Datum, backref=backref("datum_feature_value",
 							collection_class=attribute_mapped_collection("feature_name"),
-							cascade="all, delete-orphan", lazy="joined")
-							, lazy="joined"
+							cascade="all, delete-orphan", lazy="subquery")
 							)
 	feature_type		= relationship(Feature_type, 
 							backref=backref("datum_feature_value", cascade="all, delete-orphan")
-							, lazy="joined"
-							)
+							, lazy="joined")
 	feature_name		= association_proxy('feature_type','Name')
 
 class Subject(Base):
 	data 				= relationship(Datum
-							, backref=backref("subject", lazy="joined")
+							, backref=backref("subject")
 							, cascade="all, delete-orphan"
 							, order_by="Datum.datum_id"
+							, lazy="dynamic"
 							)
 	details 			= association_proxy("subject_detail_value", "Value"
 							, creator = lambda k, v: Subject_detail_value(detail_name=k, Value=v)
@@ -237,7 +232,8 @@ class Subject(Base):
 	periods				= relationship(Datum
 							, cascade="all, delete-orphan"
 							, order_by="Datum.datum_id"
-							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type==3)")
+							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type==3)"
+							, lazy="joined")
 	
 	def get_now_period_of_type(self,type):
 		session = Session.object_session(self)
@@ -259,12 +255,12 @@ class Subject(Base):
 #	periods = property(_get_periods, _set_periods)
 				
 class Subject_type(Base):
-	subjects 			= relationship(Subject, backref=backref("subject_type", lazy="joined")
+	subjects 			= relationship(Subject, backref=backref("subject_type")
 							, cascade="all, delete-orphan")
 	detail_types		= relationship(Detail_type
 							, secondary="subject_type_has_detail_type"
 							, backref="subject_types" 
-							, lazy="joined")
+							)
 #	detail_types 		= association_proxy("subject_type_has_detail_type","detail_type")
 	
 	
@@ -272,10 +268,9 @@ class Subject_detail_value(Base):
 	subject 			= relationship(Subject, backref=backref("subject_detail_value"
 							, cascade="all, delete-orphan"
 							, collection_class = attribute_mapped_collection("detail_name")
-							, lazy="joined"
+							, lazy="subquery"
 							)
-							, lazy="joined"
-							)
+						)
 	detail_type = relationship(Detail_type, 
 							backref=backref("subject_detail_value", cascade="all, delete-orphan")
 							, lazy="joined"
