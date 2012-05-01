@@ -77,8 +77,9 @@ class BciApplication(BciGenericApplication):
 		
 		return params,states
 		
-	#############################################################
-	#EDCc EDCa FCRc FCRa TMSTrigc TMSTriga NerveTrigc NerveTriga NA NA NA NA NA NA NA NA
+	def Halt(self):
+		#Use this hook to cleanup things from initialize
+		pass
 	
 	def Preflight(self, sigprops):
 		
@@ -199,7 +200,7 @@ class BciApplication(BciGenericApplication):
 		self.phase(name='intertrial', next='startcue', duration=500)
 		self.phase(name='startcue', next='mvc', duration=2000)
 		self.phase(name='mvc', next='restcue', duration=1000*self.params['MVCDuration'].val)
-		self.phase(name='restcue', next='intertrial', duration=1000*self.params['MVCRest'].val)
+		self.phase(name='restcue', next='intertrial', duration=1000*self.params['MVCRest'].val if self.states['CurrentTrial']<self.params['TrialsPerBlock'].val else 100)
 		self.design(start='intertrial', new_trial='intertrial')
 		
 	#############################################################
