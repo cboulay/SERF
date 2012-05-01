@@ -313,7 +313,8 @@ class BciApplication(BciGenericApplication):
 			m.pargs = (self,)
 
 			self.stimuli['bartext_1'].color=[0,1,0]
-			
+		
+		#Initialize the stimulator. It depends on the ExperimentType
 		#from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
 		exp_type = int(self.params['ExperimentType'])
 		if exp_type in [0,1,2]: MEP.initialize(self)#Stimulator
@@ -388,6 +389,7 @@ class BciApplication(BciGenericApplication):
 			pass
 		
 		if int(self.params['ExperimentType']) in [0,1,2]: MEP.transition(self,phase)
+		if int(self.params['ExperimentType'])==2: SICI.transition(self,phase)
 		if int(self.params['ExperimentType']) in [1,4]: IOCURVE.transition(self,phase)
 					
 	#############################################################
@@ -492,16 +494,22 @@ class BciApplication(BciGenericApplication):
 				#The ERP buffer should begin at precisely the pre-stim window so read n_erp_samples
 				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
 				self.triggered = False #We do not need to look for the ERP anymore.
-				my_trial = get_or_create(Datum\
-					, subject=self.subject\
-					, datum_type=self.period.datum_type\
-					, span_type='trial'\
-					, period=self.period\
-					, IsGood=1\
-					, Number=0\
-					, sess=Session.object_session(self.period))
-				Session.object_session(my_trial).commit()#Need to do something here that commits this to the db.
+				self.period.trials.append(Datum(subject_id=self.subject.subject_id\
+											, datum_type_id=self.period.datum_type_id\
+											, span_type='trial'\
+											, parent_datum_id=self.period.datum_id\
+											, IsGood=1, Number=0))
+				#my_trial = get_or_create(Datum\
+				#	, subject=self.subject\
+				#	, datum_type=self.period.datum_type\
+				#	, span_type='trial'\
+				#	, period=self.period\
+				#	, IsGood=1\
+				#	, Number=0\
+				#	, sess=Session.object_session(self.period))
+				#Session.object_session(my_trial).commit()#Need to do something here that commits this to the db.
 				#Session.object_session(my_trial).flush()
+				my_trial=self.period.trials[-1]
 				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
 				if int(self.params['ExperimentType']) == 2:#SICI intensity
 					my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
@@ -530,8 +538,10 @@ class BciApplication(BciGenericApplication):
 		if event.type == pygame.locals.KEYDOWN:
 			if event.key == pygame.K_UP:
 				self.stimulator.intensity = self.stimulator.intensity + 1
+				print "stim intensity ++"
 			if event.key == pygame.K_DOWN:
 				self.stimulator.intensity = self.stimulator.intensity - 1
+				print "stim intensity --"
 	#############################################################
 	
 	def StopRun(self):

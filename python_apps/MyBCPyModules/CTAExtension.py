@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 class MEP(object):
 	params = [
@@ -23,7 +24,10 @@ class MEP(object):
 	@classmethod
 	def transition(cls,app,phase):
 		if phase == 'inrange':
+			prev_remocon = app.stimulator.remocon
+			app.stimulator.remocon = True
 			app.stimulator.armed=True
+			app.stimulator.remocon = prev_remocon
 
 class SICI(object):
 	params = [
@@ -38,6 +42,16 @@ class SICI(object):
 	def initialize(cls,app):
 		app.stimulator.intensityb = app.params['StimIntensityB'].val
 		app.stimulator.ISI = app.params['PulseInterval'].val
+		n_trials = app.params['TrialsPerBlock'].val
+		true_array = np.ones(np.ceil(n_trials/2.0), dtype=np.bool)
+		false_array = np.zeros(np.floor(n_trials/2.0), dtype=np.bool)
+		app.sici_bool = np.hstack((true_array, false_array))
+		random.shuffle(app.sici_bool)
+	@classmethod
+	def transition(cls,app,phase):
+		if phase == 'intertrial':
+			trial_i = app.states['CurrentTrial']-1
+			app.stimulator.intensity = app.params['StimIntensity'].val if app.sici_bool[trial_i] else 0
 			
 class HR(object):
 	params = []
@@ -111,7 +125,7 @@ class IOCURVE(object):
 				stimi = app.erp_parms[model_type]['est']
 				if (not stimi) or np.isnan(stimi):#In case NaN or None
 					#Choose a random intensity in baseline_range
-					stimi=uniform(app.baseline_range[0],app.baseline_range[1])
+					stimi=random.uniform(app.baseline_range[0],app.baseline_range[1])
 			stimi=min(app.baseline_range[1],stimi)#stimi should not exceed the max range
 			app.stimulator.intensity = stimi
 			app.states['StimulatorIntensity']=int(round(stimi))
