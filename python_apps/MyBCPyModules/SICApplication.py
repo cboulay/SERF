@@ -130,7 +130,7 @@ class BciApplication(BciGenericApplication):
 		###################################
 		# Get the subject in the database #
 		###################################
-		self.subject=get_or_create(Subject, Name=self.params['SubjectName'])#Should crash if subject not in db.
+		#self.subject=get_or_create(Subject, Name=self.params['SubjectName'])#Should crash if subject not in db.
 		
 	#############################################################
 	
@@ -139,9 +139,23 @@ class BciApplication(BciGenericApplication):
 		############
 		# GET MVIC #
 		############
-		
+		mvic_dir=self.params['DataDirectory'] + '/' + self.params['SubjectName'] + '888/'
+		mvic_dir=os.path.abspath(mvic_dir)
+		files=FileReader.ListDatFiles(d=mvic_dir)
+		#The returned list is in ascending order, assume the last is most recent
+		best_stream = None
+		for fn in files:
+			temp_stream = FileReader.bcistream(fn)
+			temp_date = datetime.datetime.fromtimestamp(temp_stream.datestamp)
+			if not best_stream or temp_date > datetime.datetime.fromtimestamp(best_stream.datestamp): 
+				best_stream=temp_stream
+		sig,states=best_stream.decode(nsamp='all', states=['MVC','Value'])
+		x_bool = (states['MVC']==1).squeeze()
+		self.mvic = np.max(states['Value'][:,x_bool])
+		print self.mvic
+	
 		#This is a little slow because it loads a full BCI2000.dat file
-		self.mvic = self.subject._get_last_mvic()
+		#self.mvic = self.subject._get_last_mvic()
 	
 		##########
 		# SCREEN #
