@@ -111,12 +111,12 @@ class ListFrame:
             #TODO: If we want to use default values,
             #then this should be persisted to db immediately with get_or_create
             #but then we must supply all key attributes.
-            item = get_or_create(self.item_class, Name="New")
-            #item=self.item_class(Name="New")
+            #item = get_or_create(self.item_class, Name="New")
+            item=self.item_class(Name="New")
         else:
             item=self.new_item_func(self)
         self.list_data.append(item)
-        Session.commit()
+        #Session.commit()
         
         #item.Name=None
         #Insert it into list_data and listbox.
@@ -126,15 +126,16 @@ class ListFrame:
         self.lb.selection_clear(0,END)
         self.lb.selection_set(END)
         #Show the item in the edit frame
-        #self.open_item_func(item)
+        self.open_item_func(item)
     
     def del_press(self):
         curs = self.lb.curselection()
         for dd in curs:
             instance = self.list_data[int(dd)]
             if not self.del_item_func:
-                #Session.delete(instance)
-                print "Disabled db delete of", instance
+                Session.delete(instance)
+                #Session.commit()
+                #print "Disabled db delete of", instance
             else:
                 #Specify a delete function when we don't want the object deleted.
                 #e.g., removing an association/relationship
@@ -156,8 +157,11 @@ class EditFrame:
         if not frame: frame=Toplevel()
         self.frame = frame
         
+        attr_frame = Frame(frame)
+        attr_frame.pack(side=TOP, fill=X)
+        
         #Everything has Name
-        name_frame = Frame(frame)
+        name_frame = Frame(attr_frame)
         name_frame = name_frame
         name_frame.pack(side = TOP, fill = X)
         name_label = Label(name_frame, text="Name")
@@ -170,7 +174,7 @@ class EditFrame:
         
         #Many things have Description
         if hasattr(item,'Description'):
-            desc_frame = Frame(frame)
+            desc_frame = Frame(attr_frame)
             desc_frame.pack(side = TOP, fill = X)
             desc_label = Label(desc_frame, text="Description")
             desc_label.pack(side = LEFT)
@@ -182,7 +186,7 @@ class EditFrame:
             
         #Almost as many things have DefaultValue
         if hasattr(item,'DefaultValue'):
-            dv_frame = Frame(frame)
+            dv_frame = Frame(attr_frame)
             dv_frame.pack(side = TOP, fill = X)
             dv_label = Label(dv_frame, text="Default Value")
             dv_label.pack(side = LEFT)
@@ -194,32 +198,35 @@ class EditFrame:
             dv_entry = Entry(dv_frame, textvariable=dv_var)
             dv_entry.pack(side = RIGHT, fill = X)
             
+        #save_button = Button(attr_frame, text="Save", command=self.commit)
+        #save_button.pack(side=TOP, fill=X)
+            
         #Further attributes require separate frames.
         if hasattr(item, 'DateOfBirth'):
-            ss_frame = Frame(frame)
+            ss_frame = Frame(attr_frame)
             ss_frame.pack(side = TOP)
             SubjectFrame(frame=ss_frame, subject=item)
             
         #TODO: detail type list box.
         if hasattr(item, 'detail_types'):
-            dt_frame = Frame(frame)
+            dt_frame = Frame(attr_frame)
             dt_frame.pack(side=TOP)
             DetailListFrame(frame=dt_frame, parent=item)
             
         if hasattr(item, 'feature_types'):
-            ft_frame = Frame(frame)
+            ft_frame = Frame(attr_frame)
             ft_frame.pack(side=TOP)
             FeatureListFrame(frame=ft_frame, parent=item)
+            
+    def commit(self):
+        print "Autocommit enabled so this does nothing"
+        #Session.commit()
     
     def update_name(self, name_var):
         self.item.Name = name_var.get()
-        #session = Session.object_session(self.item)
-        Session.commit()
                 
     def update_description(self, desc_var):
         self.item.Description = desc_var.get()
-        #session = Session.object_session(self.item)
-        Session.commit()
         
     def update_defaultvalue(self, dv_var):
         if isinstance(item.DefaultValue,str):
@@ -233,17 +240,13 @@ class SubjectFrame:
         if not frame: frame=Toplevel()
         self.frame = frame
         
-        sp_names=['human','rat']#I wish there was a way I could figure out what the enum possibilities were.
+        sp_names=['human','rat']#TODO: I wish there was a way I could figure out what the enum possibilities were.
         
-        session = Session.object_session(self.subject)
-        self.sub_types = get_or_create(Subject_type, all=True, sess=session)
-        if not self.subject.subject_type: #implies subject not in db
+        self.sub_types = Session.query(Subject_type).all()
+        
+        if not self.subject.subject_type: #implies subject not yet persisted in db
             self.subject.subject_type = self.sub_types[0]
-            session.flush() #This should change the details associated wit the subject.
-            
-        #if not self.subject or not self.subject.Name:
-        #   #Name is nn and unique, so if it's missing assume we were passed a non-persisted subject.
-        #    self.subject = get_or_create(Subject, Name="NewSubject", subject_type=self.sub_types[0])
+            Session.add(self.subject) #New subject is now pending           
         
         det_frame = Frame(frame)
         det_frame.pack(side=LEFT, fill=Y)
@@ -344,9 +347,7 @@ class SubjectFrame:
         #Find the subject type that matches
         stname = type_var.get()
         self.subject.subject_type_id = [st.subject_type_id for st in self.sub_types if st.Name==stname][0]
-        #session = Session.object_session(self.subject)
-        #session.flush() #This should change the details associated wit the subject.
-        Session.commit()
+        #Session.commit() #Force commit because subject type affects other details and features.
         self.render_details()
     def render_details(self):
         sdvs=self.subject.subject_detail_value
@@ -569,9 +570,10 @@ class PeriodFrame:
         #TODO: Check that it matches 'YYYY-MM-DD hh:mm:ss'
         self.period.EndTime = end_var.get()
     def plot_erps(self):
-        if len(self.period.trials)>0:
+        if len(self.period.trials.all())>0:
+            if not self.period.store['channel_labels']:
+                self.period.update_store()
             per_store=self.period.store
-            if not per_store['channel_labels']: self.period.update_store()
             #Find any channel that appears in period.detail_values
             chans_list = [pdv for pdv in self.period.detail_values.itervalues() if pdv in per_store['channel_labels']]
             chans_list = list(set(chans_list))#make unique
@@ -583,10 +585,10 @@ class PeriodFrame:
             y_avg = per_store['data'].T[:,chan_bool]
             
             #get y data from up to 100 trials.
-            trials = self.period.trials
-            if len(trials)>100:
-                #trials=random.sample(trials,100)
-                trials=trials[:-100]
+            trials = self.period.trials[-100:]
+            #if len(trials)>100:
+            #    #trials=random.sample(trials,100)
+            #    trials=trials[:-100]
             y_trials = np.zeros((x_vec.shape[0],n_chans * len(trials)))
             tt=0
             for tr in trials:
@@ -798,6 +800,13 @@ class MapFrame:
         y = self.period._get_child_details('dat_TMS_coil_y').astype(float)
         z = self.period._get_child_features(erp_name)
         
+        #Limit ourselves to trials that had the same intensity as the last trial.
+        power = self.period._get_child_details('dat_TMS_powerA')
+        t_bool = np.asarray([p==power[-1] for p in power])
+        x = x[t_bool]
+        y = y[t_bool]
+        z = z[t_bool]
+        
         tx=np.linspace(min(x),max(x),100)
         ty=np.linspace(min(y),max(y),100)
         XI, YI = np.meshgrid(tx,ty)
@@ -845,27 +854,28 @@ class MonitorFrame:
         toolbar.update()
         canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
         
-        self.session = Session.object_session(self.period)
-        last_trial = self.session.query(Datum).filter(Datum.parent_datum_id==self.period.datum_id).order_by(Datum.Number.desc()).first()
+        #self.session = Session.object_session(self.period)
+        #last_trial = self.session.query(Datum).filter(Datum.parent_datum_id==self.period.datum_id).order_by(Datum.Number.desc()).first()
+        last_trial = self.period.trials.order_by(Datum.Number.desc()).first()
         self.last_n = last_trial.Number if last_trial else 0
         
         self.update_plot()
         
     def update_plot(self):
         #See if we have a new trial
-        self.session.commit()
-        last_trial = self.session.query(Datum).filter(Datum.parent_datum_id==self.period.datum_id,Datum.Number>self.last_n).order_by(Datum.Number.desc()).first()
+        #self.session.commit()
+        #last_trial = self.session.query(Datum).filter(Datum.parent_datum_id==self.period.datum_id,Datum.Number>self.last_n).order_by(Datum.Number.desc()).first()
+        last_trial = self.period.trials.filter(Datum.Number>self.last_n).order_by(Datum.Number.desc()).first()
         if last_trial and not last_trial.store['channel_labels'] is None: #If new trial, add the trial to the plot
-            per_store=self.period.store
+            tr_store=last_trial.store
             fig = self.fig
             my_ax = fig.gca()
             #my_ax.clear()
             #my_ax = fig.add_subplot(111)
-            
-            chans_list = [pdv for pdv in self.period.detail_values.itervalues() if pdv in per_store['channel_labels']]
+            chans_list = [tdv for tdv in last_trial.detail_values.itervalues() if tdv in tr_store['channel_labels']]
             chans_list = list(set(chans_list))#make unique
             #Boolean array to index the data.
-            chan_bool = np.array([cl in chans_list for cl in per_store['channel_labels']])
+            chan_bool = np.array([cl in chans_list for cl in tr_store['channel_labels']])
             
             x = last_trial.store['x_vec']
             y = last_trial.store['data']
