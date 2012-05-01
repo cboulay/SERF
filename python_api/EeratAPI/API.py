@@ -35,7 +35,7 @@ def get_or_create(model, all=False, sess=None, **kwargs):
 		instance = model(**kwargs)
 		sess.add(instance)
 		#sess.flush()
-		sess.commit()
+		#sess.commit()
 		return instance
 
 class MyBase(object):
@@ -115,31 +115,37 @@ class Datum(Base):
 							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
 	detail_values 		= association_proxy("datum_detail_value","Value",
 							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
-	trials 			= relationship("Datum", order_by="Datum.Number", backref=backref('period', remote_side=[datum_id]))
+	trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic", backref=backref('period', remote_side=[datum_id], lazy="joined"))
+	#Putting a cascade here seems to interfere with the foreign key
 	#TODO: trials should be filtered by IsGood
 	
 	def _get_store(self):
-		temp_x=self._store.x_vec
-		temp_data=self._store.erp
+		temp_store = self._store
+		temp_x=temp_store.x_vec
+		temp_data=temp_store.erp
 		if temp_x and temp_data:
 			temp_x=numpy.frombuffer(temp_x, dtype=float)
 			temp_x.flags.writeable=True
 			temp_data=numpy.frombuffer(temp_data, dtype=float)
 			temp_data.flags.writeable=True
-			temp_data=temp_data.reshape([self._store.n_channels,self._store.n_samples])
-		chan_labels = self._store.channel_labels.split(',') if self._store.channel_labels else None
+			temp_data=temp_data.reshape([temp_store.n_channels,temp_store.n_samples])
+		chan_labels = temp_store.channel_labels.split(',') if temp_store.channel_labels else None
 		return {'x_vec':temp_x, 'data':temp_data, 'channel_labels':chan_labels}
 	def _set_store(self, dict_in):
 		#Take a dict input and set the storage item
 		#ERP from numpyarray of [chans x samps] to database blob
-		self._store.n_channels,self._store.n_samples=numpy.shape(dict_in['data'])
-		self._store.x_vec=dict_in['x_vec'].tostring() #always float?
-		self._store.erp=dict_in['data'].tostring() #always float?
+		new_store = Datum_store(datum_id=self.datum_id)
+		new_store.n_channels,new_store.n_samples=numpy.shape(dict_in['data'])
+		new_store.x_vec=dict_in['x_vec'].tostring() #always float?
+		new_store.erp=dict_in['data'].tostring() #always float?
 		#self.erp=numpy.getbuffer(dict_in['data'])
 		ch_lab = dict_in['channel_labels']
 		temp_string = ch_lab if isinstance(ch_lab,str) else ",".join(dict_in['channel_labels'])
-		self._store.channel_labels=temp_string.strip().replace(' ','')
+		new_store.channel_labels=temp_string.strip().replace(' ','')
 		#TODO: Feature calculation should be asynchronous
+		self._store = new_store
+		#session = Session.object_session(self)
+		#session.commit()
 		self.calculate_all_features()
 	store = property(_get_store, _set_store)
 		#datum.store is a dict with keys 'x_vec', 'data', 'channel_labels'
@@ -156,8 +162,6 @@ class Datum(Base):
 		#TODO: It might be faster to calculate multiple features simultaneously per trial.
 		#Should calculation of trial features such as residuals use period model prior to inclusion of the current trial?
 		
-		#session=Session()
-		session = Session.object_session(self)
 		refdatum = None if self.datum_type=='period' else self.period
 		
 		#TODO: Adding a feature to a type after an instance of the type exists does not create a default value.
@@ -165,8 +169,10 @@ class Datum(Base):
 			self.calculate_value_for_feature_name(fname, refdatum=refdatum)
 			
 		#I would prefer not to need this... is there anything else that needs triggers or the db?
+		#session=Session()
+		#session = Session.object_session(self)
 		#session.flush()
-		session.commit()
+		#session.commit()
 			
 	def calculate_value_for_feature_name(self, fname, refdatum=None):
 		#use refdatum to get the required details.
@@ -255,7 +261,7 @@ class Subject(Base):
 #	periods = property(_get_periods, _set_periods)
 				
 class Subject_type(Base):
-	subjects 			= relationship(Subject, backref=backref("subject_type")
+	subjects 			= relationship(Subject, backref=backref("subject_type", lazy="subquery")
 							, cascade="all, delete-orphan")
 	detail_types		= relationship(Detail_type
 							, secondary="subject_type_has_detail_type"
@@ -315,4 +321,4 @@ engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" 
 metadata = MetaData(bind=engine)#Base's metadata needs to reflect before I can call prepare.
 metadata.reflect() #http://docs.sqlalchemy.org/en/latest/core/schema.html#reflecting-all-tables-at-once
 Base.prepare(engine)
-Session = scoped_session(sessionmaker(bind=engine, autoflush=True))
+Session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=True))
