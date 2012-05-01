@@ -12,14 +12,16 @@
 # 1 - vertical position of a cursor
 # 2 - degree extension of a motorized hand extension box
 # 3 - auditory tone
+# 4 - neuromuscular electrical stimulation
 
-import numpy
+import numpy as np
 from random import randint
 import time
 from AppTools.Boxes import box
 from AppTools.Displays import fullscreen
 from AppTools.Shapes import PolygonTexture, Disc, Block
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
+from ERDExtension import FakeFeedback
 
 # from pygame import mixer; from pygame.mixer import Sound
 # from WavTools.FakePyGame import mixer, Sound # would provide a workalike interface to the line above
@@ -45,8 +47,9 @@ class BciApplication(BciGenericApplication):
             "PythonApp:Feedback    matrix FeedbackWavs=        2 1 300hz.wav 900hz.wav % % % // feedback wavs",
             "PythonApp:Feedback    int    HandboxFeedback=     1     0     0   1  // move handbox? (boolean)",
             "PythonApp:Feedback    string HBPort=              COM7 % % %         // Serial port for controlling Handbox",
-            "PythonApp:Feedback    int    FNMESFeedback=       0 % % %         // Enable neuromuscular stim feedback? (boolean)",
-            "PythonApp:Feedback    string FNMESPort=            COM8 % % %         // Serial port for controlling FNMES",
+            "PythonApp:Feedback    int    NMESFeedback=       0 % % %         // Enable neuromuscular stim feedback? (boolean)",
+            "PythonApp:Feedback    floatlist    NMESRange=     {Thresh Max} 06 07 0 0 % //Thresh and Max in mA",
+            #"PythonApp:Feedback    string NMESPort=            COM8 % % %         // Serial port for controlling NMES",
             "PythonApp:Feedback    int    BaselineFeedback=    0 % % %         // Should constant feedback be provided during baseline? (boolean)",
             "PythonApp:Feedback    float  FeedbackDuration=    6    6    1 20 // Feedback duration in seconds",
 			
@@ -86,14 +89,14 @@ class BciApplication(BciGenericApplication):
         # use a handy AppTools.Boxes.box object as the coordinate frame for the screen
         b = box(size=siz, position=(scrw/2.0,scrh/2.0), sticky=True)
         center = b.map((0.5,0.5), 'position')
-        self.positions = {'origin': numpy.matrix(center)}
+        self.positions = {'origin': np.matrix(center)}
         
         #Use that same box, but manipulate its properties to get positional information for the other items.
         
         # the red target rectangle
         b.anchor='bottom'
         b.scale(y=targth)
-        self.positions['red'] = numpy.matrix(b.position)
+        self.positions['red'] = np.matrix(b.position)
         red = Block(position=b.position, size=b.size, color=(1,0.1,0.1))#, on=False
         
         #reset b
@@ -103,7 +106,7 @@ class BciApplication(BciGenericApplication):
         # the green target rectangle
         b.anchor='top'
         b.scale(y=targth)
-        self.positions['green'] = numpy.matrix(b.position)
+        self.positions['green'] = np.matrix(b.position)
         green = Block(position=b.position, size=b.size, color=(0.1,1,0.1))#, on=False
         
         #reset b
@@ -119,7 +122,7 @@ class BciApplication(BciGenericApplication):
         b.anchor='center'
         		
         # store the significant points on the screen for later use
-        self.p = numpy.concatenate((self.positions['red'],self.positions['green']), axis=0)
+        self.p = np.concatenate((self.positions['red'],self.positions['green']), axis=0)
         
         # let's have a black background
         self.screen.color = (0,0,0)
@@ -169,16 +172,28 @@ class BciApplication(BciGenericApplication):
             #It should take fbblks at x=+1 to travel from 90 to 0
             self.hand_speed = -90 / fbblks #hand speed in degrees per block when x=+1
             
-        if int(self.params['FNMESFeedback']):
-            from Handbox.FNMESInterface import FNMES
-            serPort=self.params['FNMESPort'].val
-            self.fnmes=FNMES(port=serPort)
+        if int(self.params['NMESFeedback']):
+            #from Handbox.NMESInterface import NMES
+            #serPort=self.params['NMESPort'].val
+            #self.nmes=NMES(port=serPort)
             #It should take fbblks at x=+1 to get intensity from 0 to 15
-            w = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-            for i in w:
-                self.fnmes.width = i
-                time.sleep(1)
-            self.fnmes_speed = 16 / fbblks #fnmes intensity rate of change per block when x=+1
+            #w = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            #for i in w:
+            #    self.nmes.width = i
+            #    time.sleep(1)
+            #self.nmes_speed = 16 / fbblks #nmes intensity rate of change per block when x=+1
+            from Caio.NMES import NMESFIFO
+            #from Caio.NMES import NMESRING
+            self.nmes = NMESFIFO()
+            #self.nmes = NMESRING()
+            self.nmes.running = True
+            stimrange=np.asarray(self.params['NMESRange'].val,dtype='float64')
+            self.nmes_baseline = stimrange[0]
+            self.nmes_max = stimrange[1]
+            for i in np.arange(0.1,2*self.nmes_baseline-self.nmes_max,0.1):
+                self.nmes.amplitude = i
+                time.sleep(0.1)
+            self.nmes_speed = float(2) * (self.nmes_max - self.nmes_baseline) / float(fbblks)
         
         # finally, some fancy stuff from AppTools.StateMonitors, for the developer to check
         # that everything's working OK
@@ -265,6 +280,12 @@ class BciApplication(BciGenericApplication):
         #Normalizer is set such that sig will be mean 0 and variance = 1 relative to baseline
         #Convert x to a measure of excitability (ERD) from -3 to +3 SDs.
         x = -1*sig.A.ravel()[0]/3
+        x = min(x, 3.2768)
+        x = max(x, -3.2767)
+        
+        #Save x to a state of uint16
+        temp_x = x * 10000
+        self.states['Value']=np.uint16(temp_x)
         
         fdbk = int(self.states['Feedback']) != 0
         if int(self.params['CursorFeedback']):
@@ -296,21 +317,23 @@ class BciApplication(BciGenericApplication):
             else: angle = 45
             self.handbox.position = angle
             
-        if int(self.params['FNMESFeedback']):
-            if fdbk: #Only allow fnmes_i to change during feedback
-                self.fnmes_i = self.fnmes_i + self.fnmes_speed * x
-                self.fnmes_i = min(self.fnmes_i, 15)
-                self.fnmes_i = max(self.fnmes_i, 0)
-            else: self.fnmes_i = 7
+        if int(self.params['NMESFeedback']):
+            if fdbk: #Only allow nmes_i to change during feedback
+                self.nmes_i = self.nmes_i + self.nmes_speed * x
+                self.nmes_i = min(self.nmes_i, self.nmes_max)
+                self.nmes_i = max(self.nmes_i, 2*self.nmes_baseline - self.nmes_max)
+            else: self.nmes_i = self.nmes_baseline
             if fdbk or int(self.params['BaselineFeedback']):
-                self.fnmes.intensity = int(round(self.fnmes_i))# if fdbk else 7
-            else: self.fnmes.intensity = 0
+                self.nmes.amplitude = self.nmes_i
+            else: self.nmes.amplitude = 0
+            #print self.nmes.amplitude
+            
     def StopRun(self):
-		
-		self.states['Feedback'] = 0
-		self.stimuli['cue'].on = False
-		self.stimuli['arrow'].on = False
-		self.stimuli['cursor1'].on = False
-		self.stimuli['cursor1'].position = self.positions['origin'].A.ravel().tolist()
-		self.stimuli['fixation'].on = False
-		for snd in self.sounds: snd.vol = 0.0
+        self.states['Feedback'] = 0
+        self.stimuli['cue'].on = False
+        self.stimuli['arrow'].on = False
+        self.stimuli['cursor1'].on = False
+        self.stimuli['cursor1'].position = self.positions['origin'].A.ravel().tolist()
+        self.stimuli['fixation'].on = False
+        for snd in self.sounds: snd.vol = 0.0
+        self.nmes.amplitude = 0
