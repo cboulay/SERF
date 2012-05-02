@@ -211,7 +211,7 @@ class BciApplication(BciGenericApplication):
 		#Determine period_type from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
 		period_type_name={0:'mep_mapping', 1:'mep_io', 2:'mep_sici', 3:'hr_hunting', 4:'hr_io'}.get(int(self.params['ExperimentType']))
 		my_period_type=get_or_create(Datum_type, Name=period_type_name)
-		self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=12)#Will create period if it does not exist.
+		self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=0)#Will create period if it does not exist.
 		
 		################
 		# PERIOD FRAME #
@@ -389,6 +389,7 @@ class BciApplication(BciGenericApplication):
 			pass
 		
 		if int(self.params['ExperimentType']) in [0,1,2]: MEP.transition(self,phase)
+		if int(self.params['ExperimentType']) == 0: MAPPING.transition(self,phase)
 		if int(self.params['ExperimentType'])==2: SICI.transition(self,phase)
 		if int(self.params['ExperimentType']) in [1,4]: IOCURVE.transition(self,phase)
 					

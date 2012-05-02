@@ -24,10 +24,7 @@ class MEP(object):
 	@classmethod
 	def transition(cls,app,phase):
 		if phase == 'inrange':
-			prev_remocon = app.stimulator.remocon
-			app.stimulator.remocon = True
 			app.stimulator.armed=True
-			app.stimulator.remocon = prev_remocon
 
 class SICI(object):
 	params = [
@@ -72,6 +69,12 @@ class MAPPING(object):
 	@classmethod
 	def initialize(cls,app):
 		app.stimulator.remocon = False#Turn off remocon so stimulator can be manually controlled.
+	@classmethod
+	def transition(cls,app,phase):
+		if phase == 'inrange':
+			app.stimulator.remocon = True
+			app.stimulator.armed=True
+			app.stimulator.remocon = False
 	
 class IOCURVE(object):
 	params = [
@@ -121,6 +124,7 @@ class IOCURVE(object):
 				elif np.isnan(_hm['err']) or _hm['err']>=(0.05*_hm['est']):
 					model_type="halfmax"
 				else:
+					model_type="threshold"
 					app.states['CurrentTrial']=500
 				stimi = app.erp_parms[model_type]['est']
 				if (not stimi) or np.isnan(stimi):#In case NaN or None

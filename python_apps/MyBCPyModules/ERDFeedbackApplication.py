@@ -231,7 +231,7 @@ class BciApplication(BciGenericApplication):
         self.phase(name='startcue',     next='gap',         duration=1000)
         self.phase(name='gap',          next='imagine',     duration=800)
         self.phase(name='imagine',      next='stopcue',     duration=1000*self.params['FeedbackDuration'].val)
-        self.phase(name='stopcue',      next='intertrial',  duration=200)
+        self.phase(name='stopcue',      next='intertrial',  duration=1000)
         
         self.design(start='intertrial', new_trial='baseline', interblock='idle')
 
@@ -336,4 +336,4 @@ class BciApplication(BciGenericApplication):
         self.stimuli['cursor1'].position = self.positions['origin'].A.ravel().tolist()
         self.stimuli['fixation'].on = False
         for snd in self.sounds: snd.vol = 0.0
-        self.nmes.amplitude = 0
+        #if self.nmes: self.nmes.amplitude = 0
