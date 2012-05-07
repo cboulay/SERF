@@ -34,7 +34,7 @@ from AppTools.Shapes import Block
 import AppTools.Meters
 from EeratAPI.API import *
 from EeratAPI.OnlineAPIExtension import *
-from CTAExtension import MEP, HR, MAPPING, IOCURVE, SICI
+from StimExtension import MEP, HR, MAPPING, IOCURVE, SICI
 import pygame, pygame.locals
 
 class BciApplication(BciGenericApplication):
