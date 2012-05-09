@@ -37,8 +37,8 @@ class SICI(object):
 		]
 	@classmethod
 	def initialize(cls,app):
-		app.stimulator.intensityb = app.params['StimIntensityB'].val
 		app.stimulator.ISI = app.params['PulseInterval'].val
+		app.stimulator.intensityb = app.params['StimIntensityB'].val
 		n_trials = app.params['TrialsPerBlock'].val
 		true_array = np.ones(np.ceil(n_trials/2.0), dtype=np.bool)
 		false_array = np.zeros(np.floor(n_trials/2.0), dtype=np.bool)
@@ -49,6 +49,7 @@ class SICI(object):
 		if phase == 'intertrial':
 			trial_i = app.states['CurrentTrial']-1
 			app.stimulator.intensity = app.params['StimIntensity'].val if app.sici_bool[trial_i] else 0
+			app.stimulator.intensityb = app.params['StimIntensityB'].val
 			
 class HR(object):
 	params = []
@@ -94,7 +95,7 @@ class IOCURVE(object):
 	@classmethod
 	def initialize(cls,app):
 		#Calculate the erp detection limit now so we don't have to calculate it during data acquisition
-		app.period._get_detection_limit()
+		app.period._get_detection_limit()			
 		
 		#Setup the stimulus intensities for the first baseline trials
 		#self.baseline_range#self.baseline_trials

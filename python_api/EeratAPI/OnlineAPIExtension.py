@@ -84,6 +84,7 @@ class Subject:
 		if not period and datum_type:
 			#If we did not find a period, then create one with default settings, including StartTime and EndTime
 			period = get_or_create(Datum, sess=session, span_type='period', subject=self, datum_type=datum_type, IsGood=1, Number=0)
+			session.flush()
 		return period
 	
 	def _get_last_mvic(self):
