@@ -163,20 +163,19 @@ class BciApplication(BciGenericApplication):
             snd.vol = 0
             snd.play(-1)
         
-        ##########################
-        # PREPARE THE STIMULATOR #
-        ##########################
-            
         self.subject=get_or_create(Subject, Name=self.params['SubjectName'], species_type='human')
         #Determine period_type from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
         period_type_name={0:'mep_io', 1:'mep_sici', 2:'hr_io'}.get(int(self.params['ExperimentType']))
         my_period_type=get_or_create(Datum_type, Name=period_type_name)
         self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=0)#Will create period if it does not exist.
-        
+                
+        ##########################
+        # PREPARE THE STIMULATOR #
+        ##########################
         #Initialize the stimulator. It depends on the ExperimentType
         #from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
         exp_type = int(self.params['ExperimentType'])
-        if True:
+        if False:#Set this to false for testing.
             if exp_type in [0,1]: MEP.initialize(self)#Stimulator
             elif exp_type == 2: HR.initialize(self)
         else:
@@ -226,6 +225,12 @@ class BciApplication(BciGenericApplication):
             m = addstatemonitor(self, 'fr_run')
             m.func = lambda x: '% 6.1fHz' % x.estimated.get('FramesPerSecond',{}).get('running', 0)
             m.pargs = (self,)
+            
+    def Halt(self):#Undo initialization
+        if self.stimulator:
+            exp_type = int(self.params['ExperimentType'])
+            if exp_type == 1: SICI.halt(self)
+            del self.stimulator
 
     def StartRun(self):
         if int(self.params['ShowFixation']):
@@ -358,10 +363,11 @@ class BciApplication(BciGenericApplication):
     
     def Event(self, phase, event):
         if event.type == pygame.locals.KEYDOWN:
-            if event.key == pygame.K_UP:
-                self.stimulator.intensity = self.stimulator.intensity + 1
-            if event.key == pygame.K_DOWN:
-                self.stimulator.intensity = self.stimulator.intensity - 1
+            if event.key in [pygame.K_UP, pygame.K_LEFT, pygame.K_DOWN, pygame.K_RIGHT]:
+                if event.key == pygame.K_UP: self.stimulator.intensity = self.stimulator.intensity + 1
+                if event.key == pygame.K_LEFT: self.stimulator.intensity = self.stimulator.intensity + 0.1
+                if event.key == pygame.K_DOWN: self.stimulator.intensity = self.stimulator.intensity - 1
+                if event.key == pygame.K_RIGHT: self.stimulator.intensity = self.stimulator.intensity - 0.1
             print ("stim intensity " + str(self.stimulator.intensity))
     #############################################################
     

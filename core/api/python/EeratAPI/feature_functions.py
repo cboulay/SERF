@@ -53,7 +53,10 @@ def MEP_aaa(datum, refdatum=None):
 	x_start=float(refdatum.detail_values['dat_MEP_start_ms'])
 	x_stop=float(refdatum.detail_values['dat_MEP_stop_ms'])
 	chan_label=refdatum.detail_values['dat_MEP_chan_label']
-	return get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label)
+	temp = get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label)
+	#bg = BEMG_aaa(datum, refdatum=refdatum)
+	#temp = temp-bg
+	return temp
 
 def MEP_p2p(datum, refdatum=None):
 	if refdatum is None: refdatum=datum

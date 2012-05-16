@@ -115,8 +115,10 @@ class Datum(Base):
 							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
 	detail_values 		= association_proxy("datum_detail_value","Value",
 							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
+	
 	trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic", backref=backref('period', remote_side=[datum_id], lazy="joined"))
-	#Putting a cascade here seems to interfere with the foreign key
+	#TODO: This should be done through a separate association table for many-to-many
+	#TODO: many-to-many should not cascade, but we can set some cascades here if we expect to always delete children of a period.
 	#TODO: trials should be filtered by IsGood
 	
 	def _get_store(self):

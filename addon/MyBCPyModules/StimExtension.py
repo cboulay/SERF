@@ -45,6 +45,10 @@ class SICI(object):
 		app.sici_bool = np.hstack((true_array, false_array))
 		random.shuffle(app.sici_bool)
 	@classmethod
+	def halt(cls,app):
+		app.stimulator.ISI = 0
+		app.stimulator.intensityb = 0
+	@classmethod
 	def transition(cls,app,phase):
 		if phase == 'intertrial':
 			trial_i = app.states['CurrentTrial']-1
@@ -95,7 +99,7 @@ class IOCURVE(object):
 	@classmethod
 	def initialize(cls,app):
 		#Calculate the erp detection limit now so we don't have to calculate it during data acquisition
-		app.period._get_detection_limit()			
+		temp = app.period.detection_limit #We can access the calculated value directly with app.period._detection_limit			
 		
 		#Setup the stimulus intensities for the first baseline trials
 		#self.baseline_range#self.baseline_trials
@@ -124,7 +128,7 @@ class IOCURVE(object):
 					model_type="threshold"
 				elif np.isnan(_hm['err']) or _hm['err']>=(0.05*_hm['est']):
 					model_type="halfmax"
-				else:
+				else: #We have finished
 					model_type="threshold"
 					app.states['CurrentTrial']=500
 				stimi = app.erp_parms[model_type]['est']
@@ -132,17 +136,18 @@ class IOCURVE(object):
 					#Choose a random intensity in baseline_range
 					stimi=random.uniform(app.baseline_range[0],app.baseline_range[1])
 			stimi=min(app.baseline_range[1],stimi)#stimi should not exceed the max range
+			stimi=max(0,stimi)#TODO: Change this if we want a negative stimulus.
 			app.stimulator.intensity = stimi
 			app.states['StimulatorIntensity']=int(round(stimi))
 			
-		elif phase == 'feedback':
+		elif phase == 'stopcue' or phase == 'feedback':
 			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
 			#TODO: I don't need the stimi and stimerr until the next trial begins, 
 			#can these requests be made asynchronous?
 			trial_ix = app.states['CurrentTrial']
 			if trial_ix >= app.baseline_trials:
-				#TODO: Request this of the GUI
 				for model_type in ['threshold','halfmax']:
+					app.period._detection_limit = None#Forces _detection_limit to be obtained from db instead of using in-memory value.
 					popt, perr, x, y=app.period.model_erp(model_type=model_type)
 					stimi = popt[0]
 					stimerr = perr[0]

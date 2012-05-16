@@ -48,16 +48,18 @@ class BciApplication(BciGenericApplication):
             "PythonApp:Feedback    int    HandboxFeedback=     1     0     0   1  // move handbox? (boolean)",
             "PythonApp:Feedback    string HBPort=              COM7 % % %         // Serial port for controlling Handbox",
             "PythonApp:Feedback    int    NMESFeedback=       0 % % %         // Enable neuromuscular stim feedback? (boolean)",
-            "PythonApp:Feedback    floatlist    NMESRange=     {Thresh Max} 06 07 0 0 % //Thresh and Max in mA",
-            #"PythonApp:Feedback    string NMESPort=            COM8 % % %         // Serial port for controlling NMES",
+            #"PythonApp:Feedback    floatlist    NMESRange=     {Thresh Max} 06 07 0 0 % //Thresh and Max in mA",
+            "PythonApp:Feedback    string NMESPort=            COM10 % % %         // Serial port for controlling NMES",
             "PythonApp:Feedback    int    BaselineFeedback=    0 % % %         // Should constant feedback be provided during baseline? (boolean)",
             "PythonApp:Feedback    float  FeedbackDuration=    6    6    1 20 // Feedback duration in seconds",
-			
+            "PythonApp:Feedback    int    FakeFeedback=        0 % % % // Make feedback contingent on an external file (boolean)",
+            "PythonApp:Feedback    string FakeFile=            % % % % // Path to fake feedback csv file (inputfile)",
 		)
         self.define_state(
 			"Baseline   1 0 0 0",
 			"StartCue   1 0 0 0",
 			"Feedback   1 0 0 0",
+            "FbBlock   16 0 0 0", #Number of blocks that feedback has been on.
 			"StopCue    1 0 0 0",
 			"TargetCode	2 0 0 0", # should the subject be imagining feet (1), left hand (2), right hand (3), or resting (0 during 'baseline' phase) ?
             "Value     16 0 0 0", #in blocks, 16-bit is max 65536
@@ -77,6 +79,10 @@ class BciApplication(BciGenericApplication):
         screenid = int(self.params['ScreenId'])  # ScreenId 0 is the first screen, 1 the second, -1 the last
         fullscreen(scale=siz, id=screenid, frameless_window=(siz==1))
         # only use a borderless window if the window is set to fill the whole screen
+        
+        if int(self.params['FakeFeedback']):
+            #TODO: Check if FakeFile is a path to a real file.
+            pass
 
     def Initialize(self, indim, outdim):
         
@@ -173,27 +179,36 @@ class BciApplication(BciGenericApplication):
             self.hand_speed = -90 / fbblks #hand speed in degrees per block when x=+1
             
         if int(self.params['NMESFeedback']):
-            #from Handbox.NMESInterface import NMES
-            #serPort=self.params['NMESPort'].val
-            #self.nmes=NMES(port=serPort)
+            from Handbox.NMESInterface import NMES
+            serPort=self.params['NMESPort'].val
+            self.nmes=NMES(port=serPort)
+            #self.nmes=NMES(port='COM10')
+            for i in np.linspace(0.1,1.0,10):#Queue up changes in width. This part is uncomfortable.
+                self.nmes.width = i #Queue will be filled immediately but takes 0.5 sec per width change.
             #It should take fbblks at x=+1 to get intensity from 0 to 15
-            #w = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-            #for i in w:
-            #    self.nmes.width = i
-            #    time.sleep(1)
-            #self.nmes_speed = 16 / fbblks #nmes intensity rate of change per block when x=+1
-            from Caio.NMES import NMESFIFO
-            #from Caio.NMES import NMESRING
-            self.nmes = NMESFIFO()
-            #self.nmes = NMESRING()
-            self.nmes.running = True
-            stimrange=np.asarray(self.params['NMESRange'].val,dtype='float64')
-            self.nmes_baseline = stimrange[0]
-            self.nmes_max = stimrange[1]
-            for i in np.arange(0.1,2*self.nmes_baseline-self.nmes_max,0.1):
-                self.nmes.amplitude = i
-                time.sleep(0.1)
-            self.nmes_speed = float(2) * (self.nmes_max - self.nmes_baseline) / float(fbblks)
+            self.nmes_speed = 16 / fbblks #nmes intensity rate of change per block when x=+1
+            self.nmes_baseline = 7
+            self.nmes_max = 15
+            self.nmes_i = self.nmes.intensity
+            
+            #from Caio.NMES import NMESFIFO
+            ##from Caio.NMES import NMESRING
+            #self.nmes = NMESFIFO()
+            ##self.nmes = NMESRING()
+            #self.nmes.running = True
+            #stimrange=np.asarray(self.params['NMESRange'].val,dtype='float64')
+            #self.nmes_baseline = stimrange[0]
+            #self.nmes_max = stimrange[1]
+            #for i in np.arange(0.1,2*self.nmes_baseline-self.nmes_max,0.1):
+            #    self.nmes.amplitude = i
+            #    time.sleep(0.1)
+            #self.nmes_speed = float(2) * (self.nmes_max - self.nmes_baseline) / float(fbblks)
+            
+        if int(self.params['FakeFeedback']):
+            import csv
+            fp=self.params['FakeFile']
+            self.fake_data = np.genfromtxt(fp, delimiter=',')
+            np.random.shuffle(self.fake_data)
         
         # finally, some fancy stuff from AppTools.StateMonitors, for the developer to check
         # that everything's working OK
@@ -246,7 +261,8 @@ class BciApplication(BciGenericApplication):
         self.stimuli['arrow'].on = (phase in ['startcue'])
         
         if phase == 'intertrial':
-            pass
+            if int(self.params['FakeFeedback']):
+                pass#TODO: Choose a random trial from fake feedback
 
         if phase == 'baseline':
             self.states['TargetCode'] = 0
@@ -271,7 +287,7 @@ class BciApplication(BciGenericApplication):
             self.sounds[1].vol = 0
         
         if phase == 'imagine':
-            pass
+            self.states['FbBlock']=0
             
         if phase == 'stopcue':
             self.stimuli['cue'].text = self.cuetext[0]
@@ -288,7 +304,17 @@ class BciApplication(BciGenericApplication):
         self.states['Value']=np.uint16(temp_x)
         
         fdbk = int(self.states['Feedback']) != 0
+        if int(self.params['FakeFeedback']) and fdbk:
+            trial_i = self.states['CurrentTrial']-1 if self.states['CurrentTrial'] < self.fake_data.shape[0] else random.uniform(0,self.params['TrialsPerBlock'])
+            x = self.fake_data[trial_i,self.states['FbBlock']]
+            x = -1 * x / 3
+            x = min(x, 3.2768)
+            x = max(x, -3.2767)
+        
+        if fdbk: self.states['FbBlock'] = self.states['FbBlock'] + 1
+        
         if int(self.params['CursorFeedback']):
+            #Cursor is always moving but only visible during feedback.
             self.stimuli['cursor1'].on = fdbk
             new_pos = self.stimuli['cursor1'].position
             new_pos[1] = new_pos[1] + self.curs_speed * x#speed is pixels per block
@@ -296,7 +322,6 @@ class BciApplication(BciGenericApplication):
             new_pos[1] = max(new_pos[1],self.p[0,1])
             self.stimuli['cursor1'].position = new_pos if fdbk else self.positions['origin'].A.ravel().tolist()
         
-        #Audio feedback is tricky because it will be used for a cue.
         if int(self.params['AudioFeedback']):
             #self.sounds[0] is drums = ERS. self.sounds[1] is piano = ERD
             #self.fader_val from -1 to +1
@@ -321,11 +346,13 @@ class BciApplication(BciGenericApplication):
             if fdbk: #Only allow nmes_i to change during feedback
                 self.nmes_i = self.nmes_i + self.nmes_speed * x
                 self.nmes_i = min(self.nmes_i, self.nmes_max)
-                self.nmes_i = max(self.nmes_i, 2*self.nmes_baseline - self.nmes_max)
-            else: self.nmes_i = self.nmes_baseline
+                self.nmes_i = max(self.nmes_i, 2*self.nmes_baseline - self.nmes_max, 0)
+            elif abs(self.nmes_i-self.nmes_baseline)<1: self.nmes_i = self.nmes_baseline
+            elif self.nmes_i > self.nmes_baseline: self.nmes_i = self.nmes_i - self.nmes_speed
+            elif self.nmes_i < self.nmes_baseline: self.nmes_i = self.nmes_i + self.nmes_speed
             if fdbk or int(self.params['BaselineFeedback']):
-                self.nmes.amplitude = self.nmes_i
-            else: self.nmes.amplitude = 0
+                self.nmes.intensity = self.nmes_i
+            else: self.nmes.intensity = 0
             #print self.nmes.amplitude
             
     def StopRun(self):

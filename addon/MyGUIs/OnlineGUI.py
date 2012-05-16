@@ -229,7 +229,7 @@ class EditFrame:
         self.item.Description = desc_var.get()
         
     def update_defaultvalue(self, dv_var):
-        if isinstance(item.DefaultValue,str):
+        if isinstance(self.item.DefaultValue,str):
             self.item.DefaultValue = dv_var.get()
         else:
             self.item.DefaultValue = float(dv_var.get())
@@ -550,6 +550,8 @@ class PeriodFrame:
         elif 'io' in self.period.type_name:
             model_button = Button(pbutton_frame, text="Model IO", command=self.show_model)
             model_button.pack(side=TOP, fill=X)
+            detection_button = Button(pbutton_frame, text="Calc Threshold", command = self.calc_threshold)
+            detection_button.pack(side=TOP, fill=X)
         recalc_button = Button(pbutton_frame, text="Recalculate", command=self.recalc_features)
         recalc_button.pack(side=TOP, fill=X)
         monitor_button = Button(pbutton_frame, text="Monitor New Trials", command=self.monitor)
@@ -617,6 +619,11 @@ class PeriodFrame:
             erp_ax.set_ylabel('AMPLITUDE (uV)')
             self.erp_fig.canvas.draw()
         
+    def calc_threshold(self):
+        self.period.detection_limit = None#Set the detail to None
+        temp = self.period.detection_limit
+        self.render_details()#Re-render ddv
+    
     def show_model(self):
         ModelFrame(period=self.period)
     def mep_map(self):
@@ -644,9 +651,9 @@ class PeriodFrame:
         entry.pack(side=RIGHT)
     def update_ddv(self,ddv,str_var):
         ddv.Value=str_var.get()
-        #TODO: flush
+        Session.flush()
     def recalc_features(self):
-        self.period._get_detection_limit()#Reget detection limit
+        #self.period._get_detection_limit()#Reget detection limit - why?
         self.period.recalculate_child_feature_values()#Recalculate features. This flushes the transaction.
     def get_xy(self):
         self.period.assign_coords(space=self.sptype_var.get())
@@ -755,7 +762,7 @@ class ModelFrame:
             lab.pack(side=TOP)
             i=i+1
         if mode=='threshold':
-            lab_str = 'Threshold: {0:.2f}'.format(self.period.erp_detection_limit)
+            lab_str = 'Threshold: {0:.2f}'.format(self.period.detection_limit)
             lab = Label(l_frame, text=lab_str)
             lab.pack(side=TOP)
                     

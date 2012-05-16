@@ -1,0 +1,3 @@
+Filtering  float   FirstBinCenter=               4Hz      // Center of first frequency bin (as a fraction of sampling rate or in Hz)
+Filtering  float   LastBinCenter=               4Hz      // Center of last frequency bin (as a fraction of sampling rate or in Hz)
+Filtering  float   BinWidth=                     3Hz      // Width of spectral bins (as a fraction of sampling rate or in Hz)

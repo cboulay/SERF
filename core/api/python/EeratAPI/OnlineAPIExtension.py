@@ -104,8 +104,83 @@ class Datum:
 	__metaclass__=ExtendInplace
 	
 	#variable definitions. Do these attach to self?
+	_detection_limit =  None
 	erp_detection_limit = None
 	mvic = None
+	
+	def _get_detection_limit(self):
+		#Get the detection limit. Use detail if set, otherwise get it from a file.
+		if self.span_type=='period':
+			temp = None
+			if self._detection_limit:
+				temp = self._detection_limit
+				
+			elif 'mep' in self.type_name:
+				if self.detail_values.has_key('dat_MEP_detection_limit') and self.detail_values['dat_MEP_detection_limit']:
+					#Get the latest detection limit from the db.
+					temp = float(Session.query(Datum_detail_value).filter(Datum_detail_value.datum_id==self.datum_id, Datum_detail_value.detail_name=='dat_MEP_detection_limit').one().Value)
+					#temp = float(self.detail_values['dat_MEP_detection_limit'])
+			
+			elif 'hr' in self.type.name:
+				if self.detail_values.has_key('dat_HR_detection_limit') and float(self.detail_values['dat_HR_detection_limit']):
+					temp = float(Session.query(Datum_detail_value).filter(Datum_detail_value.datum_id==self.datum_id, Datum_detail_value.detail_name=='dat_HR_detection_limit').one().Value)
+					#temp = float(self.detail_values['dat_HR_detection_limit'])
+			
+			if not temp: #We don't have a detail type or the detail value blank/null
+				session = Session.object_session(self)
+				dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
+				sic_dir=dir_stub + '/' + self.subject.Name + '/' + self.subject.Name + '999/'
+				bci_stream=_recent_stream_for_dir(sic_dir)
+				sig,states=bci_stream.decode(nsamp='all')
+				sig,chan_labels=bci_stream.spatialfilteredsig(sig)
+				
+				if 'hr' in self.type_name:
+					chan_label=self.detail_values['dat_HR_chan_label']
+					x_start=float(self.detail_values['dat_HR_start_ms'])
+					x_stop=float(self.detail_values['dat_HR_stop_ms'])
+				elif 'mep' in self.type_name:
+					chan_label=self.detail_values['dat_MEP_chan_label']
+					x_start=float(self.detail_values['dat_MEP_start_ms'])
+					x_stop=float(self.detail_values['dat_MEP_stop_ms'])
+				
+				#Only use the relevant channel	
+				sig=sig[chan_labels.index(chan_label),:]
+				
+				#Reduce the signal to only relevant samples
+				x_bool = (states['SummingBlocks']==1).squeeze()
+				sig=sig[:,x_bool]
+				
+				#Figure out how many samples per calculation
+				fs=bci_stream.samplingfreq_hz
+				n_samps=int(np.ceil(fs*(x_stop-x_start)/1000))
+				
+				#Divide our sig into equal blocks of n_samps
+				cut_samps=int(np.shape(sig)[1] % n_samps)
+				if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
+				sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
+				
+				#aaa or p2p
+				fts = self.datum_type.feature_types
+				isp2p = any([ft for ft in fts if 'p2p' in ft.Name])
+				
+				if isp2p:
+					vals = np.asarray(np.max(sig,axis=1)-np.min(sig,axis=1))
+				else:
+					sig=np.abs(sig)#abs value
+					vals=np.asarray(np.average(sig,axis=1))#average across n_samps to get null erp equivalent
+				
+				vals.sort(axis=0)#sort by size
+				n_vals=vals.shape[0]
+				temp = vals[np.ceil(n_vals*0.975),0]#97.5% is the cutoff
+				
+			self.detection_limit = temp
+			return self._detection_limit
+		
+	def _set_detection_limit(self, value):
+		self._detection_limit = float(value) if value else value
+		if 'mep' in self.type_name and self.detail_values.has_key('dat_MEP_detection_limit'): self.detail_values['dat_MEP_detection_limit'] = str(value) if value else value
+		if 'hr' in self.type_name and self.detail_values.has_key('dat_HR_detection_limit'): self.detail_values['dat_HR_detection_limit'] = str(value) if value else value
+	detection_limit = property(_get_detection_limit, _set_detection_limit)
 	
 	#get feature values from all child trials
 	def _get_child_features(self, feature_name):
@@ -148,56 +223,6 @@ class Datum:
 				.all()
 			return np.squeeze(np.asarray(details))
 		
-	#Get the statistical detection limit for MEP, M-wave (not used?), H-reflex
-	def _get_detection_limit(self):
-		if self.span_type=='period':
-			session = Session.object_session(self)
-			dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
-			sic_dir=dir_stub + '/' + self.subject.Name + '/' + self.subject.Name + '999/'
-			bci_stream=_recent_stream_for_dir(sic_dir)
-			sig,states=bci_stream.decode(nsamp='all')
-			sig,chan_labels=bci_stream.spatialfilteredsig(sig)
-			
-			if 'hr' in self.type_name:
-				chan_label=self.detail_values['dat_HR_chan_label']
-				x_start=float(self.detail_values['dat_HR_start_ms'])
-				x_stop=float(self.detail_values['dat_HR_stop_ms'])
-			elif 'mep' in self.type_name:
-				chan_label=self.detail_values['dat_MEP_chan_label']
-				x_start=float(self.detail_values['dat_MEP_start_ms'])
-				x_stop=float(self.detail_values['dat_MEP_stop_ms'])
-			
-			#Only use the relevant channel	
-			sig=sig[chan_labels.index(chan_label),:]
-			
-			#Reduce the signal to only relevant samples
-			x_bool = (states['SummingBlocks']==1).squeeze()
-			sig=sig[:,x_bool]
-			
-			#Figure out how many samples per calculation
-			fs=bci_stream.samplingfreq_hz
-			n_samps=int(np.ceil(fs*(x_stop-x_start)/1000))
-			
-			#Divide our sig into equal blocks of n_samps
-			cut_samps=int(np.shape(sig)[1] % n_samps)
-			if cut_samps>0:	sig=sig[:,:(-1*cut_samps)]
-			sig=sig.reshape((sig.shape[1]/n_samps,n_samps))
-			
-			#aaa or p2p
-			fts = self.datum_type.feature_types
-			isp2p = any([ft for ft in fts if 'p2p' in ft.Name])
-			
-			if isp2p:
-				vals = np.asarray(np.max(sig,axis=1)-np.min(sig,axis=1))
-			else:
-				sig=np.abs(sig)#abs value
-				vals=np.asarray(np.average(sig,axis=1))#average across n_samps to get null erp equivalent
-			
-			vals.sort(axis=0)#sort by size
-			n_vals=vals.shape[0]
-			self.erp_detection_limit=vals[np.ceil(n_vals*0.99),0]#97.5% is the cutoff
-			return self.erp_detection_limit
-			
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
 	def update_store(self):
 		if self.span_type=='period':
@@ -261,8 +286,7 @@ class Datum:
 			x_bool = ~np.isnan(x)
 			y=self._get_child_features(erp_name)
 			if model_type=='threshold':
-				if not self.erp_detection_limit: self._get_detection_limit()
-				y=y>self.erp_detection_limit
+				y=y>self.detection_limit
 				y=y.astype(int)
 			elif 'hr' in self.type_name:#Not threshold, and hr, means cut off trials > h-max
 				h_max = np.max(y)
