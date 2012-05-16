@@ -3,5 +3,4 @@ data/*
 .pydevproject
 .project
 *.bak
-python_api/build/*
-python_apps/build/*
+core/api/python/build/*

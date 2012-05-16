@@ -18,8 +18,8 @@ from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 import SigTools
 import WavTools
 from EeratAPI.API import *
-from EeratAPI.OnlineAPIExtension import *
-from StimExtension import MEP, HR, MAPPING, IOCURVE, SICI
+from MyPythonApps.OnlineAPIExtension import *
+from MyBCPyModules.StimExtension import MEP, HR, MAPPING, IOCURVE, SICI
 import pygame, pygame.locals
 
 class BciApplication(BciGenericApplication):
@@ -175,7 +175,7 @@ class BciApplication(BciGenericApplication):
         #Initialize the stimulator. It depends on the ExperimentType
         #from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
         exp_type = int(self.params['ExperimentType'])
-        if False:#Set this to false for testing.
+        if True:#Set this to false for testing.
             if exp_type in [0,1]: MEP.initialize(self)#Stimulator
             elif exp_type == 2: HR.initialize(self)
         else:
@@ -227,7 +227,7 @@ class BciApplication(BciGenericApplication):
             m.pargs = (self,)
             
     def Halt(self):#Undo initialization
-        if self.stimulator:
+        if hasattr(self,'stimulator'):
             exp_type = int(self.params['ExperimentType'])
             if exp_type == 1: SICI.halt(self)
             del self.stimulator
@@ -338,16 +338,6 @@ class BciApplication(BciGenericApplication):
                                             , span_type='trial'\
                                             , parent_datum_id=self.period.datum_id\
                                             , IsGood=1, Number=0))
-                #my_trial = get_or_create(Datum\
-                #    , subject=self.subject\
-                #    , datum_type=self.period.datum_type\
-                #    , span_type='trial'\
-                #    , period=self.period\
-                #    , IsGood=1\
-                #    , Number=0\
-                #    , sess=Session.object_session(self.period))
-                #Session.object_session(my_trial).commit()#Need to do something here that commits this to the db.
-                #Session.object_session(my_trial).flush()
                 my_trial=self.period.trials[-1]
                 my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
                 if int(self.params['ExperimentType']) == 1:#SICI intensity

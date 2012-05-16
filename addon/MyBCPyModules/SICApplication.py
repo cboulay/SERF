@@ -36,7 +36,7 @@ from AppTools.Shapes import Block
 import AppTools.Meters
 import BCPy2000.BCI2000Tools.FileReader as FileReader
 from EeratAPI.API import *
-from EeratAPI.OnlineAPIExtension import *
+from MyPythonApps.OnlineAPIExtension import *
 
 class BciApplication(BciGenericApplication):
 	

@@ -33,8 +33,8 @@ from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
 from EeratAPI.API import *
-from EeratAPI.OnlineAPIExtension import *
-from StimExtension import MEP, HR, MAPPING, IOCURVE, SICI
+from MyPythonApps.OnlineAPIExtension import *
+from MyBCPyModules.StimExtension import MEP, HR, MAPPING, IOCURVE, SICI
 import pygame, pygame.locals
 
 class BciApplication(BciGenericApplication):

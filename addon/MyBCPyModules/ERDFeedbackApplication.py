@@ -21,7 +21,7 @@ from AppTools.Boxes import box
 from AppTools.Displays import fullscreen
 from AppTools.Shapes import PolygonTexture, Disc, Block
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
-from ERDExtension import FakeFeedback
+from MyBCPyModules.ERDExtension import FakeFeedback
 
 # from pygame import mixer; from pygame.mixer import Sound
 # from WavTools.FakePyGame import mixer, Sound # would provide a workalike interface to the line above
