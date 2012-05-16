@@ -6,7 +6,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 from Tkinter import *
 from EeratAPI.API import *
-from EeratAPI.OnlineAPIExtension import *
+from OnlineAPIExtension import *
 from sqlalchemy import desc
 #from sqlalchemy.orm import *
 #from sqlalchemy import *
@@ -552,10 +552,8 @@ class PeriodFrame:
             model_button.pack(side=TOP, fill=X)
             detection_button = Button(pbutton_frame, text="Calc Threshold", command = self.calc_threshold)
             detection_button.pack(side=TOP, fill=X)
-        recalc_button = Button(pbutton_frame, text="Recalculate", command=self.recalc_features)
+        recalc_button = Button(pbutton_frame, text="Calc Features", command=self.recalc_features)
         recalc_button.pack(side=TOP, fill=X)
-        monitor_button = Button(pbutton_frame, text="Monitor New Trials", command=self.monitor)
-        monitor_button.pack(side=TOP, fill=X)
         
     def update_type(self, type_var):
         session = Session.object_session(self.period)
@@ -657,8 +655,6 @@ class PeriodFrame:
         self.period.recalculate_child_feature_values()#Recalculate features. This flushes the transaction.
     def get_xy(self):
         self.period.assign_coords(space=self.sptype_var.get())
-    def monitor(self):
-        MonitorFrame(period = self.period)
         
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -841,70 +837,6 @@ class MapFrame:
         #Display the Map hotspot
         lab = Label(l_frame, text='HOTSPOT: X {0:.2f}, Y {1:.2f}'.format(best_x,best_y))
         lab.pack(side=TOP)
-
-class MonitorFrame:
-    def __init__(self, frame=None, period=None):
-        self.period = period
-        if not frame: frame=Toplevel()
-        self.frame = frame
-        
-        plot_frame=Frame(self.frame)
-        plot_frame.pack(side=TOP, fill=X)
-        pb_frame = Frame(self.frame)
-        pb_frame.pack(side=TOP, fill=X)
-        
-        self.fig = Figure()
-        canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
-        canvas.show()
-        canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
-        toolbar = NavigationToolbar2TkAgg( canvas, plot_frame )
-        toolbar.update()
-        canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
-        
-        #self.session = Session.object_session(self.period)
-        #last_trial = self.session.query(Datum).filter(Datum.parent_datum_id==self.period.datum_id).order_by(Datum.Number.desc()).first()
-        last_trial = self.period.trials.order_by(Datum.Number.desc()).first()
-        self.last_n = last_trial.Number if last_trial else 0
-        
-        self.update_plot()
-        
-    def update_plot(self):
-        #See if we have a new trial
-        #self.session.commit()
-        #last_trial = self.session.query(Datum).filter(Datum.parent_datum_id==self.period.datum_id,Datum.Number>self.last_n).order_by(Datum.Number.desc()).first()
-        last_trial = self.period.trials.filter(Datum.Number>self.last_n).order_by(Datum.Number.desc()).first()
-        if last_trial and not last_trial.store['channel_labels'] is None: #If new trial, add the trial to the plot
-            tr_store=last_trial.store
-            fig = self.fig
-            my_ax = fig.gca()
-            #my_ax.clear()
-            #my_ax = fig.add_subplot(111)
-            chans_list = [tdv for tdv in last_trial.detail_values.itervalues() if tdv in tr_store['channel_labels']]
-            chans_list = list(set(chans_list))#make unique
-            #Boolean array to index the data.
-            chan_bool = np.array([cl in chans_list for cl in tr_store['channel_labels']])
-            
-            x = last_trial.store['x_vec']
-            y = last_trial.store['data']
-            
-            x_bool = np.logical_and(x>=-10,x<=100)
-            x=x[x_bool]
-            y=y[chan_bool,x_bool]
-            
-            #TODO: retain a memory of ~5 plots
-            my_ax.lines = my_ax.lines[-4:]
-            for ll in my_ax.lines: ll.set_linewidth(0.5) 
-            #TODO: set linewidth=0.5 for previous plots and 3.0 for current
-            my_ax.plot(x, y.T, linewidth=3.0)
-            y_max = max(my_ax.dataLim.ymax,np.max(y[:,x>5]))
-            y_min = min(my_ax.dataLim.ymin,np.min(y[:,x>5]))
-            my_ax.set_ylim(y_min,y_max)
-            my_ax.set_xlabel('TIME AFTER STIM (ms)')
-            my_ax.set_ylabel('AMPLITUDE (uv)')
-            fig.canvas.draw()
-            self.last_n = last_trial.Number
-        
-        self.frame.after(500, self.update_plot)
         
 if __name__ == "__main__":
     #engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
