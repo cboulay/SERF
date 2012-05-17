@@ -303,10 +303,6 @@ class BciApplication(BciGenericApplication):
         x = min(x, 3.2768)
         x = max(x, -3.2767)
         
-        #Save x to a state of uint16
-        temp_x = x * 10000
-        self.states['Value']=np.uint16(temp_x)
-        
         fdbk = int(self.states['Feedback']) != 0
         if int(self.params['FakeFeedback']) and fdbk:
             trial_i = self.states['CurrentTrial']-1 if self.states['CurrentTrial'] < self.fake_data.shape[0] else random.uniform(0,self.params['TrialsPerBlock'])
@@ -314,6 +310,10 @@ class BciApplication(BciGenericApplication):
             x = -1 * x / 3
             x = min(x, 3.2768)
             x = max(x, -3.2767)
+            
+        #Save x to a state of uint16
+        temp_x = x * 10000
+        self.states['Value']=np.uint16(temp_x)
         
         if fdbk: self.states['FbBlock'] = self.states['FbBlock'] + 1
         
