@@ -48,7 +48,7 @@ class BciApplication(BciGenericApplication):
             "PythonApp:Feedback    int    HandboxFeedback=     1     0     0   1  // move handbox? (boolean)",
             "PythonApp:Feedback    string HBPort=              COM7 % % %         // Serial port for controlling Handbox",
             "PythonApp:Feedback    int    NMESFeedback=       0 % % %         // Enable neuromuscular stim feedback? (boolean)",
-            #"PythonApp:Feedback    floatlist    NMESRange=     {Thresh Max} 06 07 0 0 % //Thresh and Max in mA",
+            "PythonApp:Feedback    floatlist    NMESRange=     {Mid Max} 7 15 0 0 % //Midpoint and Max stim intensities",
             "PythonApp:Feedback    string NMESPort=            COM10 % % %         // Serial port for controlling NMES",
             "PythonApp:Feedback    int    BaselineFeedback=    0 % % %         // Should constant feedback be provided during baseline? (boolean)",
             "PythonApp:Feedback    float  FeedbackDuration=    6    6    1 20 // Feedback duration in seconds",
@@ -179,24 +179,28 @@ class BciApplication(BciGenericApplication):
             self.hand_speed = -90 / fbblks #hand speed in degrees per block when x=+1
             
         if int(self.params['NMESFeedback']):
+            
+            stimrange=np.asarray(self.params['NMESRange'].val,dtype='float64')#midpoint and max
+            stim_min = 2*stimrange[0] - stimrange[1]
+            
             from Handbox.NMESInterface import NMES
             serPort=self.params['NMESPort'].val
             self.nmes=NMES(port=serPort)
-            #self.nmes=NMES(port='COM10')
-            for i in np.linspace(0.1,1.0,10):#Queue up changes in width. This part is uncomfortable.
-                self.nmes.width = i #Queue will be filled immediately but takes 0.5 sec per width change.
-            #It should take fbblks at x=+1 to get intensity from 0 to 15
-            self.nmes_speed = 16 / fbblks #nmes intensity rate of change per block when x=+1
-            self.nmes_baseline = 7
-            self.nmes_max = 15
-            self.nmes_i = self.nmes.intensity
+            self.nmes.width = 1.0
+            #self.nmes=NMES(port='COM11')
             
             #from Caio.NMES import NMESFIFO
             ##from Caio.NMES import NMESRING
             #self.nmes = NMESFIFO()
             ##self.nmes = NMESRING()
             #self.nmes.running = True
-            #stimrange=np.asarray(self.params['NMESRange'].val,dtype='float64')
+            
+            #It should take fbblks at x=+1 to get intensity from min to max
+            self.nmes_baseline = stimrange[0]
+            self.nmes_max = stimrange[1]
+            self.nmes_i = self.nmes.intensity
+            self.nmes_speed = (stimrange[1]-stim_min) / float(fbblks) #nmes intensity rate of change per block when x=+1
+            
             #self.nmes_baseline = stimrange[0]
             #self.nmes_max = stimrange[1]
             #for i in np.arange(0.1,2*self.nmes_baseline-self.nmes_max,0.1):
@@ -363,4 +367,6 @@ class BciApplication(BciGenericApplication):
         self.stimuli['cursor1'].position = self.positions['origin'].A.ravel().tolist()
         self.stimuli['fixation'].on = False
         for snd in self.sounds: snd.vol = 0.0
-        #if self.nmes: self.nmes.amplitude = 0
+        if int(self.params['NMESFeedback']):
+            self.nmes.stop()
+        
