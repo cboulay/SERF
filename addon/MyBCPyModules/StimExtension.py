@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import time
 
 class MEP(object):
 	params = [
@@ -37,7 +38,8 @@ class SICI(object):
 		]
 	@classmethod
 	def initialize(cls,app):
-		app.stimulator.ISI = app.params['PulseInterval'].val
+		time.sleep(1)#Stimulator isn't ready for ISI command just yet.
+		app.stimulator.ISI = float(app.params['PulseInterval'].val)
 		app.stimulator.intensityb = app.params['StimIntensityB'].val
 		n_trials = app.params['TrialsPerBlock'].val
 		true_array = np.ones(np.ceil(n_trials/2.0), dtype=np.bool)
