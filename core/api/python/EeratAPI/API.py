@@ -180,6 +180,9 @@ class Datum(Base):
 		#use refdatum to get the required details.
 		fxn=getattr(feature_functions,fname)
 		self.feature_values[fname]=fxn(self, refdatum=refdatum)
+		
+	def det_string(self):
+		return self.datum_type.Name + " " + str(self.Number) + " " + str(self.StartTime) + " to " + str(self.EndTime)
 				
 class Datum_store(Base):
 	datum				= relationship(Datum

@@ -22,6 +22,7 @@ class MEP(object):
 		serPort=app.params['SerialPort'].val
 		app.stimulator=Bistim(port=serPort, trigbox=trigbox)
 		app.intensity_detail_name = 'dat_TMS_powerA'
+		app.stimulator.remocon = True
 	@classmethod
 	def transition(cls,app,phase):
 		if phase == 'inrange':
@@ -38,9 +39,11 @@ class SICI(object):
 		]
 	@classmethod
 	def initialize(cls,app):
-		time.sleep(1)#Stimulator isn't ready for ISI command just yet.
-		app.stimulator.ISI = float(app.params['PulseInterval'].val)
 		app.stimulator.intensityb = app.params['StimIntensityB'].val
+		_isi = float(app.params['PulseInterval'].val)
+		while not app.stimulator.ISI == _isi:
+			app.stimulator.ISI = _isi
+			time.sleep(1)
 		n_trials = app.params['TrialsPerBlock'].val
 		true_array = np.ones(np.ceil(n_trials/2.0), dtype=np.bool)
 		false_array = np.zeros(np.floor(n_trials/2.0), dtype=np.bool)
@@ -127,13 +130,15 @@ class IOCURVE(object):
 				_th=app.erp_parms['threshold']
 				_hm=app.erp_parms['halfmax']
 				if np.isnan(_th['err']) or _th['err']>=(0.05*_th['est']):
-					model_type="threshold"
+					stimi = app.erp_parms["threshold"]['est']
 				elif np.isnan(_hm['err']) or _hm['err']>=(0.05*_hm['est']):
-					model_type="halfmax"
-				else: #We have finished
-					model_type="threshold"
-					app.states['CurrentTrial']=500
-				stimi = app.erp_parms[model_type]['est']
+					stimi = app.erp_parms["halfmax"]['est']
+				else: #We have finished hunting but make sure we have 1 trial at threshold.
+					stimi = app.erp_parms["threshold"]['est']
+					stims=app.period._get_child_details(app.intensity_detail_name).astype(np.float)
+					if stimi and np.any(stims==np.round(stimi)):
+						app.states['CurrentTrial']=500
+				
 				if (not stimi) or np.isnan(stimi):#In case NaN or None
 					#Choose a random intensity in baseline_range
 					stimi=random.uniform(app.baseline_range[0],app.baseline_range[1])
@@ -146,10 +151,11 @@ class IOCURVE(object):
 			#Request the estimate of (threshold | halfmax) and the stderr of the est from the API
 			#TODO: I don't need the stimi and stimerr until the next trial begins, 
 			#can these requests be made asynchronous?
+			
+			app.period._detection_limit = None#Forces _detection_limit to be obtained from db instead of using in-memory value.
 			trial_ix = app.states['CurrentTrial']
 			if trial_ix >= app.baseline_trials:
 				for model_type in ['threshold','halfmax']:
-					app.period._detection_limit = None#Forces _detection_limit to be obtained from db instead of using in-memory value.
 					popt, perr, x, y=app.period.model_erp(model_type=model_type)
 					stimi = popt[0]
 					stimerr = perr[0]

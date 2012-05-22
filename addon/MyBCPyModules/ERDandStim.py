@@ -32,13 +32,13 @@ class BciApplication(BciGenericApplication):
             "PythonApp:Design     int            ExperimentType= 0 0 0 2 // Experiment Type: 0 MEPRecruitment, 1 MEPSICI, 2 HRRecruitment (enumeration)",
             "PythonApp:Design     float          StimIntensity= 30 30 0 100 // 0-50 for DS5, 0-100 for Single-Pulse, 0-100 for Bistim Cond",
             "PythonApp:Design     list           TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
-            "PythonApp:Design     float          TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
+            "PythonApp:Design     float          TriggerThreshold= 100000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
             "PythonApp:Design     list           ERPChan= 1 EDC % % % // Name of channel used for ERP",
             "PythonApp:Design     floatlist      ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
             "PythonApp:Design     int            ShowFixation= 0     0     0   1  // show a fixation point in the center (boolean)",
             "PythonApp:Screen     int            ScreenId= -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
             "PythonApp:Screen     float          WindowSize= 0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
-            "PythonApp:Stimuli    matrix         CueWavs= 1 1 300hz.wav % % % // Cue wav",
+            "PythonApp:Stimuli    matrix         CueWavs= 1 1 900hz.wav % % % // Cue wav",
 		]
         params.extend(MEP.params)
         params.extend(SICI.params)
@@ -184,7 +184,8 @@ class BciApplication(BciGenericApplication):
             self.intensity_detail_name = 'dat_TMS_powerA'
             self.stimulator.ready = True
             
-        if exp_type == 1: SICI.initialize(self)
+        if exp_type == 1: 
+            SICI.initialize(self)
         if exp_type in [0,2]: IOCURVE.initialize(self)#Detection limit and baseline trials
         self.stimulator.intensity = self.params['StimIntensity'].val#This might be overwritten in inter-trial (e.g. by IOCURVE)
         
@@ -342,6 +343,7 @@ class BciApplication(BciGenericApplication):
                 my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
                 if int(self.params['ExperimentType']) == 1:#SICI intensity
                     my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
+                    my_trial.detail_values['dat_TMS_ISI']=str(self.stimulator.ISI)
                 #The fature calculation should be asynchronous.
                 my_trial.store={'x_vec':self.x_vec, 'data':x, 'channel_labels': self.chlbs}
     
@@ -366,3 +368,4 @@ class BciApplication(BciGenericApplication):
         self.stimuli['arrow'].on = False
         self.stimuli['fixation'].on = False
         for snd in self.sounds: snd.vol = 0.0
+        self.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)

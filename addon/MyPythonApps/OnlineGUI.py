@@ -87,7 +87,11 @@ class ListFrame:
         ll.pack(side=TOP, fill=X)
         ls = Scrollbar(list_frame)
         ls.pack(side=RIGHT, fill=Y)
-        lb = Listbox(list_frame, yscrollcommand=ls.set)
+        if title_text=='Periods':
+            lb = Listbox(list_frame, yscrollcommand=ls.set, width=50)
+        else:
+            lb = Listbox(list_frame, yscrollcommand=ls.set)
+        
         ls.config(command=lb.yview)
         i=0
         for item in self.list_data:
@@ -438,7 +442,7 @@ class PerListFrame:
         self.frame = frame
         
         lf = ListFrame(frame, title_text="Periods", list_data=subject.periods\
-                  , list_render_func=lambda x: x.datum_type.Name + " " + str(x.Number) + " " + str(x.StartTime) + " to " + str(x.EndTime)
+                  , list_render_func=lambda x: x.det_string()
                   , item_class=Datum\
                   , edit_frame=None\
                   , new_item_func=self.new_per\
@@ -554,6 +558,8 @@ class PeriodFrame:
             detection_button.pack(side=TOP, fill=X)
         recalc_button = Button(pbutton_frame, text="Calc Features", command=self.recalc_features)
         recalc_button.pack(side=TOP, fill=X)
+        triage_button = Button(pbutton_frame, text="Triage Trials", command=self.triage_trials)
+        triage_button.pack(side=TOP, fill=X)
         
     def update_type(self, type_var):
         session = Session.object_session(self.period)
@@ -655,6 +661,8 @@ class PeriodFrame:
         self.period.recalculate_child_feature_values()#Recalculate features. This flushes the transaction.
     def get_xy(self):
         self.period.assign_coords(space=self.sptype_var.get())
+    def triage_trials(self):
+        TriageFrame(period=self.period)
         
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -685,7 +693,6 @@ class ModelFrame:
         toolbar = NavigationToolbar2TkAgg( io_canvas, io_plot_frame )
         toolbar.update()
         io_canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
-        self.plot_io()
         
         #Plot Threshold
         self.thresh_fig = Figure()
@@ -695,19 +702,39 @@ class ModelFrame:
         toolbar = NavigationToolbar2TkAgg( thresh_canvas, thresh_plot_frame )
         toolbar.update()
         thresh_canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
-        self.plot_thresh()
+
+        self.plot_both()
         
         #Buttons
-        io_button = Button(button_frame, text="Model IO", command=self.plot_io)
-        io_button.pack(side=LEFT)
-        thresh_button = Button(button_frame, text="Model Threshold", command=self.plot_thresh)
-        thresh_button.pack(side=LEFT)
+        #io_button = Button(button_frame, text="Model IO", command=self.plot_io)
+        #io_button.pack(side=LEFT)
+        #thresh_button = Button(button_frame, text="Model Threshold", command=self.plot_thresh)
+        #thresh_button.pack(side=LEFT)
+        self.mon_var = IntVar()
+        mon_check = Checkbutton(button_frame, text="Monitor Trials", variable=self.mon_var, command=self.monitor_trials)
+        mon_check.pack()
+        last_trial = Session.query(Datum).filter(Datum.span_type=='trial').order_by(Datum.datum_id.desc()).first()
+        self.last_id = last_trial.datum_id if last_trial else None
         
+    def monitor_trials(self):
+        if self.mon_var:
+            last_trial = Session.query(Datum).filter(Datum.span_type=='trial', Datum.datum_id>self.last_id).order_by(Datum.datum_id.desc()).first()
+            if last_trial and not last_trial.store['channel_labels'] is None: #If new trial, add the trial to the plot
+                self.plot_both()
+                self.last_id = last_trial.datum_id
+        else:
+            pass
+        self.frame.after(500, self.monitor_trials)
+    
+    def plot_both(self):
+        self.plot_io()
+        self.plot_thresh()    
     def plot_io(self):
         self.plot_either()
     def plot_thresh(self):
-        self.plot_either(mode='threshold')
-    def plot_either(self,mode=None):
+        self.plot_either(mode="threshold")
+    def plot_either(self,mode="halfmax"):
+        self.period._detection_limit = None
         parms,parms_err,x,y = self.period.model_erp(model_type=mode)
         
         #if 'hr' in self.period.type_name:
@@ -721,7 +748,7 @@ class ModelFrame:
         #x = x.astype(np.float)
         #y = self.period._get_child_features(erp_name)
         
-        if not mode:#Default to io
+        if mode=="halfmax":#Default to io
             fig = self.io_fig
             ylabel = "AMPLITUDE"
             l_frame = reset_frame(self.io_label_frame)
@@ -838,6 +865,148 @@ class MapFrame:
         lab = Label(l_frame, text='HOTSPOT: X {0:.2f}, Y {1:.2f}'.format(best_x,best_y))
         lab.pack(side=TOP)
         
+class TriageFrame:
+    def __init__(self, frame=None, period=None):
+        self.period = period
+        if not frame: frame=Toplevel()
+        self.frame = frame
+        
+        self.frame.bind("<Key>", self.key)
+        
+        #Frames
+        plot_frame = Frame(frame)
+        plot_frame.pack(side=TOP, fill=X)
+        slider_frame = Frame(frame)
+        slider_frame.pack(side=TOP, fill=X)
+        mid_frame = Frame(frame)
+        mid_frame.pack(side=TOP, fill=X)
+        info_frame = Frame(mid_frame)
+        info_frame.pack(side=LEFT, fill=Y)
+        button_frame = Frame(mid_frame)
+        button_frame.pack(side=RIGHT)
+        appendix_frame = Frame(frame)
+        appendix_frame.pack(side=TOP, fill=X)
+        self.detail_frame = Frame(appendix_frame)
+        self.detail_frame.pack(side=LEFT, fill=Y)
+        self.feature_frame = Frame(appendix_frame)
+        self.feature_frame.pack(side=LEFT, fill=Y)
+        
+        #Fig for single-trial plot
+        self.erp_fig = Figure()
+        erp_canvas = FigureCanvasTkAgg(self.erp_fig, master=plot_frame)
+        erp_canvas.show()
+        erp_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        toolbar = NavigationToolbar2TkAgg( erp_canvas, plot_frame )
+        toolbar.update()
+        erp_canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
+        
+        #Scale
+        self.scale_bar = Scale(slider_frame, from_=0, to=self.period.trials.count()-1, orient=HORIZONTAL, command=self.slide_trial)
+        self.scale_bar.pack(side=TOP, fill=X)
+        
+        #Basic information
+        subj_name_label = Label(info_frame, text="Subject: " + self.period.subject.Name)
+        subj_name_label.pack(side=TOP)
+        per_info_label = Label(info_frame, text=self.period.det_string())
+        per_info_label.pack(side=TOP)
+        self.trial_info_var = StringVar()
+        trial_info_label = Label(info_frame, textvariable=self.trial_info_var)
+        trial_info_label.pack(side=TOP)
+        
+        #IsGood and any other buttons
+        self.isgood_var = IntVar()
+        isgood_check = Checkbutton(button_frame, text="IsGood?", variable=self.isgood_var, command=self.set_isgood)
+        isgood_check.pack(side=TOP)
+        
+        #Update the UI elements using the default trial.
+        self.trial = self.period.trials[0]
+        self.new_trial()
+
+    def slide_trial(self,trial_i):
+        self.trial = self.period.trials.offset(int(trial_i)).first()
+        self.new_trial()
+            
+    def set_isgood(self):
+        self.trial.IsGood = self.isgood_var.get()
+        
+    def new_trial(self):
+        self.scale_bar.to = self.period.trials.count()-1
+        self.trial_info_var.set(self.trial.det_string())
+        self.isgood_var.set(self.trial.IsGood)
+        self.plot_trial()
+        self.render_details()
+        self.render_features()
+        
+    def plot_trial(self):
+        tr_store=self.trial.store
+        #Find any channel that appears in trial.detail_values for auto-scaling purposes
+        chans_list = [tdv for tdv in self.trial.detail_values.itervalues() if tdv in tr_store['channel_labels']]
+        chans_list = list(set(chans_list))#make unique
+        chan_bool = np.array([cl in chans_list for cl in tr_store['channel_labels']])#Boolean array to index the data.
+        
+        x_vec = tr_store['x_vec']
+        y_dat = tr_store['data'].T
+        
+        x_bool = np.logical_and(x_vec>=10,x_vec<=100)
+        temp_y = y_dat[x_bool,chan_bool]
+        y_min = np.min(temp_y)
+        y_max = np.max(temp_y)
+        y_buff = 0.1 * (y_max - y_min)
+            
+        erp_ax = self.erp_fig.gca()
+        erp_ax.clear()
+        erp_ax = self.erp_fig.add_subplot(111)
+        if self.trial.IsGood: erp_ax.set_axis_bgcolor('w')
+        else: erp_ax.set_axis_bgcolor((1,0.95,0.95))
+        erp_ax.plot(x_vec, y_dat)
+        erp_ax.set_xlim([-10,100])
+        erp_ax.set_ylim([y_min-y_buff,y_max+y_buff])
+        erp_ax.set_xlabel('TIME AFTER STIM (ms)')
+        erp_ax.set_ylabel('AMPLITUDE (uV)')
+        self.erp_fig.canvas.draw()
+        
+    def key(self,event):
+        if event.keysym=='Left':
+            self.scale_bar.set(self.scale_bar.get()-1)
+        elif event.keysym=='Right':
+            self.scale_bar.set(self.scale_bar.get()+1)
+        elif event.keysym=='Up':
+            self.trial.IsGood = True
+            self.new_trial()
+        elif event.keysym=='Down':
+            self.trial.IsGood = False
+            self.new_trial()
+            
+    def render_details(self):
+        self.detail_frame=reset_frame(self.detail_frame)
+        parent = Frame(self.detail_frame)
+        parent.pack(side=TOP, fill=X)
+        lab = Label(parent, text="Detail")
+        lab.pack(side=LEFT, fill=X)
+        lab = Label(parent, text="Value")
+        lab.pack(side=RIGHT)
+        for ddv in self.trial.datum_detail_value.itervalues():
+            self.render_value(self.detail_frame,name=ddv.detail_name,value=ddv.Value)
+            
+    def render_features(self):
+        self.feature_frame=reset_frame(self.feature_frame)
+        parent = Frame(self.feature_frame)
+        parent.pack(side=TOP, fill=X)
+        lab = Label(parent, text="Feature")
+        lab.pack(side=LEFT, fill=X)
+        lab = Label(parent, text="Value")
+        lab.pack(side=RIGHT)
+        for key in self.trial.feature_values:
+            self.render_value(self.feature_frame,name=key,value=self.trial.feature_values[key])
+        
+    def render_value(self,frame,name="",value=""):
+        parent = Frame(frame)
+        parent.pack(side=TOP, fill=X)
+        lab = Label(parent, text=name + ":")
+        lab.pack(side=LEFT, fill=X)
+        val = Label(parent, text=value)
+        val.pack(side=RIGHT)
+                
 if __name__ == "__main__":
     #engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
     #Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
