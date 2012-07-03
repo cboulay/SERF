@@ -556,6 +556,9 @@ class PeriodFrame:
             model_button.pack(side=TOP, fill=X)
             detection_button = Button(pbutton_frame, text="Calc Threshold", command = self.calc_threshold)
             detection_button.pack(side=TOP, fill=X)
+        elif 'sici' in self.period.type_name:
+            sici_button = Button(pbutton_frame, text="SICI", command=self.sici_analysis)
+            sici_button.pack(side=TOP, fill=X)
         recalc_button = Button(pbutton_frame, text="Calc Features", command=self.recalc_features)
         recalc_button.pack(side=TOP, fill=X)
         triage_button = Button(pbutton_frame, text="Triage Trials", command=self.triage_trials)
@@ -663,6 +666,8 @@ class PeriodFrame:
         self.period.assign_coords(space=self.sptype_var.get())
     def triage_trials(self):
         TriageFrame(period=self.period)
+    def sici_analysis(self):
+        SiciFrame(period=self.period)
         
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -864,6 +869,77 @@ class MapFrame:
         #Display the Map hotspot
         lab = Label(l_frame, text='HOTSPOT: X {0:.2f}, Y {1:.2f}'.format(best_x,best_y))
         lab.pack(side=TOP)
+        
+class SiciFrame:
+    def __init__(self, frame=None, period=None):
+        self.period = period
+        if not frame: frame=Toplevel()
+        self.frame = frame
+        
+        self.period.recalculate_child_feature_values()
+        
+        #Frames
+        plot_frame = Frame(frame)
+        plot_frame.pack(side=TOP, fill=X)
+        
+        fig = Figure()
+        erp_canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+        erp_canvas.show()
+        erp_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        toolbar = NavigationToolbar2TkAgg( erp_canvas, plot_frame )
+        toolbar.update()
+        erp_canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
+        
+        trials = self.period.trials.filter(Datum.IsGood==True).all()
+        n_trials = len(trials)
+        meps = self.period._get_child_features('MEP_p2p')
+        
+        ts_bool = np.asarray([tt.detail_values['dat_TMS_powerA']=='0' for tt in trials])
+        cs_bool = np.logical_not(ts_bool)
+        cs_class = np.asarray(cs_bool,dtype='int16')
+        
+        chans_list = self.period.detail_values['dat_MEP_chan_label']
+        chan_bool = np.array([cl in chans_list for cl in self.period.store['channel_labels']])#Boolean array to index the data.
+        
+        
+        x_vec = self.period.store['x_vec']
+        n_samps = len(x_vec)
+        y_full = np.zeros((n_trials,n_samps))
+        y_avg = np.zeros((2,n_samps))
+        for tt in np.arange(n_trials):
+            y_full[tt,:] = trials[tt].store['data'][chan_bool,:]
+        y_avg[0,:]=np.mean(y_full[ts_bool,:],axis=0)
+        y_avg[1,:]=np.mean(y_full[cs_bool,:],axis=0)
+        
+        x_bool = np.logical_and(x_vec>=10,x_vec<=100)
+        y_min = np.min(y_avg)
+        y_max = np.max(y_avg)
+        y_buff = 0.1 * (y_max - y_min)
+        
+        avg_ax = fig.add_subplot(211)
+        avg_ax.plot(x_vec, y_avg.T)
+        avg_ax.set_xlim([-10,100])
+        avg_ax.set_ylim([y_min-y_buff,y_max+y_buff])
+        avg_ax.set_xlabel('TIME AFTER STIM (ms)')
+        avg_ax.set_ylabel('AMPLITUDE (uV)')
+        avg_ax.legend(['TS','CS'])
+        
+        sici = 100*meps/np.mean(meps[ts_bool])
+        spread_ax = fig.add_subplot(212)
+        spread_ax.plot(1,np.mean(sici[cs_bool]),'o')
+        spread_ax.plot(cs_class, 100*meps/np.mean(meps[ts_bool]), 'x')
+        spread_ax.set_xlim([-1,2])
+        spread_ax.set_xlabel('TS or CS')
+        spread_ax.set_ylabel('MEP P2P (% AVG TS)')
+        spread_ax.annotate('SICI = ' + str(100 - np.mean(sici[cs_bool])) + '%',
+               xy=(1, np.mean(sici[cs_bool])),  xycoords='data',
+                xytext=(0.2, 200), textcoords='data',
+                size=10,
+                arrowprops=dict(arrowstyle="->",
+                                connectionstyle="angle,angleA=0,angleB=90,rad=10"),
+                )
+        
+        fig.canvas.draw()
         
 class TriageFrame:
     def __init__(self, frame=None, period=None):

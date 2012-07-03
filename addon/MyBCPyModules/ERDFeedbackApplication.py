@@ -243,6 +243,9 @@ class BciApplication(BciGenericApplication):
         self.stimuli['cursor1'].position = self.positions['origin'].A.ravel().tolist()
         if int(self.params['ShowFixation']):
 			self.stimuli['fixation'].on = True
+        if int(self.params['NMESFeedback']):
+            self.nmes_i = 0
+            self.nmes.intensity = 0
 
     def Phases(self):
         self.phase(name='intertrial',   next='baseline',    duration=randint(1000,3000))
@@ -306,7 +309,8 @@ class BciApplication(BciGenericApplication):
         fdbk = int(self.states['Feedback']) != 0
         if int(self.params['FakeFeedback']) and fdbk:
             trial_i = self.states['CurrentTrial']-1 if self.states['CurrentTrial'] < self.fake_data.shape[0] else random.uniform(0,self.params['TrialsPerBlock'])
-            x = self.fake_data[trial_i,self.states['FbBlock']]
+            fake_block_ix = np.min((self.fake_data.shape[1],self.states['FbBlock']))
+            x = self.fake_data[trial_i,fake_block_ix]
             x = -1 * x / 3
             x = min(x, 3.2768)
             x = max(x, -3.2767)
@@ -355,9 +359,9 @@ class BciApplication(BciGenericApplication):
             elif self.nmes_i > self.nmes_baseline: self.nmes_i = self.nmes_i - self.nmes_speed
             elif self.nmes_i < self.nmes_baseline: self.nmes_i = self.nmes_i + self.nmes_speed
             if fdbk or int(self.params['BaselineFeedback']):
-                self.nmes.intensity = self.nmes_i
+                if not (self.nmes.intensity==int(self.nmes_i)): self.nmes.intensity = int(self.nmes_i)
             else: self.nmes.intensity = 0
-            #print self.nmes.amplitude
+            #print self.nmes.intensity
             
     def StopRun(self):
         self.states['Feedback'] = 0

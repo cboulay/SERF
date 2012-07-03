@@ -36,6 +36,7 @@ from EeratAPI.API import *
 from MyPythonApps.OnlineAPIExtension import *
 from MyBCPyModules.StimExtension import MEP, HR, MAPPING, IOCURVE, SICI
 import pygame, pygame.locals
+import time
 
 class BciApplication(BciGenericApplication):
 	#At the moment, this app is used for:
@@ -516,6 +517,7 @@ class BciApplication(BciGenericApplication):
 					my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
 				#The fature calculation should be asynchronous.
 				my_trial.store={'x_vec':self.x_vec, 'data':x, 'channel_labels': self.chlbs}
+				self.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
 				
 				#if int(self.params['ShowLastERP'])==1:
 					#Pass the plot off to a remote object so it doesn't kill this' rendering.

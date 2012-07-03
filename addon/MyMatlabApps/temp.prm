@@ -1,0 +1,1 @@
+Filtering:ExpressionFilter matrix Expressions= 1 1 20*log10(Signal(1,1)) // expressions used to compute the output of the ExpressionFilter (rows are channels; empty matrix for none)

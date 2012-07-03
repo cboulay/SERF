@@ -321,3 +321,33 @@ class Datum:
 				tt.detail_values['dat_TMS_coil_y']=float(data[i][y_ind])
 				tt.detail_values['dat_TMS_coil_z']=float(data[i][z_ind])
 				i = i+1
+				
+	def add_trials_from_file(self, filename):
+		if self.span_type=='period' and filename:
+			bci_stream=FileReader.bcistream(filename)
+			sig,states=bci_stream.decode(nsamp='all')
+			sig,chan_labels=bci_stream.spatialfilteredsig(sig)
+			erpwin = [int(bci_stream.msec2samples(ww)) for ww in bci_stream.params['ERPWindow']]
+			x_vec = np.arange(bci_stream.params['ERPWindow'][0],bci_stream.params['ERPWindow'][1],1000/bci_stream.samplingfreq_hz,dtype=float)
+			trigchan = bci_stream.params['TriggerInputChan']
+			trigchan_ix = find(trigchan[0] in chan_labels)
+			trigthresh = bci_stream.params['TriggerThreshold']
+			trigdetect = find(np.diff(np.asmatrix(sig[trigchan_ix,:]>trigthresh,dtype='int16'))>0)+1			
+			intensity_detail_name = 'dat_TMS_powerA' if self.detail_values.has_key('dat_TMS_powerA') else 'dat_Nerve_stim_output'
+			#Get approximate data segments for each trial
+			trig_ix = find(np.diff(states['Trigger'])>0)+1
+			for i in np.arange(len(trigdetect)):
+				ix = trigdetect[i]
+				dat = sig[:,ix+erpwin[0]:ix+erpwin[1]]
+				self.trials.append(Datum(subject_id=self.subject_id\
+                                            , datum_type_id=self.datum_type_id\
+                                            , span_type='trial'\
+                                            , parent_datum_id=self.datum_id\
+                                            , IsGood=1, Number=0))
+				my_trial=self.trials[-1]
+				my_trial.detail_values[intensity_detail_name]=str(states['StimulatorIntensity'][0,trig_ix[i]])
+				if int(bci_stream.params['ExperimentType']) == 1:#SICI intensity
+					my_trial.detail_values['dat_TMS_powerB']=str(bci_stream.params['StimIntensityB'])#TODO: Use the state.
+					my_trial.detail_values['dat_TMS_ISI']=str(bci_stream.params['PulseInterval'])
+				my_trial.store={'x_vec':x_vec, 'data':dat, 'channel_labels': chan_labels}
+			Session.flush()

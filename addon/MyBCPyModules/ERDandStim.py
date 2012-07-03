@@ -247,7 +247,7 @@ class BciApplication(BciGenericApplication):
         self.phase(name='baseline',     next='startcue',    duration=3000)
         self.phase(name='startcue',     next='gap',         duration=1000)
         self.phase(name='gap',          next='imagine',     duration=300)
-        self.phase(name='imagine',      next='armed',       duration=3500)
+        self.phase(name='imagine',      next='armed',       duration=3500+np.random.randint(400))
         self.phase(name='armed',        next='response',    duration=None)
         self.phase(name='response',     next='stopcue',     duration=1000)
         self.phase(name='stopcue',      next='intertrial',  duration=1000)
@@ -346,6 +346,7 @@ class BciApplication(BciGenericApplication):
                     my_trial.detail_values['dat_TMS_ISI']=str(self.stimulator.ISI)
                 #The fature calculation should be asynchronous.
                 my_trial.store={'x_vec':self.x_vec, 'data':x, 'channel_labels': self.chlbs}
+                self.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
     
     def Frame(self, phase):
         # update stimulus parameters if they need to be animated on a frame-by-frame basis

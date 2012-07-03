@@ -25,7 +25,7 @@ class MEP(object):
 		app.stimulator.remocon = True
 	@classmethod
 	def transition(cls,app,phase):
-		if phase == 'inrange':
+		if phase == 'inrange' or phase == 'baseline':
 			app.stimulator.armed=True
 
 class SICI(object):
@@ -58,7 +58,11 @@ class SICI(object):
 		if phase == 'intertrial':
 			trial_i = app.states['CurrentTrial']-1
 			app.stimulator.intensity = app.params['StimIntensity'].val if app.sici_bool[trial_i] else 0
+			#Setting stimulator.intensity to 0 takes > 3 seconds, regardless of armed state
 			app.stimulator.intensityb = app.params['StimIntensityB'].val
+			app.states['StimulatorIntensityB'] = app.stimulator.intensityb
+			app.states['ISIx10'] = int(app.stimulator.ISI * 10)
+		if phase == 'baseline': app.stimulator.armed = True
 			
 class HR(object):
 	params = []

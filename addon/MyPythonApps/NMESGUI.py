@@ -40,6 +40,7 @@ class HandsFrame:
         
         from Handbox.NMESInterface import NMES
         self.frame.nmes = NMES(port='COM11')
+        self.frame.nmes.width = 1.0
         
         stop_button = Button(self.frame, text="STOP", command=self.frame.nmes.stop)
         stop_button.pack(side = TOP, fill = X)
@@ -89,15 +90,15 @@ class GenericFrame:
         #    time.sleep(0.1)
     
     def _change_int(self, value):
-        self.frame.nmes.intensity = self.frame.nmes.intensity + float(value)
+        intensity_was = self.frame.nmes.intensity
+        self.frame.nmes.intensity = intensity_was + float(value)
+        time.sleep(0.1)
         self._int.set(str(self.frame.nmes.intensity))
     def plus_one(self): self._change_int(1)
     def plus_tenth(self): self._change_int(0.1)
     def minus_tenth(self): self._change_int(-0.1)
     def minus_one(self): self._change_int(-1)
-    def zero(self):
-        self.frame.nmes.intensity = 0
-        self._int.set(str(self.frame.nmes.intensity))
+    def zero(self): self._change_int(-1*self.frame.nmes.intensity)
         
         #from Handbox.NMESInterface import NMES
         
