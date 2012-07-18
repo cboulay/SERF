@@ -96,6 +96,9 @@ class Detail_type(Base):
 class Feature_type(Base):
 	pass
 	#datum_types 		= association_proxy("datum_type_has_feature_type","datum_type")
+	
+class Datum_has_datum(Base):
+	pass
 
 class Datum(Base):
 	#subject = relationship(Subject, backref=backref("data", cascade="all, delete-orphan"))
@@ -115,11 +118,12 @@ class Datum(Base):
 							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
 	detail_values 		= association_proxy("datum_detail_value","Value",
 							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
-	
-	trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic", backref=backref('period', remote_side=[datum_id], lazy="joined"))
-	#TODO: This should be done through a separate association table for many-to-many
-	#TODO: many-to-many should not cascade, but we can set some cascades here if we expect to always delete children of a period.
-	#TODO: trials should be filtered by IsGood
+	trials				= relationship("Datum", secondary="datum_has_datum", lazy="dynamic",
+							primaryjoin="Datum.datum_id==Datum_has_datum.parent_datum_id",
+							secondaryjoin="Datum.datum_id==Datum_has_datum.child_datum_id",
+							backref=backref("period", lazy="joined"))
+	#trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic",
+	#						backref=backref('period', remote_side=[datum_id], lazy="joined"))
 	
 	def _get_store(self):
 		temp_store = self._store
