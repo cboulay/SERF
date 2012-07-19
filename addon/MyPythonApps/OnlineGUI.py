@@ -320,15 +320,14 @@ class SubjectFrame:
         st_menu = OptionMenu(sbt_frame, sbtype_var, self.subject.subject_type.Name, *st_names)
         st_menu.pack(side=LEFT)
         
+        mvic_button = Button(det_frame, text="MVIC Preview", command=self.subject_mvic)
+        mvic_button.pack(side=TOP, fill=X)
+        
         #TODO: Each detail for this subject_type - do as a function that can change if subject_type changes
         #self.subject.details is a kv struct.
         self.details_frame = Frame(det_frame)
         self.details_frame.pack(side=TOP, fill=X)
         self.render_details()
-        
-        #TODO: MVIC preview
-        
-        #TODO: SIC preview
         
         #button to load periods
         self.showing_periods = False
@@ -376,6 +375,8 @@ class SubjectFrame:
         self.pb_button.configure(text="Periods <<" if self.showing_periods else "Periods >>")
         if self.showing_periods:
             PerListFrame(frame=frame, subject=self.subject)
+    def subject_mvic(self):
+        MvicFrame(subject=self.subject)
             
 class DetailListFrame:#For setting X_type associations
     def __init__(self, frame=None, parent=None):
@@ -563,6 +564,11 @@ class PeriodFrame:
         recalc_button.pack(side=TOP, fill=X)
         triage_button = Button(pbutton_frame, text="Triage Trials", command=self.triage_trials)
         triage_button.pack(side=TOP, fill=X)
+        mvic_button = Button(pbutton_frame, text="MVIC Preview", command=self.mvic_preview)
+        mvic_button.pack(side=TOP, fill=X)
+        #sic_button = Button(pbutton_frame, text="SIC Preview", command=self.sic_preview)
+        #sic_button.pack(side=TOP, fill=X)
+        
         
     def update_type(self, type_var):
         session = Session.object_session(self.period)
@@ -668,6 +674,10 @@ class PeriodFrame:
         TriageFrame(period=self.period)
     def sici_analysis(self):
         SiciFrame(period=self.period)
+    def mvic_preview(self):
+        MvicFrame(subject=self.period.subject, period=self.period)
+    def sic_preview(self):
+        SicFrame(period=self.period)
         
 class ModelFrame:
     def __init__(self, frame=None, period=None, doing_threshold=True):
@@ -1082,6 +1092,39 @@ class TriageFrame:
         lab.pack(side=LEFT, fill=X)
         val = Label(parent, text=value)
         val.pack(side=RIGHT)
+        
+class MvicFrame:
+    def __init__(self, frame=None, subject=None, period=None):
+        if not frame: frame=Toplevel()
+        self.frame = frame
+        
+        #Frames
+        plot_frame = Frame(frame)
+        plot_frame.pack(side=TOP, fill=X)
+        
+        fig = Figure()
+        mvic_canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+        mvic_canvas.show()
+        mvic_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        toolbar = NavigationToolbar2TkAgg( mvic_canvas, plot_frame )
+        toolbar.update()
+        mvic_canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
+        
+        #If we are using a period, get the date for this period.
+        #If we are not using a period, get the latest MVIC.
+        mvc,values=subject._get_last_mvic(period=period)
+        my_ax = fig.gca()
+        my_ax.clear()
+        my_ax = fig.add_subplot(111)
+        my_ax.plot(values.T)
+        my_ax.set_ylabel('EMG AVG (per block) ABS AMP (uV)')
+        fig.canvas.draw()
+        
+class SicFrame:
+    def __init__(self, frame=None, period=None):
+        self.period = period
+        if not frame: frame=Toplevel()
+        self.frame = frame
                 
 if __name__ == "__main__":
     #engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.

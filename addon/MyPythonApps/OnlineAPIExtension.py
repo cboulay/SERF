@@ -42,7 +42,7 @@ def model_sigmoid(x,y, mode=None):
 		else: perr = np.sqrt(pcov.diagonal())
 		return popt,perr
 	
-def _recent_stream_for_dir(dir):
+def _recent_stream_for_dir(dir, maxdate=None):
 		dir=os.path.abspath(dir)
 		files=FileReader.ListDatFiles(d=dir)
 		#The returned list is in ascending order, assume the last is most recent
@@ -50,7 +50,9 @@ def _recent_stream_for_dir(dir):
 		for fn in files:
 			temp_stream = FileReader.bcistream(fn)
 			temp_date = datetime.datetime.fromtimestamp(temp_stream.datestamp)
-			if not best_stream or temp_date > datetime.datetime.fromtimestamp(best_stream.datestamp): 
+			if not best_stream\
+				or (maxdate and temp_date<=maxdate)\
+				or (not maxdate and temp_date > datetime.datetime.fromtimestamp(best_stream.datestamp)):
 				best_stream=temp_stream
 		return best_stream
 	
@@ -87,19 +89,15 @@ class Subject:
 			session.flush()
 		return period
 	
-	def _get_last_mvic(self):
-		#Online analysis assumes most recent MVIC is relevant. Offline analysis may require date-specific MVIC.
-		#TODO: Make sure the muscle is correct.
-		session = Session.object_session(self)
-		dir_stub=get_or_create(System, sess=session, Name='bci_dat_dir').Value
+	def _get_last_mvic(self, period=None):#If period is provided, we will use that date.
+		dir_stub=Session.query(System).filter(System.Name=="bci_dat_dir").one().Value
 		mvic_dir=dir_stub + '/' + self.Name + '/' + self.Name + '888/'
-		bci_stream=_recent_stream_for_dir(mvic_dir)
+		bci_stream=_recent_stream_for_dir(mvic_dir,maxdate=period.EndTime if period else None)
 		sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
 		x_bool = (states['MVC']==1).squeeze()
-		#TODO: Filter/smooth states['Value'] so we only look for sustained contraction, not one-offs.
 		self.last_mvic = np.max(states['Value'][:,x_bool])
-		return self.last_mvic
-	
+		return self.last_mvic, states['Value']
+        	
 class Datum:
 	__metaclass__=ExtendInplace
 	
