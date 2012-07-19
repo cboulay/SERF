@@ -63,21 +63,22 @@ class BciApplication(BciGenericApplication):
 			#"Tab:SubSection DataType Name= Value DefaultValue LowRange HighRange // Comment (identifier)",
 			#See further details http://bci2000.org/wiki/index.php/Technical_Reference:Parameter_Definition
 			"PythonApp:Contingency  float 		ISIMin= 5 5 2 % // Minimum time s between stimuli",
-			"PythonApp:Contingency 	list 		ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent.",
+			"PythonApp:Contingency 	list 		ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent",
 			"PythonApp:Contingency 	float 		DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before triggering",
 			"PythonApp:Contingency 	float 		DurationRand= 0.3 0.3 0 % // Randomization s around the duration",
-			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 05 10 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria",
+			"PythonApp:Contingency 	float 		MVIC= 600 600 0 % // MVIC in uV",
+			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 8 12 0 0 % //Min and Max for signal amplitude criteria in pcnt MVIC",
 			#TODO: Some applications might want to trigger only when the signal enters the range in a certain direction.
 			#"PythonApp:Contingency 	int 		RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
 			
 			#Specify how this will be used.
 			"PythonApp:Method	int			ExperimentType= 0 0 0 4 // Experiment Type: 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment (enumeration)",
 			"PythonApp:Method	float	 	StimIntensity= 30 30 0 100 // 0-50 for DS5, 0-100 for Single-Pulse, 0-100 for Bistim Cond",
-			"PythonApp:Method	list		TriggerInputChan= 1 TMSTrig % % % // Name of channel used to monitor trigger / control ERP window",
-			"PythonApp:Method	float		TriggerThreshold= 10000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
+			"PythonApp:Method	list		TriggerInputChan= 1 Trig % % % // Name of channel used to monitor trigger / control ERP window",
+			"PythonApp:Method	float		TriggerThreshold= 1 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
 			#"PythonApp:Method   int			UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
-			"PythonApp:Method	list		ERPChan= 1 EDC % % % // Name of channel used for ERP",
-			"PythonApp:Method	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
+			"PythonApp:Method	list		ERPChan= 1 EDC_RAW % % % // Channels to store in database (in addition to trigger)",
+			"PythonApp:Method	floatlist	ERPWindow= {Start Stop} -500 500 0 % % // Stored window, relative to trigger onset, in millesconds",
 			
 			"PythonApp:Display 	string 	CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
 			"PythonApp:Display 	string 	CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
@@ -150,6 +151,9 @@ class BciApplication(BciGenericApplication):
 		else:
 			raise EndUserError, "Must supply ContingentChannel"
 
+		#TODO: Check that MVIC makes sense.
+		self.mvic=self.params['MVIC'].val
+		
 		#Check that the amplitude range makes sense.
 		amprange=self.params['AmplitudeRange'].val
 		if len(amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
@@ -159,6 +163,8 @@ class BciApplication(BciGenericApplication):
 		#############
 		# ERP CHECK #
 		#############
+		
+		#Trigger
 		self.trigchan=None
 		#tch = self.params['TriggerInputChan'].val
 		tch = self.params['TriggerInputChan']
@@ -175,10 +181,10 @@ class BciApplication(BciGenericApplication):
 			trigthresh=self.params['TriggerThreshold'].val
 			self.tch=tch #This is used for storing the channel labels.
 			self.trigthresh=trigthresh
+			
 		#Check the ERP channel.
 		erpch = self.params['ERPChan'].val
-		erpch = [ec + "_RAW" for ec in erpch]
-		#Append _RAW to each erpchan
+		#erpch = [ec + "_RAW" for ec in erpch]#Append _RAW to each erpchan
 		if len(erpch) != 0:
 			if False in [isinstance(x, int) for x in erpch]:
 				nf = filter(lambda x: not str(x) in chn, erpch)
@@ -208,33 +214,14 @@ class BciApplication(BciGenericApplication):
 		#######################################################
 		# Get our subject and its current period from the ORM #
 		#######################################################
+		my_subject_type=get_or_create(Subject_type, Name='BCPy_healthy')
 		self.subject=get_or_create(Subject, Name=self.params['SubjectName'], species_type='human')
+		if not self.subject.subject_type_id:
+			self.subject.subject_type_id=my_subject_type.subject_type_id
 		#Determine period_type from ExperimentType 0 MEPMapping, 1 MEPRecruitment, 2 MEPSICI, 3 HRHunting, 4 HRRecruitment
 		period_type_name={0:'mep_mapping', 1:'mep_io', 2:'mep_sici', 3:'hr_hunting', 4:'hr_io'}.get(int(self.params['ExperimentType']))
 		my_period_type=get_or_create(Datum_type, Name=period_type_name)
 		self.period = self.subject.get_most_recent_period(datum_type=my_period_type,delay=0)#Will create period if it does not exist.
-		
-		################
-		# PERIOD FRAME #
-		################
-		#I would like to launch the period frame for this period, but the TKInter locks up BCPy2000.
-		#Instead I will try using a simple matplotlib
-		#self.root = Tk()
-		#self.per_frame = PeriodFrame(frame=self.gui_thread.root, period=self.period)
-		#if int(self.params['ShowLastERP']):
-		#	import matplotlib.pyplot as plt
-		#	self.erp_fig = plt.figure(1)
-		#	import Pyro4 #TODO: This causes a runtime error but the error seems to not matter.
-		#	uri='PYRO:plot_maker@localhost:4567'#TODO: Make this a parameter.
-		#	self.plot_maker=Pyro4.Proxy(uri)
-		#	#self.plot_maker=Pyro4.Proxy("PYRONAME:example.greeting")#if using nameserver
-		
-		############
-		# GET MVIC #
-		############
-		#We always need an MVIC because we need to know where to put the target bar.
-		#This is a little slow because it loads a full BCI2000.dat file
-		self.mvic = self.subject._get_last_mvic()#Assumes last_mvic file is for the same muscle as current.
 		
 		##########
 		# SCREEN #
@@ -327,7 +314,8 @@ class BciApplication(BciGenericApplication):
 		
 		self.x_vec=np.arange(self.erpwin[0],self.erpwin[1],1000/self.eegfs,dtype=float)
 		self.chlbs = self.params['TriggerInputChan'] if self.trigchan else []
-		self.chlbs.extend(self.params['ERPChan'])
+		add_names = [ch_name[0:-4] if ch_name.endswith('_RAW') else ch_name for ch_name in self.params['ERPChan']]
+		self.chlbs.extend(add_names)
 		
 	#############################################################
 	
