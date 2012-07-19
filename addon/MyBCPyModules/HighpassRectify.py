@@ -81,11 +81,11 @@ class BciSignalProcessing(BciGenericSignalProcessing):
 			
 			#Add the raw_data output to the list of output channels.
 			out_sig_props=copy.deepcopy(sigprops)
-			chan_labels=out_sig_props['ChannelLabels'] #Since this is a shallow copy...
+			chan_labels=out_sig_props['ChannelLabels'] #Since this is a shallow copy>>
 			add_chan_labels=[]
 			for cc in pch:
 				add_chan_labels.append(cc+'_RAW')
-			chan_labels.extend(add_chan_labels) #... out_sig_props is automatically updated here.
+			chan_labels.extend(add_chan_labels) #>> out_sig_props is automatically updated here.
 			return out_sig_props
 			
 		#return (nOutputChannels, nOutputSamples)
