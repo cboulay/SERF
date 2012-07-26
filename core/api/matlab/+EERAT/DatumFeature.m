@@ -8,6 +8,7 @@ classdef DatumFeature < EERAT.Db_obj
         feature_type_id;
     end
     properties (Dependent=true)
+        feature_type;
         Value;
         Name; %Read-only
         Description; %Read-only
@@ -21,6 +22,10 @@ classdef DatumFeature < EERAT.Db_obj
         end
         function set.Value(feature,value)
             feature.set_col_value('Value',value);
+        end
+        function feature_type=get.feature_type(self)
+            feature_type=self.get_x_to_one('feature_type_id',...
+                'FeatureType','feature_type_id');
         end
         function Name=get.Name(feature)
             stmnt = ['SELECT Name FROM feature_type WHERE feature_type_id=',num2str(feature.feature_type_id)];

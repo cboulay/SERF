@@ -118,5 +118,41 @@ classdef Datum < EERAT.Db_obj
         function details=get.details(datum)
             details=EERAT.Db_obj.get_obj_array(datum.dbx,'DatumDetail','datum_id',datum.datum_id);
         end
+        
+        function result=calculate_feature(datum,feature_type)
+            if strcmpi(feature_type.Name,'MEP_p2p')
+                x_start_name='dat_MEP_start_ms';
+                x_stop_name='dat_MEP_stop_ms';
+                chan_label_name='dat_MEP_chan_label';
+                
+                det_names={datum.details.Name};               
+                x_start_ms=str2double(datum.details(strcmpi(det_names,x_start_name)).Value);
+                x_stop_ms=str2double(datum.details(strcmpi(det_names,x_stop_name)).Value);
+                chan_name=datum.details(strcmpi(det_names,chan_label_name)).Value;
+                
+                x_vec=datum.xvec;
+                x_bool=x_vec>=x_start_ms & x_vec<=x_stop_ms;
+                y_dat=datum.erp(x_bool,strcmpi(datum.channel_labels,chan_name));
+                result=max(y_dat)-min(y_dat);
+                
+                dfv=datum.features(strcmpi({datum.features.Name},feature_type.Name));
+                dfv.Value=result;
+            else
+                result=NaN;
+            end
+        end
+    end
+    methods (Static)
+        function yhat=sigmoid(b,X)
+            %b(1) = max value
+            %b(2) = slope
+            %b(3) = x at which y is halfmax
+            %b(4) = offset (when x=0)
+            yhat = b(1) ./ (1 + exp(-1*b(2)*(X-b(3)))) + b(4);
+            %yhat = X(:,2) ./ (1 + exp(-1*b(1)*(X(:,1)-b(2)))) + X(:,3);
+        end
+        function yhat=sigmoid_simple(b,X)
+            yhat = 1 ./ (1 + exp(-1*b(1)*(X-b(2))));
+        end
     end
 end
