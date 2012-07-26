@@ -45,38 +45,42 @@ class App:
             x = tr_store['x_vec']
             y = tr_store['data']
             
-            x_bool = np.logical_and(x>=-10,x<=100)
-            x=x[x_bool]
-            #y=y[chan_bool,x_bool]
-            y=y[:,x_bool]
-            
-            nchans = np.size(tr_store['channel_labels'])
-            naxes = np.size(fig.axes)
-            while naxes<nchans:
-                fig.add_subplot(nchans,1,naxes+1)
-                naxes=np.size(fig.axes)
+            if not isinstance(y,basestring):
+                nchans = np.size(tr_store['channel_labels'])
+                for cc in range(0,nchans):
+                    y[cc,:]=y[cc,:]-np.mean(y[cc,x<-5])
+                x_bool = np.logical_and(x>=-10,x<=100)
+                x=x[x_bool]
+                #y=y[chan_bool,x_bool]
+                y=y[:,x_bool]
                 
-            for cc in range(0,nchans):
-                this_ax = fig.axes[cc]
-                this_ax.lines = this_ax.lines[-4:]
-                this_ax.plot(x,y[cc,:].T)
-                y_max = 0.0
-                y_min = 0.0
-                for ll in this_ax.lines:
-                    ll.set_linewidth(0.5)
-                    temp_data = ll.get_ydata()
-                    y_min = min(y_min, min(temp_data[x>=10]))
-                    y_max = max(y_max, max(temp_data[x>=10]))
-                this_ax.lines[-1].set_linewidth(3.0)
-                #TODO: Scale y-axis to be +/- 20% around displayed trials (excluding stim artifact)
-                y_margin = 0.2 * np.abs((y_max - y_min))
-                this_ax.set_ylim(y_min-y_margin,y_max+y_margin)
-                if cc==nchans-1:this_ax.set_xlabel('TIME AFTER STIM (ms)')
-                this_ax.set_ylabel('AMPLITUDE (uv)')
-                this_ax.set_title(tr_store['channel_labels'][cc])
-            fig.tight_layout()
-            fig.canvas.draw()
-            self.last_id = last_trial.datum_id
+                
+                naxes = np.size(fig.axes)
+                while naxes<nchans:
+                    fig.add_subplot(nchans,1,naxes+1)
+                    naxes=np.size(fig.axes)
+                    
+                for cc in range(0,nchans):
+                    this_ax = fig.axes[cc]
+                    this_ax.lines = this_ax.lines[-4:]
+                    this_ax.plot(x,y[cc,:].T)
+                    y_max = -1*np.inf
+                    y_min = np.inf
+                    for ll in this_ax.lines:
+                        ll.set_linewidth(0.5)
+                        temp_data = ll.get_ydata()
+                        y_min = min(y_min, min(temp_data[x>=4]))
+                        y_max = max(y_max, max(temp_data[x>=4]))
+                    this_ax.lines[-1].set_linewidth(3.0)
+                    #TODO: Scale y-axis to be +/- 10% around displayed trials (excluding stim artifact)
+                    y_margin = 0.1 * np.abs((y_max - y_min))
+                    this_ax.set_ylim(y_min-y_margin,y_max+y_margin)
+                    if cc==nchans-1:this_ax.set_xlabel('TIME AFTER STIM (ms)')
+                    this_ax.set_ylabel('AMPLITUDE (uv)')
+                    this_ax.set_title(tr_store['channel_labels'][cc])
+                fig.tight_layout()
+                fig.canvas.draw()
+                self.last_id = last_trial.datum_id
         
         self.frame.after(500, self.update_plot)
         

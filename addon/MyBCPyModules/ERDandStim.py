@@ -35,6 +35,7 @@ class BciApplication(BciGenericApplication):
             "PythonApp:Design     float          TriggerThreshold= 100000 1 0 % // If monitoring trigger, use this threshold to determine ERP time 0",
             "PythonApp:Design     list           ERPChan= 1 EDC % % % // Name of channel used for ERP",
             "PythonApp:Design     floatlist      ERPWindow= {Start Stop} -500 500 0 % % // ERP window, relative to trigger onset, in millesconds",
+            "PythonApp:Design     int            AlternateTargets=    0     0     0   1  // alternate target classes rather than choosing randomly (boolean)",
             "PythonApp:Design     int            ShowFixation= 0     0     0   1  // show a fixation point in the center (boolean)",
             "PythonApp:Screen     int            ScreenId= -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
             "PythonApp:Screen     float          WindowSize= 0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",

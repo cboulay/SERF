@@ -17,7 +17,7 @@ class MEP(object):
 		if int(app.params['SerialTrigger'])==0: #Not using a serial trigger
 			from Caio.TriggerBox import TTL
 			trigbox=TTL()#Initializing this trigbox also sends out a 0V TTL on channel1
-			trigbox.add_SC()
+			#trigbox.add_SC()
 		else: trigbox=None
 		from Magstim.MagstimInterface import Bistim
 		serPort=app.params['SerialPort'].val

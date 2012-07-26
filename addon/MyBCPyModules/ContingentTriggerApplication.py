@@ -109,7 +109,7 @@ class BciApplication(BciGenericApplication):
 			"ISIExceeded 1 0 0 0",
 			"StimulatorIntensity 16 0 0 0", #So it is saved off-line analysis
 			"StimulatorReady 1 0 0 0", #Whether or not stimulator is ready to trigger.
-			"Trigger 1 0 0 0",
+			#"Trigger 1 0 0 0",
 			"Response 1 0 0 0",
 			"Feedback 1 0 0 0",
 		]
@@ -265,8 +265,12 @@ class BciApplication(BciGenericApplication):
 		##################
 		self.post_stim_samples = SigTools.msec2samples(self.erpwin[1], self.eegfs)
 		self.pre_stim_samples = SigTools.msec2samples(np.abs(self.erpwin[0]), self.eegfs)
-		#Initialize the ring buffer. It will be passed the raw data (relabeled as EDC) and the erp.
-		self.leaky_trap=SigTools.Buffering.trap(4*(self.pre_stim_samples + self.post_stim_samples), len(self.stored_chan_ids), leaky=True)
+		#Initialize the buffer that contains the full (pre and post) erp.
+		#This buffer must contain at least pre_stim_samples + post_stim_samples + 2*spb... but we'll add a few blocks for safety.
+		self.leaky_trap=SigTools.Buffering.trap(self.pre_stim_samples + self.post_stim_samples + 5*spb, len(self.stored_chan_ids), leaky=True)
+		#We will use a trap buffer that will monitor the trigger. This may only be large enough to store the post-stim erp.
+		self.erp_trap = SigTools.Buffering.trap(self.post_stim_samples, len(self.stored_chan_ids),\
+											trigger_channel=self.stored_chan_ids.index(self.trigchan[0]), trigger_threshold=self.trigthresh)
 
 		################################
 		# State monitors for debugging #
@@ -280,8 +284,9 @@ class BciApplication(BciGenericApplication):
 			addstatemonitor(self, 'Inrange')
 			#addstatemonitor(self, 'SignalEnterMet')
 			addstatemonitor(self, 'SignalCriteriaMetBlocks')
+			addstatemonitor(self, 'StimulatorReady')
 			addstatemonitor(self, 'ISIExceeded')
-			addstatemonitor(self, 'Trigger')
+			#addstatemonitor(self, 'Trigger')
 			addstatemonitor(self, 'Response')
 			addstatemonitor(self, 'Feedback')
 						
@@ -321,10 +326,10 @@ class BciApplication(BciGenericApplication):
 	
 	def StartRun(self):
 		#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
-		self.transient("Trigger")
+		#self.transient("Trigger")
 		self.forget('stim_trig')
-		self.trailingsample = None#Used for trigger monitoring
-		self.triggered = False #each new trial has not yet been triggered.
+		#self.trailingsample = None#Used for trigger monitoring
+		#self.triggered = False #each new trial has not yet been triggered.
 		if int(self.params['ExperimentType']) in [1,4]: IOCURVE.startrun(self)
 		
 	#############################################################
@@ -354,10 +359,10 @@ class BciApplication(BciGenericApplication):
 		
 		if phase == 'response':
 			self.stimulator.trigger()
-			self.states['Trigger'] = 1
+			#self.states['Trigger'] = 1
 			self.remember('stim_trig')
 			self.states['SignalCriteriaMetBlocks']=0#Reset the number of blocks
-			self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
+			#self.triggered = True #Used to make sure we only process the trigger input when it is relevant to do so.
 			self.states['StimulatorIntensity'] = self.stimulator.intensity
 		elif phase == 'outrange':
 			self.stimuli['target_box'].color = [1, 0, 0]
@@ -369,7 +374,7 @@ class BciApplication(BciGenericApplication):
 			#self.states['SignalEnterMet'] = self.enterok
 		elif phase == 'intertrial':
 			self.mindur=self.dmin + randint(-1*self.drand,self.drand)#randomized EMG contingency duration
-			self.triggered = False #each new trial has not yet been triggered.
+			#self.triggered = False #each new trial has not yet been triggered.
 			
 		elif phase == 'feedback':
 			#This should begin about 2 blocks after the response window is over.
@@ -388,6 +393,13 @@ class BciApplication(BciGenericApplication):
 		#Process is called on every packet
 		#Phase transitions occur independently of packets
 		#Therefore it is not desirable to use phases for application logic in Process
+		
+		########################################
+		# Write the ERP data to our trap.      #
+		# Do this every block, no matter what. #
+		########################################
+		self.leaky_trap.process(sig[self.stored_chan_ids,:])
+		self.erp_trap.process(sig[self.stored_chan_ids,:])
 		
 		###############################################
 		# Update the feedback pos based on the signal #
@@ -419,13 +431,6 @@ class BciApplication(BciGenericApplication):
 		stim_ready = True if not self.params['ReqStimReady'].val else self.stimulator.ready
 		self.states['StimulatorReady'] = stim_ready
 		
-		########################################
-		# Write the ERP data to our leaky trap #
-		# Do this every block, no matter what. #
-		########################################
-		#self.leaky_trap.process(sig[self.erpchan,:])
-		self.leaky_trap.process(sig[self.stored_chan_ids,:]) #Debug trigger timing
-		
 		##############################################
 		# Manually change out of inrange or outrange #
 		##############################################
@@ -443,74 +448,74 @@ class BciApplication(BciGenericApplication):
 				if ~phase_outrange:#phase is wrong
 					self.change_phase('outrange')
 		
-		####################
-		# Trigger Response #
-		####################
-		if self.triggered:#Only search for a trigger response if we have sent a trigger
-			startx = None
-			
-			#
-			# Find the Trigger #
-			####################
-			if self.trigchan:# Hardware trigger:
-				tr = np.asarray(sig[self.trigchan, :]).ravel() #flatten the trigger channel(s).
-				prev = self.trailingsample #The last sample from the previous packet
-				if prev == None: prev = [self.trigthresh - 1.0] #If we don't have a last sample, assume it was less than the threshold
-				self.trailingsample = tr[[-1]] #Keep the last sample of this packet for next time
-				tr = np.concatenate((prev,tr)) #prepend this packet with the last sample of the previous packet
-				tr = np.asarray(tr > self.trigthresh, np.int8) #booleans representing whether or not the trigger was above threshold
-				tr = np.argwhere(np.diff(tr) > 0)  #find any indices where the trigger crossed threshold
-				if len(tr): #If we have a crossing
-					startx = tr[0,0] #n_samples when the trigger first crossed threshold
-			elif self.changed('Response', 1):# Software trigger:
-				#Trigger onset was when we changed phase to Response
-				startx = self.detect_event() if self.detect_event() else self.nominal.SamplesPerPacket
-				#I still have quite a bit of jitter in the software trigger. 
-				
-			#
-			# Forget any ERP before startx + pre_stim_samples #
-			###################################################
-			if startx:
-				samps_in_trap = self.leaky_trap.collected()
-				samps_this_packet = sig.shape[1]
-				samps_to_forget = samps_in_trap - ( samps_this_packet + (self.pre_stim_samples - startx)) - 1
-				self.leaky_trap.ring.forget(samps_to_forget)
-				
-			#
-			# Extract the ERP #
-			###################
-			n_erp_samples=self.pre_stim_samples + self.post_stim_samples
-			if self.leaky_trap.collected() >= n_erp_samples:
-				#The ERP buffer should begin at precisely the pre-stim window so read n_erp_samples
-				x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
-				self.triggered = False #We do not need to look for the ERP anymore.
-				self.period.trials.append(Datum(subject_id=self.subject.subject_id\
+		#=======================================================================
+		# ####################
+		# # Trigger Response #
+		# ####################
+		# if self.triggered:#Only search for a trigger response if we have sent a trigger
+		#	startx = None
+		#	#
+		#	# Find the Trigger #
+		#	####################
+		#	if self.trigchan:# Hardware trigger:
+		#		tr = np.asarray(sig[self.trigchan, :]).ravel() #flatten the trigger channel(s).
+		#		prev = self.trailingsample #The last sample from the previous packet
+		#		if prev == None: prev = [self.trigthresh - 1.0] #If we don't have a last sample, assume it was less than the threshold
+		#		self.trailingsample = tr[[-1]] #Keep the last sample of this packet for next time
+		#		tr = np.concatenate((prev,tr)) #prepend this packet with the last sample of the previous packet
+		#		tr = np.asarray(tr > self.trigthresh, np.int8) #booleans representing whether or not the trigger was above threshold
+		#		tr = np.argwhere(np.diff(tr) > 0)  #find any indices where the trigger crossed threshold
+		#		if len(tr): #If we have a crossing
+		#			startx = tr[0,0] #n_samples when the trigger first crossed threshold
+		#			print "trigger detected"
+		#	elif self.changed('Response', 1):# Software trigger:
+		#		#Trigger onset was when we changed phase to Response
+		#		startx = self.detect_event() if self.detect_event() else self.nominal.SamplesPerPacket
+		#		#I still have quite a bit of jitter in the software trigger. 
+		#		print "event detected"
+		#	#
+		#	# Forget any ERP before startx + pre_stim_samples #
+		#	###################################################
+		#	if startx:
+		#		print startx
+		#		samps_in_trap = self.leaky_trap.collected()
+		#		samps_this_packet = sig.shape[1]
+		#		samps_to_forget = samps_in_trap - ( samps_this_packet + (self.pre_stim_samples - startx)) - 1
+		#		self.leaky_trap.ring.forget(samps_to_forget)
+		#		
+		#	#
+		#	# Extract the ERP #
+		#	###################
+		#	n_erp_samples=self.pre_stim_samples + self.post_stim_samples
+		#	if self.leaky_trap.collected() >= n_erp_samples:
+		#		#The ERP buffer should begin at precisely the pre-stim window so read n_erp_samples
+		#		x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
+		#		self.triggered = False #We do not need to look for the ERP anymore.
+		#=======================================================================
+		
+		if self.erp_trap.full():
+			n_excess = (self.erp_trap.nseen-self.erp_trap.sprung_at)-self.erp_trap.nsamples
+			self.erp_trap.reset()
+			data = self.leaky_trap.read()
+			data = data[:,-1*(self.pre_stim_samples+self.post_stim_samples+n_excess):-1*n_excess]
+			self.period.trials.append(Datum(subject_id=self.subject.subject_id\
 											, datum_type_id=self.period.datum_type_id\
 											, span_type='trial'\
 											, parent_datum_id=self.period.datum_id\
 											, IsGood=1, Number=0))
-				#my_trial = get_or_create(Datum\
-				#	, subject=self.subject\
-				#	, datum_type=self.period.datum_type\
-				#	, span_type='trial'\
-				#	, period=self.period\
-				#	, IsGood=1\
-				#	, Number=0\
-				#	, sess=Session.object_session(self.period))
-				#Session.object_session(my_trial).commit()#Need to do something here that commits this to the db.
-				#Session.object_session(my_trial).flush()
-				my_trial=self.period.trials[-1]
-				my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
-				if int(self.params['ExperimentType']) == 2:#SICI intensity
-					my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
-				#The fature calculation should be asynchronous.
-				my_trial.store={'x_vec':self.x_vec, 'data':x, 'channel_labels': self.chlbs}
-				self.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
+			my_trial=self.period.trials[-1]
+			my_trial.detail_values[self.intensity_detail_name]=str(self.stimulator.intensity)
+			if int(self.params['ExperimentType']) == 2:#SICI intensity
+				my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
+			#The fature calculation should be asynchronous.
+			my_trial.store={'x_vec':self.x_vec, 'data':data, 'channel_labels': self.chlbs}
+			self.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
 				
 				#if int(self.params['ShowLastERP'])==1:
 					#Pass the plot off to a remote object so it doesn't kill this' rendering.
 				#	ch_bool = np.asarray([self.params['ERPChan'][0]==chan_lab for chan_lab in self.chlbs])
 				#	self.plot_maker.plot_data(self.x_vec,x[ch_bool,:].T)
+				
 		##############################
 		# Response from ERP analysis #
 		##############################
