@@ -168,7 +168,7 @@ class Datum(Base):
 		#TODO: It might be faster to calculate multiple features simultaneously per trial.
 		#Should calculation of trial features such as residuals use period model prior to inclusion of the current trial?
 		
-		refdatum = None if self.datum_type=='period' else self.period[-1]#Assumes last parent is best parent.
+		refdatum = None if self.span_type=='period' else self.period[-1]#Assumes last parent is best parent.
 		
 		#TODO: Adding a feature to a type after an instance of the type exists does not create a default value.
 		for fname in self.feature_values.iterkeys():

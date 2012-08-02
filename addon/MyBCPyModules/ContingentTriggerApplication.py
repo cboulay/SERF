@@ -434,6 +434,7 @@ class BciApplication(BciGenericApplication):
 		##############################################
 		# Manually change out of inrange or outrange #
 		##############################################
+		#try using self.remember and self.since instead of phases.
 		phase_inrange=self.in_phase('inrange')
 		phase_outrange=self.in_phase('outrange')
 		if phase_inrange or phase_outrange:
@@ -448,51 +449,7 @@ class BciApplication(BciGenericApplication):
 				if ~phase_outrange:#phase is wrong
 					self.change_phase('outrange')
 		
-		#=======================================================================
-		# ####################
-		# # Trigger Response #
-		# ####################
-		# if self.triggered:#Only search for a trigger response if we have sent a trigger
-		#	startx = None
-		#	#
-		#	# Find the Trigger #
-		#	####################
-		#	if self.trigchan:# Hardware trigger:
-		#		tr = np.asarray(sig[self.trigchan, :]).ravel() #flatten the trigger channel(s).
-		#		prev = self.trailingsample #The last sample from the previous packet
-		#		if prev == None: prev = [self.trigthresh - 1.0] #If we don't have a last sample, assume it was less than the threshold
-		#		self.trailingsample = tr[[-1]] #Keep the last sample of this packet for next time
-		#		tr = np.concatenate((prev,tr)) #prepend this packet with the last sample of the previous packet
-		#		tr = np.asarray(tr > self.trigthresh, np.int8) #booleans representing whether or not the trigger was above threshold
-		#		tr = np.argwhere(np.diff(tr) > 0)  #find any indices where the trigger crossed threshold
-		#		if len(tr): #If we have a crossing
-		#			startx = tr[0,0] #n_samples when the trigger first crossed threshold
-		#			print "trigger detected"
-		#	elif self.changed('Response', 1):# Software trigger:
-		#		#Trigger onset was when we changed phase to Response
-		#		startx = self.detect_event() if self.detect_event() else self.nominal.SamplesPerPacket
-		#		#I still have quite a bit of jitter in the software trigger. 
-		#		print "event detected"
-		#	#
-		#	# Forget any ERP before startx + pre_stim_samples #
-		#	###################################################
-		#	if startx:
-		#		print startx
-		#		samps_in_trap = self.leaky_trap.collected()
-		#		samps_this_packet = sig.shape[1]
-		#		samps_to_forget = samps_in_trap - ( samps_this_packet + (self.pre_stim_samples - startx)) - 1
-		#		self.leaky_trap.ring.forget(samps_to_forget)
-		#		
-		#	#
-		#	# Extract the ERP #
-		#	###################
-		#	n_erp_samples=self.pre_stim_samples + self.post_stim_samples
-		#	if self.leaky_trap.collected() >= n_erp_samples:
-		#		#The ERP buffer should begin at precisely the pre-stim window so read n_erp_samples
-		#		x=self.leaky_trap.ring.read(nsamp=n_erp_samples, remove=False)
-		#		self.triggered = False #We do not need to look for the ERP anymore.
-		#=======================================================================
-		
+		#if self.in_phase('response'):self.dbstop()
 		if self.erp_trap.full():
 			n_excess = (self.erp_trap.nseen-self.erp_trap.sprung_at)-self.erp_trap.nsamples
 			self.erp_trap.reset()
@@ -508,6 +465,8 @@ class BciApplication(BciGenericApplication):
 			if int(self.params['ExperimentType']) == 2:#SICI intensity
 				my_trial.detail_values['dat_TMS_powerB']=str(self.stimulator.intensityb)
 			#The fature calculation should be asynchronous.
+			if isinstance(data,basestring): self.dbstop()
+			
 			my_trial.store={'x_vec':self.x_vec, 'data':data, 'channel_labels': self.chlbs}
 			self.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
 				

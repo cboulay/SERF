@@ -78,7 +78,7 @@ class App:
                     if cc==nchans-1:this_ax.set_xlabel('TIME AFTER STIM (ms)')
                     this_ax.set_ylabel('AMPLITUDE (uv)')
                     this_ax.set_title(tr_store['channel_labels'][cc])
-                fig.tight_layout()
+                #fig.tight_layout() #tight_layout shrinks the plots
                 fig.canvas.draw()
                 self.last_id = last_trial.datum_id
         

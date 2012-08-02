@@ -97,6 +97,12 @@ class Subject:
 		x_bool = (states['MVC']==1).squeeze()
 		self.last_mvic = np.max(states['Value'][:,x_bool])
 		return self.last_mvic, states['Value']
+	
+	def _get_last_sic(self, period=None):
+		dir_stub=Session.query(System).filter(System.Name=="bci_dat_dir").one().Value
+		sic_dir=dir_stub + '/' + self.Name + '/' + self.Name + '999/'
+		bci_stream=_recent_stream_for_dir(sic_dir,maxdate=period.EndTime if period else None)
+		return bci_stream
         	
 class Datum:
 	__metaclass__=ExtendInplace
@@ -119,7 +125,7 @@ class Datum:
 					temp = float(Session.query(Datum_detail_value).filter(Datum_detail_value.datum_id==self.datum_id, Datum_detail_value.detail_name=='dat_MEP_detection_limit').one().Value)
 					#temp = float(self.detail_values['dat_MEP_detection_limit'])
 			
-			elif 'hr' in self.type.name:
+			elif 'hr' in self.type_name:
 				if self.detail_values.has_key('dat_HR_detection_limit') and float(self.detail_values['dat_HR_detection_limit']):
 					temp = float(Session.query(Datum_detail_value).filter(Datum_detail_value.datum_id==self.datum_id, Datum_detail_value.detail_name=='dat_HR_detection_limit').one().Value)
 					#temp = float(self.detail_values['dat_HR_detection_limit'])
@@ -130,7 +136,9 @@ class Datum:
 				sic_dir=dir_stub + '/' + self.subject.Name + '/' + self.subject.Name + '999/'
 				bci_stream=_recent_stream_for_dir(sic_dir)
 				sig,states=bci_stream.decode(nsamp='all')
-				sig,chan_labels=bci_stream.spatialfilteredsig(sig)
+				#sig,chan_labels=bci_stream.spatialfilteredsig(sig)
+				#TODO: get spatially filtered signal that matches what will be stored in ERP
+				chan_labels = bci_stream.params['ChannelNames']
 				
 				if 'hr' in self.type_name:
 					chan_label=self.detail_values['dat_HR_chan_label']
@@ -143,7 +151,7 @@ class Datum:
 				
 				#Only use the relevant channel	
 				sig=sig[chan_labels.index(chan_label),:]
-				
+				sig = sig - np.mean(sig, axis=1)
 				#Reduce the signal to only relevant samples
 				x_bool = (states['SummingBlocks']==1).squeeze()
 				sig=sig[:,x_bool]
@@ -255,9 +263,10 @@ class Datum:
 				#temp_data.flags.writeable=True
 				#temp_data=temp_data.reshape([n_channels,n_samples])
 				#TODO: Only use IsGood trials. self.trials does not discriminate (I don't think, check API).
-				running_sum=running_sum+ds.store['data']
-				n_trials=n_trials+1
-			avg_data = running_sum/n_trials
+				if not isinstance(ds.store['data'],basestring):
+					running_sum=running_sum+ds.store['data']
+					n_trials=n_trials+1
+			if n_trials>0: avg_data = running_sum/n_trials
 			
 			last_store=last_trial.store
 			

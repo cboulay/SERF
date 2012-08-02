@@ -24,6 +24,7 @@ class MEP(object):
 		app.stimulator=Bistim(port=serPort, trigbox=trigbox)
 		app.intensity_detail_name = 'dat_TMS_powerA'
 		app.stimulator.remocon = True
+		app.stimulator.intensity = app.params['StimIntensity'].val
 	@classmethod
 	def transition(cls,app,phase):
 		if phase == 'inrange' or phase == 'baseline':
@@ -74,7 +75,7 @@ class HR(object):
 		trigbox=TTL()#Initializing this trigbox also sends out a 0V TTL on channel1
 		from Caio.VirtualStimulatorInterface import Virtual
 		trigbox._caio.fs=10000
-		trigbox.set_TTL(width=1, channel=2)#Use a shorter TTL width, since the TTL drives the stimulator.
+		trigbox.set_TTL(width=1)#Use a shorter TTL width, since the TTL drives the stimulator.
 		app.stimulator=Virtual(trigbox=trigbox)
 		app.intensity_detail_name = 'dat_Nerve_stim_output'
 		

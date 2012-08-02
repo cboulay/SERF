@@ -58,6 +58,7 @@ class BciApplication(BciGenericApplication):
 			"PythonApp:Contingency 	list 		ContingentChannel= 1 EDC % % % // Processed-channel for monitoring EMG",
 			"PythonApp:Contingency 	float 		DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before counting",
 			"PythonApp:Contingency 	float 		DurationTotal= 60 60 0 % // Cumulative duration (s) of sustained contraction",
+			"PythonApp:Contingency 	float 		MVIC= 600 600 0 % // MVIC in uV",
 			"PythonApp:Contingency 	floatlist 	AmplitudeRange= {Min Max} 20 40 0 0 % //Min and Max as pcnt MVIC for signal amplitude criteria.",
 			
 			"PythonApp:Display 	string 	CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
@@ -122,7 +123,9 @@ class BciApplication(BciGenericApplication):
 		else:
 			raise EndUserError, "Must supply ContingentChannel"
 
-			#Check that the range makes sense.
+		#TODO: Check that MVIC makes sense.
+		self.mvic=self.params['MVIC'].val
+		#Check that the range makes sense.
 		self.amprange=np.asarray(self.params['AmplitudeRange'].val, dtype='float64')
 		if len(self.amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
 		if self.amprange[0]>self.amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
@@ -136,27 +139,6 @@ class BciApplication(BciGenericApplication):
 	
 	def Initialize(self, indim, outdim):
 		
-		############
-		# GET MVIC #
-		############
-		mvic_dir=self.params['DataDirectory'] + '/' + self.params['SubjectName'] + '888/'
-		mvic_dir=os.path.abspath(mvic_dir)
-		files=FileReader.ListDatFiles(d=mvic_dir)
-		#The returned list is in ascending order, assume the last is most recent
-		best_stream = None
-		for fn in files:
-			temp_stream = FileReader.bcistream(fn)
-			temp_date = datetime.datetime.fromtimestamp(temp_stream.datestamp)
-			if not best_stream or temp_date > datetime.datetime.fromtimestamp(best_stream.datestamp): 
-				best_stream=temp_stream
-		sig,states=best_stream.decode(nsamp='all', states=['MVC','Value'])
-		x_bool = (states['MVC']==1).squeeze()
-		self.mvic = np.max(states['Value'][:,x_bool])
-		print self.mvic
-	
-		#This is a little slow because it loads a full BCI2000.dat file
-		#self.mvic = self.subject._get_last_mvic()
-	
 		##########
 		# SCREEN #
 		##########

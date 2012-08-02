@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
+import Tkinter
 from Tkinter import *
 from EeratAPI.API import *
 from OnlineAPIExtension import *
@@ -13,6 +14,7 @@ from sqlalchemy import desc
 from ListBoxChoice import ListBoxChoice
 import random
 import time
+import pyperclip
 
 def reset_frame(frame):
     for ww in frame.pack_slaves():
@@ -236,7 +238,7 @@ class EditFrame:
         if isinstance(self.item.DefaultValue,str):
             self.item.DefaultValue = dv_var.get()
         else:
-            self.item.DefaultValue = float(dv_var.get())
+            self.item.DefaultValue = float(dv_var.get()) if dv_var.get() else 0.0
               
 class SubjectFrame:
     def __init__(self, frame=None, subject=None):
@@ -322,6 +324,8 @@ class SubjectFrame:
         
         mvic_button = Button(det_frame, text="MVIC Preview", command=self.subject_mvic)
         mvic_button.pack(side=TOP, fill=X)
+        offset_button = Button(det_frame, text="Channel Offsets", command=self.subject_offset)
+        offset_button.pack(side=TOP, fill=X)
         
         #TODO: Each detail for this subject_type - do as a function that can change if subject_type changes
         #self.subject.details is a kv struct.
@@ -377,6 +381,8 @@ class SubjectFrame:
             PerListFrame(frame=frame, subject=self.subject)
     def subject_mvic(self):
         MvicFrame(subject=self.subject)
+    def subject_offset(self):
+        OffsetFrame(subject=self.subject, period=None)
             
 class DetailListFrame:#For setting X_type associations
     def __init__(self, frame=None, parent=None):
@@ -595,9 +601,11 @@ class PeriodFrame:
             #Boolean array to index the data.
             chan_bool = np.array([cl in chans_list for cl in per_store['channel_labels']])
             n_chans = sum(chan_bool)
-            
             x_vec = per_store['x_vec']
             y_avg = per_store['data'].T[:,chan_bool]
+            base_bool = per_store['x_vec']<-5
+            offsets = np.mean(y_avg[base_bool,:],axis=0)
+            y_avg = y_avg - np.tile(offsets,[1,1])
             
             #get y data from up to 100 trials.
             trials = self.period.trials[-100:]
@@ -608,12 +616,17 @@ class PeriodFrame:
             tt=0
             for tr in trials:
                 store=tr.store
-                dat=store['data'].T[:,chan_bool]
-                if n_chans>1:
-                    y_trials[:,n_chans*tt:n_chans*tt+n_chans-1]=dat
-                else:
-                    y_trials[:,tt]=dat.T
-                tt=tt+1
+                if not isinstance(store['data'],basestring):
+                    dat=store['data'].T[:,chan_bool]
+                    #subtract offset
+                    
+                    offsets = np.mean(dat[base_bool,:],axis=0)
+                    dat = dat - np.tile(offsets,[1,1])
+                    if n_chans>1:
+                        y_trials[:,n_chans*tt:n_chans*tt+n_chans-1]=dat
+                    else:
+                        y_trials[:,tt]=dat.T
+                    tt=tt+1
                 
             #Find values for axvline
             window_lims = [pdv for pdk,pdv in self.period.detail_values.iteritems() if '_ms' in pdk]
@@ -855,6 +868,11 @@ class MapFrame:
         tx=np.linspace(min(x),max(x),100)
         ty=np.linspace(min(y),max(y),100)
         XI, YI = np.meshgrid(tx,ty)
+        
+        #Add 0's on the corners
+        x = np.append(x,[np.min(tx),np.max(tx),np.min(tx),np.max(tx)])
+        y = np.append(y,[np.min(ty),np.min(ty),np.max(ty),np.max(ty)])
+        z = np.append(z,[0,0,0,0])
         
         #http://docs.scipy.org/doc/scipy/reference/tutorial/interpolate-7.py
         from scipy.interpolate import Rbf
@@ -1119,7 +1137,48 @@ class MvicFrame:
         my_ax.plot(values.T)
         my_ax.set_ylabel('EMG AVG (per block) ABS AMP (uV)')
         fig.canvas.draw()
+
+class OffsetFrame:
+    def __init__(self, frame=None, subject=None, period=None):
+        if not frame: frame=Toplevel()
+        self.frame = frame
         
+        #Load the 999 file.
+        bci_stream=subject._get_last_sic(period=period)
+        sig,states=bci_stream.decode(nsamp='all')
+        n_chans,n_samps=sig.shape
+        sig=sig[:,n_samps/10:]
+        diff_offset = np.mean(sig, axis=1)
+        prev_offset = bci_stream.offsets
+        new_offset = prev_offset - diff_offset
+        new_offset = new_offset.flatten()   
+        
+        temp = np.array(prev_offset)
+        temp = temp.reshape(temp.size)
+        temp = ["%.5f" % x for x in temp]
+        temp = ' '.join(temp)
+        old_txt = Tkinter.Text(self.frame, wrap=WORD, height=8)
+        old_txt.insert(END, temp)
+        old_txt.pack()
+        
+        temp = np.array(diff_offset)
+        temp = temp.reshape(temp.size)
+        temp = ["%.5f" % x for x in temp]
+        temp = ' '.join(temp)
+        diff_txt = Tkinter.Text(self.frame, wrap=WORD, height=8)
+        diff_txt.insert(END, temp)
+        diff_txt.pack()
+        
+        temp = np.array(new_offset)
+        temp = temp.reshape(temp.size)
+        temp = ["%.5f" % x for x in temp]
+        temp = ' '.join(temp)
+        new_txt = Tkinter.Text(self.frame, wrap=WORD, height=8)
+        new_txt.insert(END, temp)
+        new_txt.pack()
+        
+        pyperclip.copy(temp)
+              
 class SicFrame:
     def __init__(self, frame=None, period=None):
         self.period = period

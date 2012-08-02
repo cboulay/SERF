@@ -22,6 +22,9 @@ class App:
         digitimer_button = Button(button_frame, text="DIGITIMER >>", command=self.digitimer)
         digitimer_button.pack(side=TOP)
         
+        digiring_button = Button(button_frame, text="DIGIRING >>", command=self.digiring)
+        digiring_button.pack(side=TOP)
+        
         hands_button = Button(button_frame, text="HANDS >>", command = self.hands)
         hands_button.pack(side = TOP)
         
@@ -32,6 +35,10 @@ class App:
     def digitimer(self):
         self.dat_frame=reset_frame(self.dat_frame)
         DigitimerFrame(frame = self.dat_frame)
+        
+    def digiring(self):
+        self.dat_frame=reset_frame(self.dat_frame)
+        DigitimerFrame(frame = self.dat_frame, type='RING')
         
 class HandsFrame:
     def __init__(self, frame=None):
@@ -48,12 +55,12 @@ class HandsFrame:
         GenericFrame(frame = self.frame)
         
 class DigitimerFrame:
-    def __init__(self, frame=None):
+    def __init__(self, frame=None, type='FIFO'):
         if not frame: frame=Toplevel()
         self.frame = frame
         
-        from Caio.NMES import NMESFIFO
-        self.frame.nmes = NMESFIFO()
+        from Caio.NMES import NMESFIFO, NMESRING
+        self.frame.nmes = NMESFIFO() if type=='FIFO' else NMESRING()
         self.frame.nmes.running = True
         
         GenericFrame(frame = self.frame)
