@@ -126,9 +126,6 @@ class Template(object):
             elif phase == 'stopcue':
                 pass
             
-            
-            
-    
     @classmethod
     def process(cls,app,sig):
         if int(app.params['ContingencyEnable'])==1:
