@@ -42,6 +42,8 @@ class BciSignalProcessing(BciGenericSignalProcessing):
 			"PythonSig int HPOrder= 8 8 0 % // HP filter order",
 			"PythonSig float LPCutoffHz= 10 10 0 % // LP filter cutoff frequency in Hz",
 			"PythonSig int LPOrder= 2 2 0 % // LP filter order",
+			"PythonSig float OutputScaleFactor= 1.0 1.0 0 % // Try 1/MVC",
+			"PythonSig float OutputOffset= 0 0 0 % // Add to output",
 		]
 		states = [
 			
@@ -61,6 +63,8 @@ class BciSignalProcessing(BciGenericSignalProcessing):
 		self.eegfs = self.nominal['SamplesPerSecond']
 		
 		#TODO: Check if there is a stimulus channel to pass through to the application
+		
+		#TODO: Check OutputScaleFactor and OutputOffset
 		
 		# Check ProcessChannels
 		pch = self.params['ProcessChannels'].val
@@ -134,6 +138,9 @@ class BciSignalProcessing(BciGenericSignalProcessing):
 			#LP Filter
 			if self.lpfilter != None:
 				sig[self.procchan,:] = self.lpfilter(sig[self.procchan,:], axis=1)
+				
+			sig[self.procchan,:] = sig[self.procchan,:] * self.params['OutputScaleFactor'].val
+			sig[self.procchan,:] = sig[self.procchan,:] + self.params['OutputOffset'].val
 		#Concat the raw data to the bottom of the processed data
 		#Should a scalar be returned instead of all the samples?
 		return numpy.concatenate((sig,raw_data))

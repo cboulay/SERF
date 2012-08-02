@@ -5,20 +5,18 @@
 #	Author:	Chadwick Boulay
 #   chadwick.boulay@gmail.com
 #   
-#   This program is free software: you can redistribute it
-#   and/or modify it under the terms of the GNU General Public License
-#   as published by the Free Software Foundation, either version 3 of
-#   the License, or (at your option) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#   GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
+#===============================================================================
+# With the inclusion of some extensions, and without too much modification,
+# this BCPy2000 application should support many combinations of the following experimental pieces:
+# -TMS or nerve stimulation
+# -Task progression contingent on a specified signal remaining within a specified range for some specified duration
+#	-The amplitude of the specified signal and the desired range may or may not be displayed.
+# -Real-time feedback of a brain-signal
+#	-Feedback may be on-screen or through an external device
+# -Feedback of an evoked potential
+#	-Feedback properties may use information from previous ERPs (e.g., residual of a multivariable model)
+#===============================================================================
+	
 import numpy as np
 from random import randint, uniform
 from math import ceil
@@ -28,7 +26,7 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-from MyBCPyModules import MagstimExtension, DigitimerExtension, ERPExtension
+from MyBCPyModules import MagstimExtension, DigitimerExtension, ERPExtension, ContingencyExtension
 import pygame, pygame.locals
 import time
 
@@ -83,8 +81,13 @@ class BciApplication(BciGenericApplication):
 		# SCREEN #
 		##########
 		self.screen.color = (0,0,0) #let's have a black background
-		scrw,scrh = self.screen.size #Get the screen dimensions.
+		self.scrw,self.scrh = self.screen.size #Get the screen dimensions.
 		
+		#Some useful variables
+		self.eegfs = self.nominal['SamplesPerSecond'] #Sampling rate
+		self.spb = self.nominal['SamplesPerPacket'] #Samples per block/packet
+		self.block_dur = 1000*self.spb/self.eegfs#duration (ms) of a sample block
+
 		################################
 		# State monitors for debugging #
 		################################
@@ -200,7 +203,7 @@ class BciApplication(BciGenericApplication):
 			
 		#If we are in Response and we are using ERPExtension
 		if self.in_phase('response') and int(self.params['ERPDatabaseEnable']):
-			if erp_collected: self.change_phase('stopcue')
+			if app.erp_collected: self.change_phase('stopcue')
 	
 	#############################################################
 	def Frame(self, phase):

@@ -1,7 +1,7 @@
 #===============================================================================
-# Triggers the stimulus as soon as the response phase is entered.
-# Application cannot advance to response from task if MSReqStimReady and it isn't ready.
 # Sets the stimulus parameters during the intertrial phase.
+# Application cannot advance to response from task if MSReqStimReady and it isn't ready.
+# Triggers the stimulus as soon as the response phase is entered.
 #===============================================================================
 
 import numpy as np
@@ -80,7 +80,7 @@ class MagstimApp(object):
     def transition(cls,app,phase):
         if int(app.params['MSEnable'])==1:
             if phase == 'intertrial':
-                pass
+                app.stimulator.armed = True
                 
             elif phase == 'baseline':
                 pass
@@ -92,12 +92,13 @@ class MagstimApp(object):
                 pass
                 
             elif phase == 'response':
-                pass
-            
+                self.stimulator.trigger()
+                self.states['MSIntensityA'] = app.stimulator.intensity
+                self.states['MSIntensityB'] = app.stimulator.intensityb
+                self.states['ISIx10'] = app.stimulator.ISI
+                
             elif phase == 'stopcue':
                 pass
-            #self.states['StimulatorIntensity'] = self.stimulator.intensity
-            #self.stimulator.trigger()
     
     @classmethod
     def process(cls,app,sig):
@@ -105,7 +106,8 @@ class MagstimApp(object):
             ####################################
             # Update the StimulatorReady state #
             ####################################
-            stim_ready = True if not app.params['ReqStimReady'].val else app.stimulator.ready
+            if not app.stimulator.armed: app.stimulator.armed = True
+            stim_ready = True if not app.params['ReqStimReady'].val else (app.stimulator.ready and app.stimulator.armed)
             app.states['StimulatorReady'] = stim_ready
     
     @classmethod

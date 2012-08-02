@@ -2,6 +2,9 @@
 # The application will not be able to exit out of the Task phase
 # unless the contingency criteria are met.
 # Contingency criteria are only evaluated during process.
+# Expects ContingentChannel's signal to be scaled so 1.0 means something (variance, maximum, baseline)
+#  -e.g., isometric contraction: EMG input between 0 and 1, and 1=MVC
+#  -e.g., ERD threshold: channel input has mean 0 and variance=1
 #===============================================================================
 
 
@@ -18,8 +21,7 @@ class Template(object):
             "PythonApp:Contingency    list            ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent",
             "PythonApp:Contingency    float        DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before triggering",
             "PythonApp:Contingency    float        DurationRand= 0.3 0.3 0 % // Randomization s around the duration",
-            "PythonApp:Contingency    float        MVIC= 600 600 0 % // MVIC in uV",
-            "PythonApp:Contingency    floatlist    ContingencyRange= {Min Max} 0.08 0.12 0 0 % //Min and Max for signal amplitude criteria",
+            "PythonApp:Contingency    floatlist    ContingencyRange= {Min Max} 0.07 0.13 0 0 % //Min and Max for signal amplitude criteria",
             #"PythonApp:Contingency     int         RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
             "PythonApp:Contingency     string     CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
             "PythonApp:Contingency     string     CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
@@ -31,7 +33,6 @@ class Template(object):
         ]
     states = [
             "Inrange 2 0 0 0", #1 for Inrange, 0 for Outrange. This is not a phase state, but actually reflects the signal.
-            "ISIExceeded 1 0 0 0",
         ]
     
     @classmethod
@@ -39,6 +40,7 @@ class Template(object):
         if int(app.params['ContingencyEnable'])==1:
             #Not yet supported
             #if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
+            
             # Make sure ContingentChannel is in the list of channels.
             chn = app.inchannels()
             pch = app.params['ContingentChannel'].val
@@ -65,43 +67,29 @@ class Template(object):
     def initialize(cls, app, indim, outdim):
         if int(app.params['ContingencyEnable'])==1:
             #Target box:
-            #Convert range from %MVIC to amplitude.
-            self.amprange=(self.amprange/100)*self.mvic
         
             #There is a linear transformation from amplitude to screen coordinates for the y-dimension
             #The equation is y=mx+b where y is the screen coordinates, x is the signal amplitude, b is the screen coordinate for 0-amplitude, and m is the slope.
-            mgn=float(self.params['RangeMarginPcnt'].val)/100
-            margin=(max(self.amprange[1],0)-min(self.amprange[0],0))*mgn    #Add a margin around the full range
-            plot_max=max(self.amprange[1]+margin,0+margin)                    #With the margin, what is the new max...
-            plot_min=min(self.amprange[0]-margin,0-margin)                    #... and the new min plot range.
-            m=scrh/(plot_max-plot_min)                                        #From the range we can get the slope
+            mgn=float(app.params['RangeMarginPcnt'].val)/100
+            margin=(max(app.amprange[1],0)-min(app.amprange[0],0))*mgn    #Add a margin around the full range
+            plot_max=max(app.amprange[1]+margin,0+margin)                    #With the margin, what is the new max...
+            plot_min=min(app.amprange[0]-margin,0-margin)                    #... and the new min plot range.
+            m=app.scrh/(plot_max-plot_min)                                        #From the range we can get the slope
             b=-1*m*plot_min                                                    #From the slope we can get the intercept
             #Setup the target box
-            target_box = Block(position=(0,m*self.amprange[0]+b), size=(scrw,m*(self.amprange[1]-self.amprange[0])), color=(1,0,0,0.5), anchor='lowerleft')
-            self.stimulus('target_box', z=1, stim=target_box)
+            target_box = Block(position=(0,m*app.amprange[0]+b), size=(app.scrw,m*(app.amprange[1]-app.amprange[0])), color=(1,0,0,0.5), anchor='lowerleft')
+            app.stimulus('target_box', z=1, stim=target_box)
             #Setup the feedback bar
-            self.addbar(color=(0,1,0), pos=(scrw/2.0,b), thickness=scrw/10, fac=m)
-            self.stimuli['bartext_1'].position=(50,50)
-            self.stimuli['bartext_1'].color=[0,0,0]
+            app.addbar(color=(0,1,0), pos=(app.scrw/2.0,b), thickness=app.scrw/10, fac=m)
+            app.stimuli['bartext_1'].position=(50,50)
+            app.stimuli['bartext_1'].color=[0,0,0]
+            app.stimuli['bartext_1'].color=[0,1,0]
             
-            #######################################################
-            # (Convert and) Attach contingency parameters to self #
-            #######################################################
-            self.ISIMin=float(self.params['ISIMin'])
-            self.eegfs=self.nominal['SamplesPerSecond'] #Sampling rate
-            spb=self.nominal['SamplesPerPacket'] #Samples per block/packet
-            self.dmin=int(ceil(self.params['DurationMin'].val * self.eegfs / spb)) #Convert DurationMin to blocks        
-            self.drand=int(ceil(self.params['DurationRand'].val * self.eegfs / spb)) #Convert DurationRand to blocks
-            self.enterok=False #Init to False
-            self.block_dur= 1000*spb/self.eegfs#duration (ms) of a sample block
+            app.dmin=int(ceil(app.params['DurationMin'].val * app.eegfs / app.spb)) #Convert DurationMin to blocks        
+            app.drand=int(ceil(app.params['DurationRand'].val * app.eegfs / app.spb)) #Convert DurationRand to blocks
             
             addstatemonitor(self, 'Inrange')
-            #addstatemonitor(self, 'SignalEnterMet')
-            #addstatemonitor(self, 'SignalCriteriaMetBlocks')
-            addstatemonitor(self, 'StimulatorReady')
-            addstatemonitor(self, 'ISIExceeded')
             
-            self.stimuli['bartext_1'].color=[0,1,0]
         
     @classmethod
     def halt(cls,app):
@@ -121,7 +109,7 @@ class Template(object):
     def transition(cls,app,phase):
         if int(app.params['ContingencyEnable'])==1:
             if phase == 'intertrial':
-                pass
+                app.mindur = app.dmin + randint(-1*app.drand,app.drand)#randomized EMG contingency duration
                 
             elif phase == 'baseline':
                 pass
@@ -130,7 +118,7 @@ class Template(object):
                 pass
                 
             elif phase == 'task':
-                pass
+                app.remember('range_ok')
                 
             elif phase == 'response':
                 self.remember('stim_trig')
@@ -138,21 +126,15 @@ class Template(object):
             elif phase == 'stopcue':
                 pass
             
-            self.mindur=self.dmin + randint(-1*self.drand,self.drand)#randomized EMG contingency duration
+            
             
     
     @classmethod
     def process(cls,app,sig):
         if int(app.params['ContingencyEnable'])==1:
-            ###############################################
-            # Update the feedback pos based on the signal #
-            ###############################################
             #Convert input signal to scalar
             x = sig[app.procchan,:].mean(axis=1)#still a matrix
             x=float(x)#single value
-            #app.updatebars(x)#Update visual stimulus based on x
-            #self.stimuli['target_box'].color = [1, 0, 0]
-            #self.stimuli['target_box'].color = [0, 1, 0]
             
             #===================================================================
             # Update whether or not we are in range based on the signal
@@ -160,33 +142,14 @@ class Template(object):
             now_in_range = (x >= app.amprange[0]) and (x <= app.amprange[1])
             self.states['Inrange'] = now_in_range #update state
             if app.changed('Inrange', only=1): app.remember('range_ok')
-            #TODO: Check entry direction condition.
-            #self.enterok = True
-            #self.states['SignalEnterMet'] = self.enterok
+            rangeok = app.since('range_ok')['msec'] >= app.mindur
+            isiok = app.since('stim_trig')['msec'] >= 1000.0 * float(self.params['ISIMin'])
+            enterok = True #TODO: Check entry direction condition.
+            app.contingency_met = rangeok and isiok and enterok
             
-            ################################
-            # Update the ISIExceeded state #
-            ################################
-            isiok = self.since('stim_trig')['msec'] >= 1000 * self.ISIMin
-            self.states['ISIExceeded'] = isiok #update state
+            #app.updatebars(x)#Update visual stimulus based on x
+            app.stimuli['target_box'].color = [1-rangeok, rangeok, 0]
             
-            ##############################################
-            # Manually change out of inrange or outrange #
-            ##############################################
-            #try using self.remember and self.since instead of phases.
-            phase_inrange=self.in_phase('inrange')
-            phase_outrange=self.in_phase('outrange')
-            if phase_inrange or phase_outrange:
-                if now_in_range:
-                    if phase_inrange:#phase was correct
-                        #if self.enterok and isiok and stim_ready and self.stimulator.armed and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
-                        if isiok and stim_ready and int(self.states['SignalCriteriaMetBlocks']) >= self.mindur:
-                            self.change_phase('response')
-                    else:#phase was wrong
-                        self.change_phase('inrange')                    
-                else:#now not in range
-                    if ~phase_outrange:#phase is wrong
-                        self.change_phase('outrange')
 
     @classmethod
     def event(cls, app, phasename, event):

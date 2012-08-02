@@ -30,7 +30,6 @@ class Template(object):
                 app.trigbox = TTL(channel=trigType)
             from Caio.VirtualStimulatorInterface import Virtual
             app.digistim = Virtual(trigbox=app.trigbox)
-            #app.intensity_detail_name = 'dat_Nerve_stim_output'
             
     @classmethod
     def halt(cls,app):
