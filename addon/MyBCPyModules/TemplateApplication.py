@@ -26,8 +26,11 @@ from AppTools.Displays import fullscreen
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 from AppTools.Shapes import Block
 import AppTools.Meters
-from MyBCPyModules import MagstimExtension, DigitimerExtension, ERPExtension, ContingencyExtension
-import pygame, pygame.locals
+from MyBCPyModules.ContingencyExtension import ContingencyApp
+from MyBCPyModules.ContinuousFeedbackExtension import FeedbackApp
+from MyBCPyModules.MagstimExtension import MagstimApp
+from MyBCPyModules.DigitimerExtension import DigitimerApp
+from MyBCPyModules.ERPExtension import ERPApp
 import time
 
 class BciApplication(BciGenericApplication):
@@ -39,28 +42,33 @@ class BciApplication(BciGenericApplication):
 	def Construct(self):
 		#See here for already defined params and states http://bci2000.org/wiki/index.php/Contributions:BCPy2000#CurrentBlock
 		params = [
+			"PythonApp:Design  float	IntertrialDur=      0.5   0.5   0.0 100.0 // Intertrial duration in seconds",
+			"PythonApp:Design  float	BaselineDur=        4.0   4.0   0.0 100.0 // Baseline duration in seconds",
+			"PythonApp:Design  float	TaskDur=        	6.0   6.0   0.0 100.0 // Task duration in seconds (unless contingency or wait for stimready)",
 			"PythonApp:Display  int		ScreenId=           -1    -1     %   %  // on which screen should the stimulus window be opened - use -1 for last",
 			"PythonApp:Display  float	WindowSize=         0.8   1.0   0.0 1.0 // size of the stimulus window, proportional to the screen",
 			]
-		params.extend(MagstimExtension.params)
-		params.extend(DigitimerExtension.params)
-		params.extend(ContingencyExtension.params)
-		params.extend(ERPExtension.params)
-			
+		params.extend(ContingencyApp.params)
+		params.extend(MagstimApp.params)
+		params.extend(DigitimerApp.params)
+		params.extend(ERPApp.params)
+		params.extend(FeedbackApp.params)	
 		states = [
 			#===================================================================
 			# "Intertrial 1 0 0 0",
 			# "Baseline 1 0 0 0",
 			# "GoCue 1 0 0 0",
-			# "Task 1 0 0 0",
+			"Task 1 0 0 0",
 			# "Response 1 0 0 0",
 			# "StopCue 1 0 0 0",
+			"TargetCode 4 0 0 0",
 			#===================================================================
 		]
-		states.extend(MagstimExtension.states)
-		states.extend(DigitimerExtension.states)
-		states.extend(ContingencyExtension.states)
-		states.extend(ERPExtension.states)
+		states.extend(ContingencyApp.states)
+		states.extend(MagstimApp.states)
+		states.extend(DigitimerApp.states)
+		states.extend(ERPApp.states)
+		states.extend(FeedbackApp.states)
 		return params,states
 		
 	#############################################################
@@ -70,10 +78,11 @@ class BciApplication(BciGenericApplication):
 		screenid = int(self.params['ScreenId'])  # ScreenId 0 is the first screen, 1 the second, -1 the last
 		fullscreen(scale=siz, id=screenid, frameless_window=(siz==1)) # only use a borderless window if the window is set to fill the whole screen
 		
-		MagstimExtension.preflight(self, sigprops)
-		DigitimerExtension.preflight(self, sigprops)
-		ContingencyExtension.preflight(self, sigprops)
-		ERPExtension.preflight(self, sigprops)
+		ContingencyApp.preflight(self, sigprops)
+		MagstimApp.preflight(self, sigprops)
+		DigitimerApp.preflight(self, sigprops)
+		ERPApp.preflight(self, sigprops)
+		FeedbackApp.preflight(self, sigprops)
 		
 	#############################################################
 	def Initialize(self, indim, outdim):
@@ -111,40 +120,44 @@ class BciApplication(BciGenericApplication):
 			m.func = lambda x: '% 6.1fHz' % x.estimated.get('FramesPerSecond',{}).get('running', 0)
 			m.pargs = (self,)
 
-		MagstimExtension.initialize(self, indim, outdim)
-		DigitimerExtension.initialize(self, indim, outdim)
-		ContingencyExtension.initialize(self, indim, outdim)
-		ERPExtension.initialize(self, indim, outdim)
+		MagstimApp.initialize(self, indim, outdim)
+		DigitimerApp.initialize(self, indim, outdim)
+		ContingencyApp.initialize(self, indim, outdim)
+		ERPApp.initialize(self, indim, outdim)
+		FeedbackApp.initialize(self, indim, outdim)
 		
 	#############################################################
 	def Halt(self):
-		MagstimExtension.halt(self)
-		DigitimerExtension.halt(self)
-		ContingencyExtension.halt(self)
-		ERPExtension.halt(self)
+		if self.params.has_key('MSEnable') and self.params['MSEnable']==1: MagstimApp.halt(self)
+		if self.params.has_key('DigitimerEnable') and self.params['DigitimerEnable']==1: DigitimerApp.halt(self)
+		if self.params.has_key('ContingencyEnable') and self.params['ContingencyEnable']==1: ContingencyApp.halt(self)
+		if self.params.has_key('ERPDatabaseEnable') and self.params['ERPDatabaseEnable']==1: ERPApp.halt(self)
+		if self.params.has_key('ContFeedbackEnable') and self.params['ContFeedbackEnable']==1: FeedbackApp.halt(self)
 		
 	#############################################################
 	def StartRun(self):
-		MagstimExtension.startrun(self)
-		DigitimerExtension.startrun(self)
-		ContingencyExtension.startrun(self)
-		ERPExtension.startrun(self)
+		MagstimApp.startrun(self)
+		DigitimerApp.startrun(self)
+		ContingencyApp.startrun(self)
+		ERPApp.startrun(self)
+		FeedbackApp.startrun(self)
 		
 	#############################################################
 	def StopRun(self):
-		MagstimExtension.stoprun(self)
-		DigitimerExtension.stoprun(self)
-		ContingencyExtension.stoprun(self)
-		ERPExtension.stoprun(self)
+		MagstimApp.stoprun(self)
+		DigitimerApp.stoprun(self)
+		ContingencyApp.stoprun(self)
+		ERPApp.stoprun(self)
+		FeedbackApp.stoprun(self)
 		
 	#############################################################
 	def Phases(self):
 		# define phase machine using calls to self.phase and self.design
-		self.phase(name='intertrial', next='baseline', duration=500)#TODO Replace this duration with some parameter
-		self.phase(name='baseline', next='gocue', duration=4000)
+		self.phase(name='intertrial', next='baseline', duration=self.params['IntertrialDur'].val*1000.0)#TODO Replace this duration with some parameter
+		self.phase(name='baseline', next='gocue', duration=self.params['BaselineDur'].val*1000.0)
 		self.phase(name='gocue', next='task', duration=500)
 		self.phase(name='task', next='response',\
-				duration=None if int(self.params['ContingencyEnable']) or (int(self.params['MSEnable']) and int(self.params['MSReqStimReady'])) else 6000)
+				duration=None if int(self.params['ContingencyEnable']) or (int(self.params['MSEnable']) and int(self.params['MSReqStimReady'])) else self.params['TaskDur'].val*1000.0)
 		self.phase(name='response', next='stopcue',\
 				duration=None if int(self.params['ERPDatabaseEnable']) else 1)
 		self.phase(name='stopcue', next='intertrial', duration=500)
@@ -154,13 +167,15 @@ class BciApplication(BciGenericApplication):
 	#############################################################
 	def Transition(self, phase):
 		# present stimuli and update state variables to record what is going on
-		#Update some states
-		self.states['Intertrial'] = int(phase in ['intertrial'])
-		self.states['Baseline'] = int(phase in ['baseline'])
-		self.states['GoCue'] = int(phase in ['gocue'])
+		#=======================================================================
+		# #Update some states
+		# self.states['Intertrial'] = int(phase in ['intertrial'])
+		# self.states['Baseline'] = int(phase in ['baseline'])
+		# self.states['GoCue'] = int(phase in ['gocue'])
 		self.states['Task'] = int(phase in ['task'])
-		self.states['Response']  = int(phase in ['response'])
-		self.states['StopCue']  = int(phase in ['stopcue'])
+		# self.states['Response']  = int(phase in ['response'])
+		# self.states['StopCue']  = int(phase in ['stopcue'])
+		#=======================================================================
 		
 		if phase == 'intertrial':
 			pass
@@ -180,30 +195,33 @@ class BciApplication(BciGenericApplication):
 		elif phase == 'stopcue':
 			pass
 		
-		MagstimExtension.transition(self, phase)
-		DigitimerExtension.transition(self, phase)
-		ContingencyExtension.transition(self, phase)
-		ERPExtension.transition(self, phase)
+		MagstimApp.transition(self, phase)
+		DigitimerApp.transition(self, phase)
+		ContingencyApp.transition(self, phase)
+		ERPApp.transition(self, phase)
+		FeedbackApp.transition(self, phase)
 					
 	#############################################################
 	def Process(self, sig):
 		#Process is called on every packet
 		#Phase transitions occur independently of packets
 		#Therefore it is not desirable to use phases for application logic in Process
-		MagstimExtension.process(self, sig)
-		DigitimerExtension.process(self, sig)
-		ContingencyExtension.process(self, sig)
-		ERPExtension.process(self, sig)
+		MagstimApp.process(self, sig)
+		DigitimerApp.process(self, sig)
+		ContingencyApp.process(self, sig)
+		ERPApp.process(self, sig)
+		FeedbackApp.process(self, sig)
 		
-		#If we are in Task, and we are using ContingencyExtension or MagstimExtension
+		#If we are in Task, and we are using ContingencyApp or MagstimApp
 		if self.in_phase('task') and (int(self.params['ContingencyEnable']) or int(self.params['MSEnable'])):
-			contingency_met = self.contingency_met if int(self.params['ContingencyEnable']) else True
-			stim_ready = self.stim_ready if int(self.params['MSEnable']) else True
-			if contingency_met and stim_ready: self.change_phase('response')
+			contingency_met = self.states['ContingencyOK'] if int(self.params['ContingencyEnable']) else True
+			stim_ready = self.states['StimulatorReady'] if int(self.params['MSEnable']) else True
+			if contingency_met and stim_ready:
+				self.change_phase('response')
 			
-		#If we are in Response and we are using ERPExtension
+		#If we are in Response and we are using ERPApp
 		if self.in_phase('response') and int(self.params['ERPDatabaseEnable']):
-			if app.erp_collected: self.change_phase('stopcue')
+			if self.erp_collected: self.change_phase('stopcue')
 	
 	#############################################################
 	def Frame(self, phase):
@@ -212,10 +230,11 @@ class BciApplication(BciGenericApplication):
 	
 	#############################################################
 	def Event(self, phase, event):
-		MagstimExtension.event(self, phase, event)
-		DigitimerExtension.event(self, phase, event)
-		ContingencyExtension.event(self, phase, event)
-		ERPExtension.event(self, phase, event)
+		MagstimApp.event(self, phase, event)
+		DigitimerApp.event(self, phase, event)
+		ContingencyApp.event(self, phase, event)
+		ERPApp.event(self, phase, event)
+		FeedbackApp.event(self, phase, event)
 		
 #################################################################
 #################################################################

@@ -2,44 +2,49 @@
 # The application will not be able to exit out of the Task phase
 # unless the contingency criteria are met.
 # Contingency criteria are only evaluated during process.
-# Expects ContingentChannel's signal to be scaled so 1.0 means something (variance, maximum, baseline)
+# Expects ContingentChannel's signal to be scaled so +1.0 is the top of the screen
 #  -e.g., isometric contraction: EMG input between 0 and 1, and 1=MVC
 #  -e.g., ERD threshold: channel input has mean 0 and variance=1
 #===============================================================================
 
-
+from math import ceil
+from random import randint
 import numpy as np
-import random
-import time
+#import random
+#import time
+from AppTools.Shapes import Block
+from AppTools.StateMonitors import addstatemonitor
 
-class Template(object):
+class ContingencyApp(object):
     params = [
               #"Tab:SubSection DataType Name= Value DefaultValue LowRange HighRange // Comment (identifier)",
               #See further details http://bci2000.org/wiki/index.php/Technical_Reference:Parameter_Definition
             "PythonApp:Contingency    int            ContingencyEnable= 1 1 0 1 // Enable: 0 no, 1 yes (boolean)",
             "PythonApp:Contingency    float        ISIMin= 5 5 2 % // Minimum time s between stimuli",
-            "PythonApp:Contingency    list            ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent",
+            "PythonApp:Contingency    list        ContingentChannel= 1 EDC % % % // Processed-channel on which the trigger is contingent",
             "PythonApp:Contingency    float        DurationMin= 2.6 2.6 0 % // Duration s which signal must continuously meet criteria before triggering",
             "PythonApp:Contingency    float        DurationRand= 0.3 0.3 0 % // Randomization s around the duration",
             "PythonApp:Contingency    floatlist    ContingencyRange= {Min Max} 0.07 0.13 0 0 % //Min and Max for signal amplitude criteria",
             #"PythonApp:Contingency     int         RangeEnter= 0 0 0 2 // Signal must enter range from: 0 either, 1 below, 2 above (enumeration)",
-            "PythonApp:Contingency     string     CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
-            "PythonApp:Contingency     string     CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
-            "PythonApp:Contingency     string     BGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background (color)",
-            "PythonApp:Contingency     string    InRangeBGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background indicating target range (color)",
-            "PythonApp:Contingency     int        FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
-            "PythonApp:Contingency     int        RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
+            "PythonApp:Contingency    int            ContingencyFeedback= 1 1 0 1 // Enable: 0 no, 1 yes (boolean)",
+            "PythonApp:Contingency    string        CriteriaMetColor= 0x00FF00 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria met (color)",
+            "PythonApp:Contingency    string        CriteriaOutColor= 0xCBFFCF 0xFFFFFF 0x000000 0xFFFFFF // Color of feedback when signal criteria not met (color)",
+            "PythonApp:Contingency    string        BGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background (color)",
+            "PythonApp:Contingency    string        InRangeBGColor= 0x000000 0x000000 0x000000 0xFFFFFF // Color of background indicating target range (color)",
+            "PythonApp:Contingency    int            FeedbackType= 0 0 0 2 // Feedback type: 0 bar, 1 trace, 2 cursor (enumeration)",#Only supports bar for now
+            "PythonApp:Contingency    int            RangeMarginPcnt= 20 20 0 % // Percent of the display to use as a margin around the range",
             
         ]
     states = [
-            "Inrange 2 0 0 0", #1 for Inrange, 0 for Outrange. This is not a phase state, but actually reflects the signal.
+            "Inrange 1 0 0 0", #1 for Inrange, 0 for Outrange. This is not a phase state, but actually reflects the signal.
+            "ContingencyOK 1 0 0 0", #Boolean if all contingency paramaters are currently satisfied.
         ]
     
     @classmethod
     def preflight(cls, app, sigprops):
         if int(app.params['ContingencyEnable'])==1:
             #Not yet supported
-            #if self.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
+            #if app.params['RangeEnter'].val: raise EndUserError, "RangeEnter not yet supported"
             
             # Make sure ContingentChannel is in the list of channels.
             chn = app.inchannels()
@@ -58,9 +63,9 @@ class Template(object):
                 raise EndUserError, "Must supply ContingentChannel"
             
             #Check that the amplitude range makes sense.
-            amprange=app.params['AmplitudeRange'].val
-            if len(amprange)!=2: raise EndUserError, "AmplitudeRange must have 2 values"
-            if amprange[0]>amprange[1]: raise EndUserError, "AmplitudeRange must be in increasing order"
+            amprange=app.params['ContingencyRange'].val
+            if len(amprange)!=2: raise EndUserError, "ContingencyRange must have 2 values"
+            if amprange[0]>amprange[1]: raise EndUserError, "ContingencyRange must be in increasing order"
             app.amprange=np.asarray(amprange,dtype='float64')
     
     @classmethod
@@ -83,23 +88,24 @@ class Template(object):
             app.addbar(color=(0,1,0), pos=(app.scrw/2.0,b), thickness=app.scrw/10, fac=m)
             app.stimuli['bartext_1'].position=(50,50)
             app.stimuli['bartext_1'].color=[0,0,0]
-            app.stimuli['bartext_1'].color=[0,1,0]
+            #app.stimuli['bartext_1'].color=[0,1,0]
             
-            app.dmin=int(ceil(app.params['DurationMin'].val * app.eegfs / app.spb)) #Convert DurationMin to blocks        
-            app.drand=int(ceil(app.params['DurationRand'].val * app.eegfs / app.spb)) #Convert DurationRand to blocks
+            #app.dmin=int(ceil(app.params['DurationMin'].val * app.eegfs / app.spb)) #Convert DurationMin to blocks        
+            #app.drand=int(ceil(app.params['DurationRand'].val * app.eegfs / app.spb)) #Convert DurationRand to blocks
             
-            addstatemonitor(self, 'Inrange')
-            
+            if int(app.params['ShowSignalTime']):
+                addstatemonitor(app, 'Inrange')
+                addstatemonitor(app, 'ContingencyOK')
         
     @classmethod
     def halt(cls,app):
-        if int(app.params['ContingencyEnable'])==1: pass
+        pass
     
     @classmethod
     def startrun(cls,app):
         if int(app.params['ContingencyEnable'])==1:
-            self.forget('stim_trig')#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
-            self.forget('range_ok')
+            app.forget('stim_trig')#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
+            app.forget('range_ok')
     
     @classmethod
     def stoprun(cls,app):
@@ -108,8 +114,13 @@ class Template(object):
     @classmethod
     def transition(cls,app,phase):
         if int(app.params['ContingencyEnable'])==1:
+            
+            app.stimuli['target_box'].on = phase in ['baseline','task'] and app.params['ContingencyFeedback']
+            for bar in app.bars:
+                bar.rectobj.parameters.on = phase in ['baseline','task'] and app.params['ContingencyFeedback']
+                    
             if phase == 'intertrial':
-                app.mindur = app.dmin + randint(-1*app.drand,app.drand)#randomized EMG contingency duration
+                app.mindur = 1000*app.params['DurationMin'].val + randint(int(-1000*app.params['DurationRand'].val),int(1000*app.params['DurationRand'].val))#randomized EMG contingency duration
                 
             elif phase == 'baseline':
                 pass
@@ -121,7 +132,7 @@ class Template(object):
                 app.remember('range_ok')
                 
             elif phase == 'response':
-                self.remember('stim_trig')
+                app.remember('stim_trig')
             
             elif phase == 'stopcue':
                 pass
@@ -137,16 +148,16 @@ class Template(object):
             # Update whether or not we are in range based on the signal
             #===================================================================
             now_in_range = (x >= app.amprange[0]) and (x <= app.amprange[1])
-            self.states['Inrange'] = now_in_range #update state
-            if app.changed('Inrange', only=1): app.remember('range_ok')
+            app.states['Inrange'] = now_in_range #update state
+            if app.changed('Inrange', only=1) or not now_in_range: app.remember('range_ok')
             rangeok = app.since('range_ok')['msec'] >= app.mindur
-            isiok = app.since('stim_trig')['msec'] >= 1000.0 * float(self.params['ISIMin'])
+            isiok = app.since('stim_trig')['msec'] >= 1000.0 * float(app.params['ISIMin'])
             enterok = True #TODO: Check entry direction condition.
             app.contingency_met = rangeok and isiok and enterok
+            app.states['ContingencyOK'] = app.contingency_met
             
-            #app.updatebars(x)#Update visual stimulus based on x
-            app.stimuli['target_box'].color = [1-rangeok, rangeok, 0]
-            
+            app.updatebars(x)#Update visual stimulus based on x
+            app.stimuli['target_box'].color = [1-now_in_range, now_in_range, 0]
 
     @classmethod
     def event(cls, app, phasename, event):

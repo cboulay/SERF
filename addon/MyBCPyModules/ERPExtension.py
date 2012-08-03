@@ -18,6 +18,7 @@ import threading
 import numpy as np
 #import random
 #import time
+import SigTools
 from EeratAPI.API import *
 from MyPythonApps.OnlineAPIExtension import *
 
@@ -30,7 +31,7 @@ class ERPThread(threading.Thread):
     def run(self):
         while True:
             try:#Get a message from the queue
-                msg = self.queue.get(True, 0.5)
+                msg = self.queue.get(True, 0.8)
             except:#Queue is empty -> Do the default action.
                 self.queue.put({'default': 0})
             else:#We got a message
@@ -52,8 +53,9 @@ class ERPThread(threading.Thread):
                         if k=='dat_TMS_powerA': my_trial.detail_values[k]=str(self.app.magstim.intensity)
                         if k=='dat_TMS_powerB': my_trial.detail_values[k]=str(self.app.magstim.intensityb)
                         if k=='dat_TMS_ISI': my_trial.detail_values[k]=str(self.app.magstim.ISI)
+                    if value.shape[0]<1: self.app.dbstop()
                     my_trial.store={'x_vec':self.app.x_vec, 'data':value, 'channel_labels': self.app.chlbs}
-                    app.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
+                    self.app.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
                     
                 elif key=='default':
                     #===========================================================
@@ -62,13 +64,13 @@ class ERPThread(threading.Thread):
                     # change the value of self.app.states['LastERPx100']
                     # Also set last_trial.detail_values['dat_conditioned_result']
                     #===========================================================
-                    pass
+                    last_trial = Session.query(Datum).filter(Datum.span_type=='trial').order_by(Datum.datum_id.desc()).first()
                 self.queue.task_done()#signals to queue job is done. Maybe the stimulator object should do this?
 
-class Template(object):
+class ERPApp(object):
     params = [
             "PythonApp:ERPDatabase    int        ERPDatabaseEnable= 1 1 0 1 // Enable: 0 no, 1 yes (boolean)",
-            "PythonApp:ERPDatabase    int        ERPDatumType= 0 0 0 4 // 0 mep_mapping, 1 mep_io, 2 mep_sici, 3 hr_hunting, 4 hr_io (enumeration)",
+            "PythonApp:ERPDatabase    int        ERPDatumType= 0 0 0 5 // 0 mep_mapping, 1 mep_io, 2 mep_sici, 3 hr_hunting, 4 hr_io, 5 mep (enumeration)",
             "PythonApp:ERPDatabase    list        TriggerInputChan= 1 Trig % % % // Name of channel used to monitor trigger / control ERP window",
             "PythonApp:ERPDatabase    float        TriggerThreshold= 1 1 0 % // Use this threshold to determine ERP time 0",
             #"PythonApp:ERPDatabase   int            UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
@@ -85,7 +87,7 @@ class Template(object):
     @classmethod
     def preflight(cls, app, sigprops):
         if int(app.params['ERPDatabaseEnable'])==1:
-            
+            chn = app.inchannels()
             #Trigger
             app.trigchan=None
             tch = app.params['TriggerInputChan']
@@ -131,9 +133,9 @@ class Template(object):
             #===================================================================
             # Get our subject from the DB API.
             #===================================================================
+            my_subject_type=get_or_create(Subject_type, Name='BCPy_healthy')#Must come before next statement.
             app.subject=get_or_create(Subject, Name=app.params['SubjectName'], species_type='human')
             if not app.subject.subject_type_id:
-                my_subject_type=get_or_create(Subject_type, Name='BCPy_healthy')
                 app.subject.subject_type_id=my_subject_type.subject_type_id
                 
             #===================================================================
@@ -153,7 +155,7 @@ class Template(object):
             app.chlbs = [ch_name[0:-4] if ch_name.endswith('_RAW') else ch_name for ch_name in app.params['ERPChan']]#Needed when saving trials.
             app.post_stim_samples = SigTools.msec2samples(app.erpwin[1], app.eegfs)
             app.pre_stim_samples = SigTools.msec2samples(np.abs(app.erpwin[0]), app.eegfs)
-            app.leaky_trap=SigTools.Buffering.trap(app.pre_stim_samples + app.post_stim_samples + 5*spb, len(app.chlbs), leaky=True)
+            app.leaky_trap=SigTools.Buffering.trap(app.pre_stim_samples + app.post_stim_samples + 5*app.spb, len(app.chlbs), leaky=True)
             app.trig_trap = SigTools.Buffering.trap(app.post_stim_samples, 1, trigger_channel=0, trigger_threshold=app.trigthresh)
             
             #===================================================================
@@ -170,11 +172,12 @@ class Template(object):
         
     @classmethod
     def halt(cls,app):
-        if int(app.params['ERPDatabaseEnable'])==1: pass
+        pass
     
     @classmethod
     def startrun(cls,app):
-        if int(app.params['ERPDatabaseEnable'])==1: pass
+        if int(app.params['ERPDatabaseEnable'])==1:
+            app.erp_collected = False
         
     @classmethod
     def stoprun(cls,app):
