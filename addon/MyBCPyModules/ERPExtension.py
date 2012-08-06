@@ -70,7 +70,7 @@ class ERPThread(threading.Thread):
 class ERPApp(object):
     params = [
             "PythonApp:ERPDatabase    int        ERPDatabaseEnable= 1 1 0 1 // Enable: 0 no, 1 yes (boolean)",
-            "PythonApp:ERPDatabase    int        ERPDatumType= 0 0 0 5 // 0 mep_mapping, 1 mep_io, 2 mep_sici, 3 hr_hunting, 4 hr_io, 5 mep (enumeration)",
+            "PythonApp:ERPDatabase    int        ERPDatumType= 0 0 0 5 // 0 hr_hunting, 1 hr_io, 2 mep_io, 3 mep_sici, 4 mep_mapping, 5 mep_imagery (enumeration)",
             "PythonApp:ERPDatabase    list        TriggerInputChan= 1 Trig % % % // Name of channel used to monitor trigger / control ERP window",
             "PythonApp:ERPDatabase    float        TriggerThreshold= 1 1 0 % // Use this threshold to determine ERP time 0",
             #"PythonApp:ERPDatabase   int            UseSoftwareTrigger= 0 0 0 1  // Use phase change to determine trigger onset (boolean)",
@@ -141,8 +141,8 @@ class ERPApp(object):
             #===================================================================
             # Get our period from the DB API.
             #===================================================================
-            #Determine datum type from parameters.
-            period_type_name={0:'mep_mapping', 1:'mep_io', 2:'mep_sici', 3:'hr_hunting', 4:'hr_io'}.get(int(app.params['ERPDatumType']))
+            #Determine datum type from parameters. 0 hr_hunting, 1 hr_io, 2 mep_io, 3 mep_sici, 4 mep_mapping, 5 mep_imagery
+            period_type_name={0:'hr_hunting', 1:'hr_io', 2:'mep_io', 3:'mep_sici', 4:'mep_mapping', 5: 'mep_imagery'}.get(int(app.params['ERPDatumType']))
             my_period_type=get_or_create(Datum_type, Name=period_type_name)
             app.period = app.subject.get_most_recent_period(datum_type=my_period_type,delay=0)#Will create period if it does not exist.
             

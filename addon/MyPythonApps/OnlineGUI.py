@@ -1130,7 +1130,7 @@ class MvicFrame:
         
         #If we are using a period, get the date for this period.
         #If we are not using a period, get the latest MVIC.
-        mvc,values=subject._get_last_mvic(period=period)
+        values=subject._get_last_mvic(period=period)
         my_ax = fig.gca()
         my_ax.clear()
         my_ax = fig.add_subplot(111)

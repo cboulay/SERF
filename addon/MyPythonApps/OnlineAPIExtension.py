@@ -93,10 +93,12 @@ class Subject:
 		dir_stub=Session.query(System).filter(System.Name=="bci_dat_dir").one().Value
 		mvic_dir=dir_stub + '/' + self.Name + '/' + self.Name + '888/'
 		bci_stream=_recent_stream_for_dir(mvic_dir,maxdate=period.EndTime if period else None)
-		sig,states=bci_stream.decode(nsamp='all', states=['MVC','Value'])
-		x_bool = (states['MVC']==1).squeeze()
-		self.last_mvic = np.max(states['Value'][:,x_bool])
-		return self.last_mvic, states['Value']
+		sig,states=bci_stream.decode(nsamp='all', states=['FBValue'])
+		#Convert from state uint16 to true value at the source.
+		x = np.int16(states['FBValue']) / 10000.0
+		x = x * 3
+		x = x / bci_stream.params['OutputScaleFactor']
+		return x
 	
 	def _get_last_sic(self, period=None):
 		dir_stub=Session.query(System).filter(System.Name=="bci_dat_dir").one().Value

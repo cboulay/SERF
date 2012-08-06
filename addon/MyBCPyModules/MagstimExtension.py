@@ -16,13 +16,14 @@ class MagstimApp(object):
             "PythonApp:Magstim        string    MSSerialPort= COM4 % % % // Serial port for controlling Magstim",
             "PythonApp:Magstim        int        MSTriggerType= 0 0 0 2 // Trigger by: 0 SerialPort, 1 Contec1, 2 Contec2 (enumeration)",
             "PythonApp:Magstim        int        MSReqStimReady= 0 0 0 1 // (Buggy) Require ready response to trigger: 0 no, 1 yes (boolean)",
+            "PythonApp:Magstim        float      MSISIMin= 6 6 2 % // Minimum time s between stimuli",
             "PythonApp:Magstim        int        MSIntensityA= 50 50 0 100 // TS for single, CS for double",
             "PythonApp:Magstim        int        MSIntensityB= 0 0 0 100 // TS for double",
             "PythonApp:Magstim        float    MSPulseInterval= 0 0 0 999 // Double-pulse interval in ms",
             "PythonApp:Magstim        int        MSSICIType= 0 0 0 2 // Two-pulses: 0 Always, 1 Alternate, 2 Pseudorandom (enumeration)",
         ]
     states = [
-            "StimulatorReady 1 0 0 0", #Whether or not the magstim returns ready
+            "MagstimReady 1 0 0 0", #Whether or not the magstim returns ready
             "MSIntensityA 16 0 0 0", #Intensity of StimA
             "MSIntensityB 16 0 0 0", #Intensity of StimA
             "ISIx10 16 0 0 0", #Double-pulse ISI in 0.1ms
@@ -77,7 +78,8 @@ class MagstimApp(object):
     
     @classmethod
     def startrun(cls,app):
-        if int(app.params['MSEnable'])==1: pass
+        if int(app.params['MSEnable'])==1:
+            app.forget('tms_trig')#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
         
     @classmethod
     def stoprun(cls,app):
@@ -103,6 +105,7 @@ class MagstimApp(object):
                 app.states['MSIntensityA'] = app.magstim.intensity
                 app.states['MSIntensityB'] = app.magstim.intensityb
                 app.states['ISIx10'] = app.magstim.ISI
+                app.remember('tms_trig')
                 
             elif phase == 'stopcue':
                 pass
@@ -113,8 +116,9 @@ class MagstimApp(object):
             ####################################
             # Update the StimulatorReady state #
             ####################################
-            stim_ready = True if not app.params['MSReqStimReady'].val else (app.magstim.ready and app.magstim.armed)
-            app.states['StimulatorReady'] = stim_ready
+            stim_ready = app.magstim.armed if not app.params['MSReqStimReady'].val else (app.magstim.ready and app.magstim.armed)
+            isiok = app.since('tms_trig')['msec'] >= 1000.0 * float(app.params['MSISIMin'])
+            app.states['MagstimReady'] = stim_ready and isiok
             if not app.magstim.armed: app.magstim.armed = True
     
     @classmethod

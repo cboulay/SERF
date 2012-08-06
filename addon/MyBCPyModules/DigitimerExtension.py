@@ -12,9 +12,11 @@ class DigitimerApp(object):
     params = [
             "PythonApp:Digitimer        int        DigitimerEnable= 1 1 0 1 // Enable: 0 no, 1 yes (boolean)",
             "PythonApp:Digitimer        int        DigiTriggerType= 0 0 0 1 // Trigger through: 0 Contec1, 1 Contec2 (enumeration)",
+            "PythonApp:Digitimer        float      DigiISIMin= 6 6 2 % // Minimum time s between stimuli",
         ]
     states = [
             #"SpecificState 1 0 0 0", #Define states that are specific to this extension.
+            "DigitimerReady 1 0 0 0", #Whether or not the digitimer is ready. Right now the only requirement is ISI
         ]
     
     @classmethod
@@ -42,7 +44,8 @@ class DigitimerApp(object):
     
     @classmethod
     def startrun(cls,app):
-        if int(app.params['DigitimerEnable'])==1: pass
+        if int(app.params['DigitimerEnable'])==1:
+            app.forget('digi_trig')#Pretend that there was a stimulus at time 0 so that the min ISI check works on the first trial.
     
     @classmethod
     def stoprun(cls,app):
@@ -65,13 +68,15 @@ class DigitimerApp(object):
                 
             elif phase == 'response':
                 app.digistim.trigger()
+                app.remember('digi_trig')
             
             elif phase == 'stopcue':
                 pass
     
     @classmethod
     def process(cls,app,sig):
-        if int(app.params['DigitimerEnable'])==1: return sig
+        if int(app.params['DigitimerEnable'])==1:
+            app.states['DigitimerReady'] = app.since('digi_trig')['msec'] >= 1000.0 * float(app.params['DigiISIMin'])
     
     @classmethod
     def event(cls, app, phasename, event):
