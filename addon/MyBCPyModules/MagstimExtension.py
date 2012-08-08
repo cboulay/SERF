@@ -62,7 +62,7 @@ class MagstimApp(object):
                 if sici_type==2: random.shuffle(app.sici_bool)
                 
             if int(app.params['ShowSignalTime']):
-                addstatemonitor(app, 'StimulatorReady')
+                addstatemonitor(app, 'MagstimReady')
                 addstatemonitor(app, 'MSIntensityA')
                 addstatemonitor(app, 'MSIntensityB')
                 addstatemonitor(app, 'ISIx10')
@@ -89,7 +89,7 @@ class MagstimApp(object):
     def transition(cls,app,phase):
         if int(app.params['MSEnable'])==1:
             if phase == 'intertrial':
-                pass
+                app.magstim.remocon = False
                 
             elif phase == 'baseline':
                 pass
@@ -101,6 +101,7 @@ class MagstimApp(object):
                 pass
                 
             elif phase == 'response':
+                app.magstim.remocon = True
                 app.magstim.trigger()
                 app.states['MSIntensityA'] = app.magstim.intensity
                 app.states['MSIntensityB'] = app.magstim.intensityb
@@ -117,13 +118,19 @@ class MagstimApp(object):
             # Update the StimulatorReady state #
             ####################################
             stim_ready = app.magstim.armed if not app.params['MSReqStimReady'].val else (app.magstim.ready and app.magstim.armed)
+            stim_ready = True #Debugging
             isiok = app.since('tms_trig')['msec'] >= 1000.0 * float(app.params['MSISIMin'])
             app.states['MagstimReady'] = stim_ready and isiok
-            if not app.magstim.armed: app.magstim.armed = True
+            if not app.magstim.armed:
+                if not app.magstim.remocon: app.magstim.remocon = True
+                app.magstim.armed = True
+                app.magstim.remocon = False#Toggle remocon so that we can manually adjust the intensity.
     
     @classmethod
     def event(cls, app, phasename, event):
         if int(app.params['MSEnable'])==1 and event.type == pygame.locals.KEYDOWN and event.key in [pygame.K_UP, pygame.K_DOWN]:
+            if not app.magstim.remocon: app.magstim.remocon = True
             if event.key == pygame.K_UP: app.magstim.intensity = app.magstim.intensity + 1
             if event.key == pygame.K_DOWN: app.magstim.intensity = app.magstim.intensity - 1
+            app.magstim.remocon = False
             print ("magstim intensity " + str(app.magstim.intensity))
