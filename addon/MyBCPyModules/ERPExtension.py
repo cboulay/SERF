@@ -53,8 +53,10 @@ class ERPThread(threading.Thread):
                         if k=='dat_TMS_powerA': my_trial.detail_values[k]=str(self.app.magstim.intensity)
                         if k=='dat_TMS_powerB': my_trial.detail_values[k]=str(self.app.magstim.intensityb)
                         if k=='dat_TMS_ISI': my_trial.detail_values[k]=str(self.app.magstim.ISI)
-                    if value.shape[0]<1: self.app.dbstop()
+                        if k=='dat_task_condition': my_trial.detail_values[k]=str(self.app.states['TargetCode'])
                     my_trial.store={'x_vec':self.app.x_vec, 'data':value, 'channel_labels': self.app.chlbs}
+#                    print my_trial.store['data'].shape
+                    if my_trial.store['data'].shape[0]<1: self.app.dbstop()
                     self.app.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
                     
                 elif key=='default':
@@ -65,6 +67,8 @@ class ERPThread(threading.Thread):
                     # Also set last_trial.detail_values['dat_conditioned_result']
                     #===========================================================
                     last_trial = Session.query(Datum).filter(Datum.span_type=='trial').order_by(Datum.datum_id.desc()).first()
+                    
+                elif key=='shutdown': return
                 self.queue.task_done()#signals to queue job is done. Maybe the stimulator object should do this?
 
 class ERPApp(object):
@@ -172,7 +176,7 @@ class ERPApp(object):
         
     @classmethod
     def halt(cls,app):
-        pass
+        app.erp_thread.queue.put({'shutdown':None})#Kill the thread
     
     @classmethod
     def startrun(cls,app):
