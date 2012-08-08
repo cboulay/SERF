@@ -229,7 +229,6 @@ class BciApplication(BciGenericApplication):
 			pass
 		
 		elif phase == 'stopcue':
-			self.states['TargetCode'] = 0
 			self.stimuli['cue'].text = "Relax"
 			
 		self.stimuli['cue'].on = (phase in ['gocue', 'stopcue'])

@@ -347,7 +347,7 @@ class SubjectFrame:
     def update_gender(self):
         self.subject.IsMale = self.gender_var.get()
     def update_weight(self, wt_var):
-        self.subject.Weight=float(wt_var.get())
+        if len(wt_var.get())>0: self.subject.Weight=float(wt_var.get())
     def update_species(self, type_var):
         self.subject.species_type=type_var.get()
     def update_subject_type(self, type_var):
