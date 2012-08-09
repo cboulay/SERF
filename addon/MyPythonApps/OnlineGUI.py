@@ -204,8 +204,8 @@ class EditFrame:
             dv_entry = Entry(dv_frame, textvariable=dv_var)
             dv_entry.pack(side = RIGHT, fill = X)
             
-        #save_button = Button(attr_frame, text="Save", command=self.commit)
-        #save_button.pack(side=TOP, fill=X)
+        save_button = Button(attr_frame, text="Save", command=self.save)
+        save_button.pack(side=TOP, fill=X)
             
         #Further attributes require separate frames.
         if hasattr(item, 'DateOfBirth'):
@@ -224,8 +224,10 @@ class EditFrame:
             ft_frame.pack(side=TOP)
             FeatureListFrame(frame=ft_frame, parent=item)
             
-    def commit(self):
-        print "Autocommit enabled so this does nothing"
+    def save(self):
+        if not Session.object_session(self.item): Session.add(self.item)
+        Session.object_session(self.item).flush()
+        #print "Autocommit enabled so this does nothing"
         #Session.commit()
     
     def update_name(self, name_var):
@@ -869,24 +871,35 @@ class MapFrame:
         ty=np.linspace(min(y),max(y),100)
         XI, YI = np.meshgrid(tx,ty)
         
-        #Add 0's on the corners
-        x = np.append(x,[np.min(tx),np.max(tx),np.min(tx),np.max(tx)])
-        y = np.append(y,[np.min(ty),np.min(ty),np.max(ty),np.max(ty)])
-        z = np.append(z,[0,0,0,0])
+        #=======================================================================
+        # #Add 0's on the corners
+        # x = np.append(x,[np.min(tx),np.max(tx),np.min(tx),np.max(tx)])
+        # y = np.append(y,[np.min(ty),np.min(ty),np.max(ty),np.max(ty)])
+        # z = np.append(z,[0,0,0,0])
+        #=======================================================================
         
-        #http://docs.scipy.org/doc/scipy/reference/tutorial/interpolate-7.py
-        from scipy.interpolate import Rbf
-        rbf = Rbf(x, y, z, esplison=2)
-        ZI = rbf(XI, YI)
-        id = find(ZI==np.max(ZI))[0]
+        #http://stackoverflow.com/questions/5146025/python-scipy-2d-interpolation-non-uniform-data
+        from scipy import interpolate
+        # temp = interpolate.interp2d(x,y,z, kind='cubic', fill_value=0)
+        # temp = interpolate.SmoothBivariateSpline(x,y,z,w=np.ones(z.shape))
+        # tz = temp(tx, ty)
+        # id = find(tz==np.max(tz))[0]
+        
+        # temp = interpolate.Rbf(x, y, z, esplison=2)
+        # ZI = temp(XI, YI)
+        points = zip(x,y)
+        ZI = interpolate.griddata(points, z, (XI,YI), method="cubic", fill_value=0)
+        id = find(ZI==np.nanmax(ZI))[0]
+        
         best_x = XI.flatten()[id]
         best_y = YI.flatten()[id]
-
+        
         #Plot model estimate and actual values
         map_ax = fig.gca()
         map_ax.clear()
         map_ax = fig.add_subplot(111)
         abc = map_ax.pcolor(XI,YI,ZI)
+        #abc = map_ax.pcolor(tx,ty,tz)
         fig.colorbar(abc)
         map_ax.scatter(x,y,100,z)
         map_ax.scatter(best_x,best_y,100,marker='x')

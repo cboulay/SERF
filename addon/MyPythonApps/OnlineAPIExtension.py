@@ -195,20 +195,15 @@ class Datum:
 		#e.g., 'HR_aaa'
 		if self.span_type=='period':
 			session = Session.object_session(self)
-			features = session.query(Datum_feature_value.Value).filter(\
-				Datum.span_type=='trial'\
-				, Datum.subject_id==self.subject_id\
-				, Datum.datum_type_id==self.datum_type_id\
-				, Datum.IsGood==True\
-				, Datum.parent_datum_id==self.datum_id\
-				, Datum_feature_value.datum_id==Datum.datum_id\
-				, Datum_feature_value.feature_type_id==Feature_type.feature_type_id\
-				, Feature_type.Name==feature_name\
-				, Datum_feature_value.Value != None)\
-				.order_by(Datum.Number)\
-				.all()
-				#, Datum.StartTime>=self.StartTime\
-				#, Datum.EndTime<=self.EndTime\
+			expr = "SELECT datum_feature_value.Value" +\
+				" FROM datum_feature_value INNER JOIN feature_type"+\
+				" ON datum_feature_value.feature_type_id = feature_type.feature_type_id, datum_has_datum" +\
+				" WHERE datum_has_datum.parent_datum_id = :per_id"+\
+				" AND datum_feature_value.datum_id = datum_has_datum.child_datum_id"+\
+				" AND feature_type.Name LIKE :fet_name"
+			features = session.execute(expr, {'per_id':int(self.datum_id), 'fet_name':feature_name}).fetchall()
+			#, Datum.StartTime>=self.StartTime\
+			#, Datum.EndTime<=self.EndTime\
 			return np.squeeze(np.asarray(features).astype(np.float))
 			
 	#get detail values from all child trials.
@@ -217,18 +212,13 @@ class Datum:
 		#TODO: Should not include trials without a store.
 		if self.span_type=='period':
 			session = Session.object_session(self)
-			details = session.query(Datum_detail_value.Value).filter(\
-				Datum.span_type=='trial'\
-				, Datum.subject_id==self.subject_id\
-				, Datum.datum_type_id==self.datum_type_id\
-				, Datum.IsGood==True\
-				, Datum.parent_datum_id==self.datum_id\
-				, Datum_detail_value.datum_id==Datum.datum_id\
-				, Datum_detail_value.detail_type_id==Detail_type.detail_type_id\
-				, Detail_type.Name==detail_name\
-				, Datum_detail_value.Value != None)\
-				.order_by(Datum.Number)\
-				.all()
+			expr = "SELECT datum_detail_value.Value" +\
+			    " FROM datum_detail_value INNER JOIN detail_type"+\
+			    " ON datum_detail_value.detail_type_id = detail_type.detail_type_id, datum_has_datum" +\
+			    " WHERE datum_has_datum.parent_datum_id = :per_id"+\
+			    " AND datum_detail_value.datum_id = datum_has_datum.child_datum_id"+\
+			    " AND detail_type.Name LIKE :det_name"
+			details = session.execute(expr, {'per_id':int(self.datum_id), 'det_name':detail_name}).fetchall()
 			return np.squeeze(np.asarray(details))
 		
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
