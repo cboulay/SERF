@@ -11,7 +11,7 @@
 #OR
 #Use SQL Expression language to lightly wrap databases.
 #http://docs.sqlalchemy.org/en/latest/core/tutorial.html
-import numpy
+import numpy as np
 from operator import attrgetter
 from sqlalchemy import *
 from sqlalchemy.orm import *
@@ -97,8 +97,14 @@ class Feature_type(Base):
 	pass
 	#datum_types 		= association_proxy("datum_type_has_feature_type","datum_type")
 	
-class Datum_has_datum(Base):
-	pass
+#===============================================================================
+# class Datum_has_datum(Base):
+#	parent_datum_id		= Column(Integer, ForeignKey("datum.datum_id"), primary_key = True)
+#	child_datum_id		= Column(Integer, ForeignKey("datum.datum_id"), primary_key = True)
+#===============================================================================
+Datum_has_datum = Table("datum_has_datum", Base.metadata,
+	Column("parent_datum_id", Integer, ForeignKey("datum.datum_id"), primary_key = True),
+	Column("child_datum_id", Integer, ForeignKey("datum.datum_id"), primary_key = True))
 
 class Datum(Base):
 	#subject = relationship(Subject, backref=backref("data", cascade="all, delete-orphan"))
@@ -118,33 +124,38 @@ class Datum(Base):
 							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
 	detail_values 		= association_proxy("datum_detail_value","Value",
 							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
-	trials				= relationship("Datum", secondary="datum_has_datum", lazy="dynamic",
-							primaryjoin="Datum.datum_id==Datum_has_datum.parent_datum_id",
-							secondaryjoin="Datum.datum_id==Datum_has_datum.child_datum_id",
-							backref=backref("period", lazy="joined"))
+	#http://sqlalchemy.readthedocs.org/en/latest/orm/relationships.html#self-referential-many-to-many-relationship
+	trials				= relationship("Datum", secondary=Datum_has_datum, lazy="dynamic",
+							primaryjoin= datum_id==Datum_has_datum.c.parent_datum_id,
+							#primaryjoin = datum_id == Datum_has_datum.parent_datum_id,
+							secondaryjoin = datum_id==Datum_has_datum.c.child_datum_id,
+							backref=backref("periods", lazy="joined"))
 	#trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic",
 	#						backref=backref('period', remote_side=[datum_id], lazy="joined"))
 	
 	def _get_store(self):
 		temp_store = self._store
-		temp_x=temp_store.x_vec
-		temp_data=temp_store.erp
-		if temp_x and temp_data:
-			temp_x=numpy.frombuffer(temp_x, dtype=float)
-			temp_x.flags.writeable=True
-			temp_data=numpy.frombuffer(temp_data, dtype=float)
-			temp_data.flags.writeable=True
-			temp_data=temp_data.reshape([temp_store.n_channels,temp_store.n_samples])
-		chan_labels = temp_store.channel_labels.split(',') if temp_store.channel_labels else None
+		temp_x = temp_store.x_vec
+		temp_data = temp_store.erp
+		if temp_x:
+			temp_x = np.frombuffer(temp_x, dtype=float)
+			temp_x.flags.writeable = True
+		if not hasattr(temp_x,'shape'): temp_x = np.ndarray((0),dtype=float)
+		if temp_data:
+			temp_data = np.frombuffer(temp_data, dtype=float)
+			temp_data.flags.writeable = True
+			temp_data = temp_data.reshape([temp_store.n_channels,temp_store.n_samples])
+		if not hasattr(temp_data,'shape'): temp_data = np.ndarray((0),dtype=float)
+		chan_labels = temp_store.channel_labels.split(',') if temp_store.channel_labels else list()
 		return {'x_vec':temp_x, 'data':temp_data, 'channel_labels':chan_labels}
 	def _set_store(self, dict_in):
 		#Take a dict input and set the storage item
 		#ERP from numpyarray of [chans x samps] to database blob
 		new_store = Datum_store(datum_id=self.datum_id)
-		new_store.n_channels,new_store.n_samples=numpy.shape(dict_in['data'])
+		new_store.n_channels,new_store.n_samples=np.shape(dict_in['data'])
 		new_store.x_vec=dict_in['x_vec'].tostring() #always float?
 		new_store.erp=dict_in['data'].tostring() #always float?
-		#self.erp=numpy.getbuffer(dict_in['data'])
+		#self.erp=np.getbuffer(dict_in['data'])
 		ch_lab = dict_in['channel_labels']
 		temp_string = ch_lab if isinstance(ch_lab,str) else ",".join(dict_in['channel_labels'])
 		new_store.channel_labels=temp_string.strip().replace(' ','')
@@ -152,7 +163,7 @@ class Datum(Base):
 		self._store = new_store
 		#session = Session.object_session(self)
 		#session.commit()
-		self.calculate_all_features()
+		#self.calculate_all_features()
 	store = property(_get_store, _set_store)
 		#datum.store is a dict with keys 'x_vec', 'data', 'channel_labels'
 		#x_vec and data are np.arrays. channel_labels is a list.
@@ -168,7 +179,7 @@ class Datum(Base):
 		#TODO: It might be faster to calculate multiple features simultaneously per trial.
 		#Should calculation of trial features such as residuals use period model prior to inclusion of the current trial?
 		
-		refdatum = None if self.span_type=='period' else self.period[-1]#Assumes last parent is best parent.
+		refdatum = None if self.span_type=='period' else self.periods[-1]#Assumes last parent is best parent.
 		
 		#TODO: Adding a feature to a type after an instance of the type exists does not create a default value.
 		for fname in self.feature_values.iterkeys():
@@ -245,7 +256,7 @@ class Subject(Base):
 							, creator = lambda k, v: Subject_detail_value(detail_name=k, Value=v)
 							)
 	periods				= relationship(Datum
-							, cascade="all, delete-orphan"
+							#, cascade="all, delete-orphan"
 							, order_by="Datum.datum_id"
 							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type==3)"
 							, lazy="joined")

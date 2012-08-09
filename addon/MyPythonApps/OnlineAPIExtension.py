@@ -234,15 +234,21 @@ class Datum:
 	#Calculate the ERP from good trials and store it. This will cause simple features to be calculated too.
 	def update_store(self):
 		if self.span_type=='period':
-			#session = Session.object_session(self)
-			  #Assume x_vec, n_channels, n_samples, channel_labels are all the same across trials.
-			  #Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
-			  #Getting the last_trial this way is slower for the first call to update_store but is faster for subsequent calls than using the more explicit query.
-			#last_trial_id = session.query("datum_id")\
+			#===================================================================
+			# OLD
+			# session = Session.object_session(self)
+			#  #Assume x_vec, n_channels, n_samples, channel_labels are all the same across trials.
+			#  #Get the x_vec, n_channels, n_samples, channel_labels from the most recent trial.
+			#  #Getting the last_trial this way is slower for the first call to update_store but is faster for subsequent calls than using the more explicit query.
+			# last_trial_id = session.query("datum_id")\
 			#	.from_statement("SELECT datum.datum_id FROM datum WHERE getParentPeriodIdForDatumId(datum_id)=:period_id AND IsGood=1 AND span_type=1 ORDER BY Number DESC")\
 			#	.params(period_id=self.datum_id).first()
-			#last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
-			last_trial=self.trials[-1]
+			# last_trial = session.query(Datum).filter(Datum.datum_id==last_trial_id[0]).one()
+			#===================================================================
+			
+			#Use the second last trial if available, because (for now) sometimes the last trial
+			#has no data.
+			last_trial = self.trials[-2] if self.trials.count()>1 else self.trials[-1]
 			
 			#n_channels,n_samples=[last_trial._store.n_channels,last_trial._store.n_samples]
 			
@@ -260,22 +266,18 @@ class Datum:
 			#	Datum.IsGood==True, \
 			#	Datum.StartTime>=self.StartTime, \
 			#	Datum.EndTime<=self.EndTime):
-			for ds in self.trials:
-				#temp_data=np.frombuffer(ds.erp, dtype=float)
-				#temp_data.flags.writeable=True
-				#temp_data=temp_data.reshape([n_channels,n_samples])
+			for tr in self.trials:
 				#TODO: Only use IsGood trials. self.trials does not discriminate (I don't think, check API).
-				if not isinstance(ds.store['data'],basestring):
-					running_sum=running_sum+ds.store['data']
+				if tr.store['data'].shape[0]>0:
+					running_sum=running_sum+tr.store['data']
 					n_trials=n_trials+1
-			if n_trials>0: avg_data = running_sum/n_trials
-			
-			last_store=last_trial.store
-			
-			self.store={\
-				'x_vec':last_store['x_vec']\
-				, 'data':avg_data\
-				, 'channel_labels':last_store['channel_labels']}
+					last_store = tr.store
+			if n_trials>0:
+				avg_data = running_sum/n_trials
+				self.store={\
+					'x_vec':last_store['x_vec']\
+					, 'data':avg_data\
+					, 'channel_labels':last_store['channel_labels']}
 		
 	def model_erp(self,model_type='halfmax'):
 		if self.span_type=='period':

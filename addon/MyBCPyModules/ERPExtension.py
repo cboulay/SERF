@@ -45,7 +45,6 @@ class ERPThread(threading.Thread):
                     self.app.period.trials.append(Datum(subject_id=self.app.subject.subject_id\
                             , datum_type_id=self.app.period.datum_type_id\
                             , span_type='trial'\
-                            , parent_datum_id=self.app.period.datum_id\
                             , IsGood=1, Number=0))#Number=0 kicks a SQL trigger to find the lowest number
                     my_trial=self.app.period.trials[-1]
                     for k in my_trial.detail_values.keys():
@@ -55,8 +54,9 @@ class ERPThread(threading.Thread):
                         if k=='dat_TMS_ISI': my_trial.detail_values[k]=str(self.app.magstim.ISI)
                         if k=='dat_task_condition': my_trial.detail_values[k]=str(self.app.states['TargetCode'])
                     my_trial.store={'x_vec':self.app.x_vec, 'data':value, 'channel_labels': self.app.chlbs}
-#                    print my_trial.store['data'].shape
-                    if my_trial.store['data'].shape[0]<1: self.app.dbstop()
+                    #We need to trick the ORM to store the trial in the database immediately.
+                    if self.app.params['ERPFeedbackDisplay'].val==0:
+                        Session.object_session(self.app.period).flush()
                     self.app.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
                     
                 elif key=='default':
@@ -185,7 +185,8 @@ class ERPApp(object):
         
     @classmethod
     def stoprun(cls,app):
-        if int(app.params['ERPDatabaseEnable'])==1: pass
+        if int(app.params['ERPDatabaseEnable'])==1:
+            Session.object_session(app.period).flush()
     
     @classmethod
     def transition(cls,app,phase):

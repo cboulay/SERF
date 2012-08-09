@@ -592,7 +592,7 @@ class PeriodFrame:
         self.period.EndTime = end_var.get()
     def plot_erps(self):
         if len(self.period.trials.all())>0:
-            if not self.period.store['channel_labels']:
+            if len(self.period.store['channel_labels'])==0:
                 self.period.update_store()
             per_store=self.period.store
             #Find any channel that appears in period.detail_values
@@ -616,7 +616,7 @@ class PeriodFrame:
             tt=0
             for tr in trials:
                 store=tr.store
-                if not isinstance(store['data'],basestring):
+                if tr.store['data'].shape[0]>0:
                     dat=store['data'].T[:,chan_bool]
                     #subtract offset
                     
