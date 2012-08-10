@@ -106,23 +106,23 @@ class FeedbackApp(object):
                 # of the screen, at the top and bottom.
                 #===============================================================
                 targth = 0.08#float(app.params['TargetSize'])
-                
+                targtw = 0.5
                 # the green target rectangle
                 b.anchor='top'
-                b.scale(y=targth)
+                b.scale(y=targth, x=targtw)
                 app.positions['green'] = np.matrix(b.position)
                 green = Block(position=b.position, size=b.size, color=(0.1,1,0.1))#, on=False
                 app.stimulus('green', z=2, stim=green)
-                b.scale(y=1.0/targth)#reset b
+                b.scale(y=1.0/targth, x=1.0/targtw)#reset b
                 b.anchor='center'#reset b
             
                 # the red target rectangle
                 b.anchor='bottom'
-                b.scale(y=targth)
+                b.scale(y=targth, x=targtw)
                 app.positions['red'] = np.matrix(b.position)
                 red = Block(position=b.position, size=b.size, color=(1,0.1,0.1))#, on=False
                 app.stimulus('red', z=2, stim=red)
-                b.scale(y=1.0/targth)#reset b
+                b.scale(y=1.0/targth, x=1.0/targtw)#reset b
                 b.anchor='center'#reset b
                 
                 #===============================================================
@@ -294,11 +294,13 @@ class FeedbackApp(object):
     @classmethod
     def process(cls,app,sig):
         if int(app.params['ContFeedbackEnable'])==1 and app.states['FeedbackOn']:
+            #Assumes that sig ranges from extremes of -10 to +10
+            #Your signal processing should be designed so the input signal varies as such.
             if app.params['FakeFeedback'].val:
                 trial_i = app.states['CurrentTrial']-1 if app.states['CurrentTrial'] < app.fake_data.shape[0] else random.uniform(0,app.params['TrialsPerBlock'])
                 fake_block_ix = np.min((app.fake_data.shape[1],app.states['FBBlock']))
                 x = app.fake_data[trial_i,fake_block_ix]
-                x = -1 * x / 3
+                x = x / 3
                 x = min(x, 3.2768)
                 x = max(x, -3.2767)
             else:

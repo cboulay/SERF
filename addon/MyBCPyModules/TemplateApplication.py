@@ -263,7 +263,7 @@ class BciApplication(BciGenericApplication):
 			
 		#If we are in Response and we are using ERPApp
 		if self.in_phase('response') and int(self.params['ERPDatabaseEnable']):
-			if self.erp_collected: self.change_phase('stopcue')
+			if self.states['ERPCollected']: self.change_phase('stopcue')
 	
 	#############################################################
 	def Frame(self, phase):

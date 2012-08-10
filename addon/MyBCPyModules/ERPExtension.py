@@ -18,9 +18,10 @@ import threading
 import numpy as np
 #import random
 #import time
-import SigTools
 from EeratAPI.API import *
 from MyPythonApps.OnlineAPIExtension import *
+from AppTools.Shapes import Block
+import SigTools
 
 class ERPThread(threading.Thread):
     def __init__(self, queue, app):
@@ -46,7 +47,7 @@ class ERPThread(threading.Thread):
                             , datum_type_id=self.app.period.datum_type_id\
                             , span_type='trial'\
                             , IsGood=1, Number=0))#Number=0 kicks a SQL trigger to find the lowest number
-                    my_trial=self.app.period.trials[-1]
+                    my_trial = self.app.period.trials[-1]
                     for k in my_trial.detail_values.keys():
                         if k=='dat_Nerve_stim_output': my_trial.detail_values[k]=str(self.app.digistim.intensity)
                         if k=='dat_TMS_powerA': my_trial.detail_values[k]=str(self.app.magstim.intensity)
@@ -55,8 +56,7 @@ class ERPThread(threading.Thread):
                         if k=='dat_task_condition': my_trial.detail_values[k]=str(self.app.states['TargetCode'])
                     my_trial.store={'x_vec':self.app.x_vec, 'data':value, 'channel_labels': self.app.chlbs}
                     #We need to trick the ORM to store the trial in the database immediately.
-                    if self.app.params['ERPFeedbackDisplay'].val==0:
-                        Session.object_session(self.app.period).flush()
+                    Session.object_session(self.app.period).flush()
                     self.app.period.EndTime = datetime.datetime.now() + datetime.timedelta(minutes = 5)
                     
                 elif key=='default':
@@ -66,7 +66,18 @@ class ERPThread(threading.Thread):
                     # change the value of self.app.states['LastERPx100']
                     # Also set last_trial.detail_values['dat_conditioned_result']
                     #===========================================================
-                    last_trial = Session.query(Datum).filter(Datum.span_type=='trial').order_by(Datum.datum_id.desc()).first()
+                    if int(self.app.params['ERPFeedbackDisplay'])>0:
+                        last_trial = self.app.period.trials[-1] if self.app.period.trials.count()>0 else None
+                        if last_trial:
+                            feature_type_name={0:'aaa', 1:'p2p', 2:'residual'}.get(int(self.app.params['ERPFeedbackOf']))
+                            if 'hr' in last_trial.type_name:
+                                feature_type_name = 'HR_' + feature_type_name
+                            elif 'mep' in last_trial.type_name:
+                                feature_type_name = 'MEP_' + feature_type_name
+                            last_trial.calculate_value_for_feature_name(feature_type_name)
+                            feature_value = last_trial.feature_values[feature_type_name]
+                            feature_value = feature_value * self.app.erp_scale
+                            self.app.states['LastERPVal'] = np.uint16(feature_value)
                     
                 elif key=='shutdown': return
                 self.queue.task_done()#signals to queue job is done. Maybe the stimulator object should do this?
@@ -85,7 +96,8 @@ class ERPApp(object):
             "PythonApp:ERPDatabase    float        ERPFeedbackThreshold= 3.0 0 % % // (+/-) threshold for correct erp feedback",
         ]
     states = [
-            "LastERPx100 10 0 0 0", #Last ERP's interesting value x 100
+            "LastERPVal 16 0 0 0", #Last ERP's interesting value
+            "ERPCollected 1 0 0 0", #Whether or not the ERP was collected this trial.
         ]
     
     @classmethod
@@ -171,8 +183,27 @@ class ERPApp(object):
             app.erp_thread.start() #Starts the thread.
             
             #===================================================================
-            # TODO: Setup the ERP feedback elements.
+            # Setup the ERP feedback elements.
+            # -Screen will range from -2*fbthresh to +2*fbthresh
+            # -Calculated ERP value will be scaled so 65536(int16) fills the screen. 
             #===================================================================
+            if int(app.params['ERPFeedbackDisplay'])==2:
+                fbthresh = app.params['ERPFeedbackThreshold'].val
+                app.erp_scale = (2.0**16) / (4.0*np.abs(fbthresh))
+                if fbthresh < 0:
+                    fbmax = fbthresh * app.erp_scale
+                    fbmin = 2.0 * fbthresh * app.erp_scale
+                else:
+                    fbmax = 2.0 * fbthresh * app.erp_scale
+                    fbmin = fbthresh * app.erp_scale
+                m=app.scrh/float(2**16)#Conversion factor from signal amplitude to pixels.
+                b_offset=app.scrh/2.0 #Input 0.0 should be at this pixel value.
+                app.addbar(color=(1,0,0), pos=(0.9*app.scrw,b_offset), thickness=0.1*app.scrw, fac=m)
+                n_bars = len(app.bars)
+                #app.stimuli['bartext_1'].position=(50,50)
+                app.stimuli['bartext_' + str(n_bars)].color=[0,0,0]
+                erp_target_box = Block(position=(0.8*app.scrw,m*fbmin+b_offset), size=(0.2*app.scrw,m*(fbmax-fbmin)), color=(1,0,0,0.5), anchor='lowerleft')
+                app.stimulus('erp_target_box', z=1, stim=erp_target_box)
         
     @classmethod
     def halt(cls,app):
@@ -181,7 +212,7 @@ class ERPApp(object):
     @classmethod
     def startrun(cls,app):
         if int(app.params['ERPDatabaseEnable'])==1:
-            app.erp_collected = False
+            app.states['ERPCollected'] = False
         
     @classmethod
     def stoprun(cls,app):
@@ -207,7 +238,7 @@ class ERPApp(object):
                 pass
             
             elif phase == 'stopcue':
-                app.erp_collected = False
+                app.states['ERPCollected'] = False
     
     @classmethod
     def process(cls,app,sig):
@@ -221,12 +252,17 @@ class ERPApp(object):
                 data = app.leaky_trap.read()
                 data = data[:,-1*(app.pre_stim_samples+app.post_stim_samples+n_excess):-1*n_excess]
                 app.erp_thread.queue.put({'save_trial':data})
-                app.erp_collected = True
+                app.states['ERPCollected'] = True
                 
-            if app.changed('LastERPx100'):
-                #TODO: Update the feedback to show the LastERP's value
-                pass
-            
+            if app.changed('LastERPVal'):
+                if int(app.params['ERPFeedbackDisplay'])==2:
+                    x = int(np.int16(app.states['LastERPVal']))
+                    app.updatebars(x,barlist=[app.bars[-1]])
+                    fbthresh = app.params['ERPFeedbackThreshold'].val * app.erp_scale
+                    erp_inrange = (fbthresh>0 and x>=fbthresh) or (fbthresh<0 and x<=fbthresh)
+                    app.stimuli['erp_target_box'].color = [1-erp_inrange, erp_inrange, 0]
+                    n_bars = len(app.bars)
+                    app.stimuli['barrect_' + str(n_bars)].color = [1-erp_inrange, erp_inrange, 0]
     @classmethod
     def event(cls, app, phasename, event):
         if int(app.params['ERPDatabaseEnable'])==1: pass
