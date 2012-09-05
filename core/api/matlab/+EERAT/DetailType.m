@@ -11,7 +11,7 @@ classdef DetailType < EERAT.GenericType
     end
     methods
         function obj = DetailType(varargin)
-            obj = obj@EERAT.GenericType(varargin);
+            obj = obj@EERAT.GenericType(varargin{:});
         end
         function DefaultValue=get.DefaultValue(obj)
             DefaultValue=obj.get_col_value('DefaultValue');

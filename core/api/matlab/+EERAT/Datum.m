@@ -25,7 +25,7 @@ classdef Datum < EERAT.Db_obj
     end
     methods
         function obj = Datum(varargin)
-            obj = obj@EERAT.Db_obj(varargin);
+            obj = obj@EERAT.Db_obj(varargin{:});
         end
         function subject=get.subject(self)
             subject=self.get_x_to_one('subject_type_id',...
@@ -63,12 +63,14 @@ classdef Datum < EERAT.Db_obj
             value=obj.get_col_value('StartTime');
         end
         function set.StartTime(obj,StartTime)
+            StartTime = datestr(StartTime, 'yyyy-mm-dd HH:MM:SS');%reformat StartTime to something mysql likes
             obj.set_col_value('StartTime',StartTime);
         end
         function value=get.EndTime(obj)
             value=obj.get_col_value('EndTime');
         end
         function set.EndTime(obj,EndTime)
+            EndTime = datestr(EndTime, 'yyyy-mm-dd HH:MM:SS');%reformat EndTime to something mysql likes
             obj.set_col_value('EndTime',EndTime);
         end
         function value=get.MeetsCriteria(obj)
@@ -78,7 +80,6 @@ classdef Datum < EERAT.Db_obj
             obj.set_col_value('MeetsCriteria',MeetsCriteria);
         end
         
-        %TODO: Setters for store.
         function erp=get.erp(datum)%
             sel_stmnt=['SELECT erp FROM datum_store WHERE datum_id=',num2str(datum.datum_id)];
             mo=datum.dbx.statement(sel_stmnt);
@@ -86,11 +87,26 @@ classdef Datum < EERAT.Db_obj
             erp=typecast(erp,'double');
             erp=reshape(erp,datum.n_samples,datum.n_channels);
         end
+        function set.erp(datum, values)
+            [n_samples, n_channels] = size(values);
+            values = reshape(values,[],1);
+            values = typecast(values, 'uint8');
+            stmnt = 'UPDATE datum_store SET erp = "{uB}", n_channels={Si}, n_samples={Si} WHERE datum_id={Si}';
+            parms = {values;n_channels;n_samples;datum.datum_id};
+            datum.dbx.statement(stmnt, parms);
+        end
         function xvec=get.xvec(datum)%
             sel_stmnt=['SELECT x_vec FROM datum_store WHERE datum_id=',num2str(datum.datum_id)];
             mo=datum.dbx.statement(sel_stmnt);
             xvec=mo.x_vec{1};
             xvec=typecast(xvec,'double');
+        end
+        function set.xvec(datum,xvec)
+            %TODO: Convert xvec to vector of uint8 from vector of double.
+            xvec = typecast(xvec,'uint8');
+            stmnt = 'UPDATE datum_store SET x_vec = "{uB}" WHERE datum_id={Si}';
+            parms = {xvec;datum.datum_id};
+            datum.dbx.statement(stmnt, parms);
         end
         function n_channels=get.n_channels(datum)%
             sel_stmnt=['SELECT n_channels FROM datum_store WHERE datum_id=',num2str(datum.datum_id)];
@@ -105,18 +121,54 @@ classdef Datum < EERAT.Db_obj
         function channel_labels=get.channel_labels(datum)%
             sel_stmnt=['SELECT channel_labels FROM datum_store WHERE datum_id=',num2str(datum.datum_id)];
             mo=datum.dbx.statement(sel_stmnt);
-            channel_labels=char(mo.channel_labels{1})';
+            channel_labels = mo.channel_labels{1};
+            channel_labels=char(channel_labels)';
             channel_labels=textscan(channel_labels,'%s','delimiter',',');
             channel_labels=channel_labels{1};
         end
+        function set.channel_labels(datum,channel_labels)
+            n_chans = length(channel_labels);
+            channel_labels = cellstr(channel_labels);
+            if size(channel_labels,1)==1 && size(channel_labels,2)>1
+                channel_labels = channel_labels';
+            end
+            channel_labels = [channel_labels repmat({','},n_chans,1)];
+            channel_labels = reshape(channel_labels',1,[]);
+            channel_labels = cell2mat(channel_labels);
+            channel_labels = channel_labels(1:end-1);
+%             channel_labels = cast(channel_labels','uint8');
+            stmnt = 'UPDATE datum_store SET channel_labels = "{S}" WHERE datum_id={Si}';
+            parms = {channel_labels;datum.datum_id};
+            datum.dbx.statement(stmnt, parms);
+        end
         
-        %TODO: Setters for features and details?
+        %TODO: Setters for features and details? -> Subclasses?
         %TODO: Further parameters to splice features/details?
         function features=get.features(datum)%
             features=EERAT.Db_obj.get_obj_array(datum.dbx,'DatumFeature','datum_id',datum.datum_id);
         end
+        function feature=get_single_feature(datum, feature_name)
+            %Instead of relying on trial.features, it is faster to call upon
+            %it directly.
+            stmnt = ['SELECT dfv.Value as val FROM datum_feature_value AS dfv, feature_type as ft',...
+                ' WHERE ft.Name LIKE "{S}"',...
+                ' AND dfv.feature_type_id = ft.feature_type_id',...
+                ' AND dfv.datum_id = {Si}'];
+            mo = datum.dbx.statement(stmnt,{feature_name,datum.datum_id});
+            feature = mo.val;
+        end
         function details=get.details(datum)
             details=EERAT.Db_obj.get_obj_array(datum.dbx,'DatumDetail','datum_id',datum.datum_id);
+        end
+        function detail = get_single_detail(datum, detail_name)
+            %Instead of relying on trial.details, it is faster to call upon
+            %it directly.
+            stmnt = ['SELECT ddv.Value as val FROM datum_detail_value AS ddv, detail_type as dt',...
+                ' WHERE dt.Name LIKE "{S}"',...
+                ' AND ddv.detail_type_id = dt.detail_type_id',...
+                ' AND ddv.datum_id = {Si}'];
+            mo = datum.dbx.statement(stmnt,{detail_name,datum.datum_id});
+            detail = mo.val{1};
         end
         
         function result=calculate_feature(datum,feature_type)
@@ -142,6 +194,8 @@ classdef Datum < EERAT.Db_obj
             end
         end
     end
+    
+    %TODO: Move these to a different class.
     methods (Static)
         function yhat=sigmoid(b,X)
             %b(1) = max value

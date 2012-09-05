@@ -12,7 +12,7 @@ classdef GenericDetail < EERAT.Db_obj
     end
     methods
         function obj = GenericDetail(varargin)
-            obj = obj@EERAT.Db_obj(varargin);
+            obj = obj@EERAT.Db_obj(varargin{:});
         end
         function value=get.Value(detail)
             value=detail.get_col_value('Value');

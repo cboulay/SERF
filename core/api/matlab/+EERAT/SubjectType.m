@@ -11,7 +11,7 @@ classdef SubjectType < EERAT.GenericType
     end
     methods
         function obj = SubjectType(varargin)
-            obj = obj@EERAT.GenericType(varargin);
+            obj = obj@EERAT.GenericType(varargin{:});
         end
         function detail_types=get.detail_types(self)
             detail_types=self.get_many_to_many('subject_type_has_detail_type',...

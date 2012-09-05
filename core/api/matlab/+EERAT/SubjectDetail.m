@@ -8,7 +8,7 @@ classdef SubjectDetail < EERAT.GenericDetail
     end
     methods
         function obj = SubjectDetail(varargin)
-            obj = obj@EERAT.GenericDetail(varargin);
+            obj = obj@EERAT.GenericDetail(varargin{:});
         end
     end
 end

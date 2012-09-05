@@ -9,7 +9,7 @@ classdef System < EERAT.Db_obj
     end
     methods
         function obj = System(varargin)
-            obj = obj@EERAT.Db_obj(varargin);
+            obj = obj@EERAT.Db_obj(varargin{:});
         end
         function value=get.Value(obj)
             value=obj.get_col_value('Value');

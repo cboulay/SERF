@@ -15,7 +15,7 @@ classdef DatumFeature < EERAT.Db_obj
     end
     methods
         function obj = DatumFeature(varargin)
-            obj = obj@EERAT.Db_obj(varargin);
+            obj = obj@EERAT.Db_obj(varargin{:});
         end
         function value=get.Value(feature)
             value=feature.get_col_value('Value');

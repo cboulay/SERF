@@ -7,12 +7,13 @@ classdef DatumType < EERAT.GenericType
         datum_type_id;
     end
     properties
-        detail_types;
-        feature_types;
+        detail_types
+        feature_types
+        TrialClass
     end
     methods
         function obj = DatumType(varargin)
-            obj = obj@EERAT.GenericType(varargin);
+            obj = obj@EERAT.GenericType(varargin{:});
         end
         function detail_types=get.detail_types(self)
             detail_types=self.get_many_to_many('datum_type_has_detail_type',...
@@ -29,6 +30,12 @@ classdef DatumType < EERAT.GenericType
         function set.feature_types(self,feature_types)
             self.set_many_to_many(feature_types,'datum_type_has_feature_type',...
                 'datum_type_id','datum_type_id','feature_type_id','feature_type_id');
+        end
+        function TrialClass=get.TrialClass(obj)
+            TrialClass=obj.get_col_value('TrialClass');
+        end
+        function set.TrialClass(obj,TrialClass)
+            obj.set_col_value('TrialClass',TrialClass);
         end
     end
 end

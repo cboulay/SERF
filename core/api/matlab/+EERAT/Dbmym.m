@@ -23,13 +23,36 @@ classdef Dbmym < handle
             end
         end
         function [mo]=statement(obj,SQL_statement,mym_parameters)
-            if obj.status~=0
-                obj.keepalive;
-            end
-            if nargin>2
-                mo=mym(obj.cid,SQL_statement,mym_parameters{:});
-            else
-                mo=mym(obj.cid,SQL_statement);
+%             if obj.status~=0 %This probably slows things down. Maybe I should do a try/catch instead.
+%                 obj.keepalive;
+%             end
+            repeat = true(1,1);
+            while repeat
+                if nargin>2
+                    try
+                        repeat = false(1,1);
+                        mo=mym(obj.cid,SQL_statement,mym_parameters{:});
+                    catch err
+                        if strcmpi(err.message,'Not connected')
+                            obj.keepalive;
+                            repeat = true(1,1);
+                        else
+                            rethrow(err);
+                        end
+                    end
+                else
+                    try
+                        repeat = false(1,1);
+                        mo=mym(obj.cid,SQL_statement);                        
+                    catch err
+                        if strcmpi(err.message,'Not connected')
+                            obj.keepalive;
+                            repeat = true(1,1);
+                        else
+                            rethrow(err);
+                        end
+                    end
+                end
             end
         end
         function delete(obj)

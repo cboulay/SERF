@@ -1,17 +1,21 @@
 classdef Period < EERAT.Datum
     properties (Dependent = true, Transient = true)
-        trials;
+        trials
+        trial_class
     end
+%     properties (Hidden = true)
+%         trial_class = 'Trial'; %Saved to disk.
+%     end
     methods
-        function self = Period(varargin)
-            self = self@EERAT.Datum(varargin);
+        function period = Period(varargin)
+            period = period@EERAT.Datum(varargin{:});
         end
-        function trials = get.trials(self)
+        function trials = get.trials(period)
             %Since I have not implemented span_type="day", the only
             %possible children are trials, thus I can use the parent class
             %method.
-            trials=self.get_many_to_many('datum_has_datum',...
-                'parent_datum_id','datum_id','child_datum_id','datum_id','Trial');
+            trials=period.get_many_to_many('datum_has_datum',...
+                'parent_datum_id','datum_id','child_datum_id','datum_id',period.trial_class);
         end
         
         %The following functions are provided for convenience to speed up
@@ -61,47 +65,57 @@ classdef Period < EERAT.Datum
             end
         end
         
-        function set_trials_features(self,feature_names,feature_matrix)
-            trial_id=[self.trials.datum_id];
+        function set_trials_features(period,feature_names,feature_matrix)
+            trial_id=[period.trials.datum_id];
             %TODO: Throw an error if trial_id length ~= feature_matrix
             %length.
-            stmnt=['UPDATE datum_feature_value,feature_type SET ',...
-                'datum_feature_value.Value={S4} WHERE ',...
-                'datum_feature_value.datum_id={Si} AND ',...
-                'datum_feature_value.feature_type_id=feature_type.feature_type_id AND ',...
-                'feature_type.Name LIKE "{S}"'];
-            self.dbx.statement('BEGIN');
+            name_stmnt = 'SELECT feature_type_id FROM feature_type WHERE Name LIKE "{S}"';
+            val_stmnt = 'UPDATE datum_feature_value SET Value={S4} WHERE datum_id={Si} AND feature_type_id={Si}';
             for ff=1:size(feature_matrix,2)
-                feature_name=feature_names{ff};
+                %Get the feature_type_id
+                mo = period.dbx.statement(name_stmnt,feature_names(ff));
+                ft_id = mo.feature_type_id;
+                period.dbx.statement('BEGIN');
                 for tt=1:size(feature_matrix,1)
-                    self.dbx.statement(stmnt,{feature_matrix(tt,ff),...
-                        trial_id(tt),feature_name});
+                    fval = feature_matrix(tt,ff);
+                    if ~isnan(fval) %submitting a nan value really screws things up.
+                        period.dbx.statement(val_stmnt,{fval,trial_id(tt),ft_id});
+                    end
                 end
+                period.dbx.statement('COMMIT');
             end
-            self.dbx.statement('COMMIT');
+            
         end
-        function set_trials_details(self,detail_names,detail_matrix)
-            trial_id=[self.trials.datum_id];
+        function set_trials_details(period,detail_names,detail_matrix)
+            trial_id=[period.trials.datum_id];
             %TODO: Throw an error if trial_id length ~= feature_matrix
             %length.
-            stmnt=['UPDATE datum_detail_value,detail_type SET ',...
-                'datum_detail_value.Value="{S}" WHERE ',...
-                'datum_detail_value.datum_id={Si} AND ',...
-                'datum_detail_value.detail_type_id=detail_type.detail_type_id AND ',...
-                'detail_type.Name LIKE "{S}"'];
-            self.dbx.statement('BEGIN');
+            name_stmnt = 'SELECT detail_type_id FROM detail_type WHERE Name LIKE "{S}"';
+            val_stmnt = 'UPDATE datum_detail_value SET Value="{S}" WHERE datum_id={Si} AND detail_type_id={Si}';
             for dd=1:size(detail_matrix,2)
-                detail_name=detail_names{dd};
+                mo = period.dbx.statement(name_stmnt,detail_names(dd));
+                dt_id = mo.detail_type_id;
+                period.dbx.statement('BEGIN');
                 for tt=1:size(detail_matrix,1)
-                    if isnumeric(detail_matrix(tt,dd))
+                    if isnumeric(detail_matrix(tt,dd)) && ~isnan(detail_matrix(tt,dd))
                         detail_value=num2str(detail_matrix(tt,dd));
+                    elseif iscell(detail_matrix(tt,dd))
+                        detail_value = detail_matrix{tt,dd};
                     else
                         detail_value=detail_matrix(tt,dd);
                     end
-                    self.dbx.statement(stmnt,{detail_value,trial_id(tt),detail_name});
+                    if ischar(detail_value) || ~isnan(detail_value)
+                        period.dbx.statement(val_stmnt,{detail_value,trial_id(tt),dt_id});
+                    end
                 end
+                period.dbx.statement('COMMIT');
             end
-            self.dbx.statement('COMMIT');
+        end
+        
+        function trial_class = get.trial_class(period)
+            stmnt = 'SELECT TrialClass FROM datum_type WHERE datum_type_id = {Si}';
+            mo = period.dbx.statement(stmnt,{period.datum_type.datum_type_id});
+            trial_class = mo.TrialClass{1};
         end
     end
 end

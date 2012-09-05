@@ -5,7 +5,7 @@ classdef GenericType < EERAT.Db_obj
     end
     methods
         function obj = GenericType(varargin)
-            obj = obj@EERAT.Db_obj(varargin);
+            obj = obj@EERAT.Db_obj(varargin{:});
         end
         function Name=get.Name(obj)
             Name=obj.get_col_value('Name');

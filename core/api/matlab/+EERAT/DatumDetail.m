@@ -8,7 +8,7 @@ classdef DatumDetail < EERAT.GenericDetail
     end
     methods
         function obj = DatumDetail(varargin)
-            obj = obj@EERAT.GenericDetail(varargin);
+            obj = obj@EERAT.GenericDetail(varargin{:});
         end
     end
 end

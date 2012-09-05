@@ -108,15 +108,12 @@ classdef Db_obj < handle
             end
         end
         function obj=Db_obj(varargin) %Constructor
-            while ~isempty(varargin) && iscell(varargin{1})
-                varargin=varargin{1};
-            end
-            if ~isempty(varargin)
+            if nargin>0 && strcmpi(class(varargin{1}),'EERAT.Dbmym')
                 this_dbx=varargin{1};
             else
                 this_dbx=EERAT.Dbmym('EERAT');
             end
-            if length(varargin)>=2
+            if nargin>1%length(varargin)>=2
                 key_value_pairs=varargin(2:end);
                 if strcmpi(key_value_pairs{1},'new')
                     do_new=key_value_pairs{2};
@@ -207,6 +204,8 @@ classdef Db_obj < handle
             end
         end
         function value=get_col_value(obj,col_name) %Single attribute retrieval
+            %Does not handle joins thus not useful for getting
+            %datum_feature_value or datum_detail_value.
             SQL_statement='SELECT {S} FROM `{S}`';
             arg_array=[{col_name},{obj.table_name}];
             [where_stmnt,where_args]=obj.build_identifying_where;
@@ -224,7 +223,10 @@ classdef Db_obj < handle
         function set_col_value(obj,col_name,col_value) %Single attribute save
             SQL_statement='UPDATE `{S}` SET {S}=';
             if isnumeric(col_value)
-                if mod(col_value,1)==0
+                if ~isnan(col_value)
+                    SQL_statement=[SQL_statement,'{S}'];
+                    col_value='NULL';
+                elseif mod(col_value,1)==0
                     SQL_statement=[SQL_statement,'{Si}'];
                 else
                     SQL_statement=[SQL_statement,'{S4}'];

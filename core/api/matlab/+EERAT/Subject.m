@@ -20,8 +20,9 @@ classdef Subject < EERAT.Db_obj
     end
     methods
         function self = Subject(varargin)
-            temp=varargin;
-            self = self@EERAT.Db_obj(temp);
+%             assert(nargin>=5 && strcmpi(varargin{2},'Name') && strcmpi(varargin{4},'subject_type_id'),...
+%                 'EERAT.Subject needs Name and subject_type_id when instantiated.');
+            self = self@EERAT.Db_obj(varargin{:});
         end
         function subject_type=get.subject_type(self)
             subject_type=self.get_x_to_one('subject_type_id',...
