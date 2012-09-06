@@ -15,9 +15,9 @@ import numpy as np
 from operator import attrgetter
 from sqlalchemy import *
 from sqlalchemy.orm import *
+from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm.collections import attribute_mapped_collection
 import feature_functions
 
 #The following gets or creates a model into the db but also persists it.
@@ -35,7 +35,7 @@ def get_or_create(model, all=False, sess=None, **kwargs):
 		instance = model(**kwargs)
 		sess.add(instance)
 		#sess.flush()
-		#sess.commit()
+		sess.commit() #commit right away to fire triggers.
 		return instance
 
 class MyBase(object):
@@ -86,7 +86,7 @@ Base = declarative_base(cls=MyBase)#Create declarative base class also inheritin
 	# Define one-to-many relationships in the parent (one) table using direct cascades.
 
 class System(Base):
-	pass
+	pass #MYBase takes care of everything.
 
 class Detail_type(Base):
 	pass
@@ -218,12 +218,6 @@ class Datum_type(Base):
 	feature_types		= relationship(Feature_type
 							, secondary="datum_type_has_feature_type"
 							, backref="datum_types")
-#	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
-#							,creator = lambda k, v: Datum_type_has_feature_type(_feature_name=k, feature_type=v)
-#							)
-#	detail_types 		= association_proxy("datum_type_has_detail_type", "detail_type"
-#							,creator = lambda det: Datum_type_has_detail_type(datum_type=self, detail_type=det)
-#							)
 							
 class Datum_detail_value(Base):
 	datum 				= relationship(Datum, backref=backref("datum_detail_value",
@@ -245,58 +239,8 @@ class Datum_feature_value(Base):
 							, lazy="joined")
 	feature_name		= association_proxy('feature_type','Name')
 
-class Subject(Base):
-	data 				= relationship(Datum
-							, backref=backref("subject")
-							, cascade="all, delete-orphan"
-							, order_by="Datum.datum_id"
-							, lazy="dynamic"
-							)
-	details 			= association_proxy("subject_detail_value", "Value"
-							, creator = lambda k, v: Subject_detail_value(detail_name=k, Value=v)
-							)
-	periods				= relationship(Datum
-							#, cascade="all, delete-orphan"
-							, order_by="Datum.datum_id"
-							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type==3)"
-							, lazy="joined")
-	
-	def get_now_period_of_type(self,type):
-		session = Session.object_session(self)
-		per_id = session.query("period_id")\
-			.from_statement("SELECT getNowPeriodIdForSubjectIdDatumTypeId(:subject_id,:datum_type_id) AS period_id")\
-			.params(subject_id=self.subject_id,datum_type_id=type.datum_type_id).one()
-			#.params(subject_id=my_subject.subject_id,datum_type_id=my_dat_type.datum_type_id)\
-		if per_id[0]:
-			return session.query(Datum).filter(Datum.datum_id==per_id[0]).one()
-		else:
-			return None
-		
-#	def _get_periods(self):
-#		session = Session.object_session(self)
-#		periods = session.query(Datum).filter(\
-#					Datum.subject_id==self.subject_id,\
-#					Datum.span_type==3).order_by(Datum.Number).all()
-#	def _set_periods(self): pass #Read-only. 
-#	periods = property(_get_periods, _set_periods)
-				
-class Subject_type(Base):
-	subjects 			= relationship(Subject, backref=backref("subject_type", lazy="subquery")
-							, cascade="all, delete-orphan")
-	detail_types		= relationship(Detail_type
-							, secondary="subject_type_has_detail_type"
-							, backref="subject_types" 
-							)
-#	detail_types 		= association_proxy("subject_type_has_detail_type","detail_type")
-	
 	
 class Subject_detail_value(Base):
-	subject 			= relationship(Subject, backref=backref("subject_detail_value"
-							, cascade="all, delete-orphan"
-							, collection_class = attribute_mapped_collection("detail_name")
-							, lazy="subquery"
-							)
-						)
 	detail_type = relationship(Detail_type, 
 							backref=backref("subject_detail_value", cascade="all, delete-orphan")
 							, lazy="joined"
@@ -306,14 +250,7 @@ class Subject_detail_value(Base):
 #
 #Do I need the below association tables as association objects? What about using secondaries?
 #
-class Subject_type_has_detail_type(Base):
-	pass
-#	subject_type 		= relationship(Subject_type, 
-#							backref=backref("subject_type_has_detail_type", cascade="all, delete-orphan"))
-#	detail_type 		= relationship(Detail_type, 
-#							backref=backref("subject_type_has_detail_type", cascade="all, delete-orphan"))
-#	_subject_type_name 	= association_proxy("subject_type","Name")
-#	_detail_name 		= association_proxy("detail_type","Name")
+
 #	
 class Datum_type_has_detail_type(Base):
 	pass
@@ -337,8 +274,32 @@ class Datum_type_has_feature_type(Base):
 #	_datum_name 		= association_proxy("datum_type","Name")
 #	_feature_name 		= association_proxy("feature_type","Name")
 
-engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
-metadata = MetaData(bind=engine)#Base's metadata needs to reflect before I can call prepare.
-metadata.reflect() #http://docs.sqlalchemy.org/en/latest/core/schema.html#reflecting-all-tables-at-once
-Base.prepare(engine)
-Session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=True))
+
+Session = sessionmaker(autoflush=True)#, twophase=True)
+#Session = scoped_session(Session)
+
+class Subject(object):
+	def __init__(self, name='template'):
+		self.name = name;
+		settings_engine = create_engine("mysql://root@localhost/eerat_settings", echo=False)
+		subject_engine = create_engine("mysql://root@localhost/eerat_subject_"+self.name, echo=False)
+		self.session = Session()
+		self.session.configure(binds={
+									Datum:subject_engine,
+									Datum_has_datum:subject_engine,
+									Datum_store:subject_engine,
+									Datum_detail_value:subject_engine,
+									Datum_feature_value:subject_engine,
+									Subject_detail_value:subject_engine,
+									System:settings_engine,
+									Feature_type:settings_engine,
+									Datum_type:settings_engine,
+									Detail_type:settings_engine,
+									Detail_type:settings_engine,
+									Datum_type_has_feature_type:settings_engine
+								 })
+		#session = Session.object_session(someobject)
+		
+		Base.metadata.reflect(bind=settings_engine) #http://docs.sqlalchemy.org/en/latest/core/schema.html#reflecting-all-tables-at-once
+		Base.metadata.reflect(bind=subject_engine)
+		#Base.prepare()
