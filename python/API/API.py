@@ -275,7 +275,7 @@ class Datum_type_has_feature_type(Base):
 #	_feature_name 		= association_proxy("feature_type","Name")
 
 
-Session = sessionmaker(autoflush=True)#, twophase=True)
+Session = sessionmaker(autoflush=True)#, twophase=True) autocommit=False
 #Session = scoped_session(Session)
 
 class Subject(object):
@@ -299,6 +299,10 @@ class Subject(object):
 									Datum_type_has_feature_type:settings_engine
 								 })
 		#session = Session.object_session(someobject)
+		#It should be possible to create two metadata then reflect them using different engines.
+		#This should populate each metadata with the table definitions.
+		#But then how does that work with declarative base prepare?
+		#Base can be prepared twice?
 		
 		Base.metadata.reflect(bind=settings_engine) #http://docs.sqlalchemy.org/en/latest/core/schema.html#reflecting-all-tables-at-once
 		Base.metadata.reflect(bind=subject_engine)

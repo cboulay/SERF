@@ -1,8 +1,8 @@
-# Evoked Electrophysiological Response Analysis Toolbox (EERAT)
+# Evoked Electrophysiological Response Feedback (EERF)
 
 ## Python data API
 
-This module provides access to the EERAT datastore from Python.
+This module provides access to the EERF datastore from Python.
 In addition to simple reading and writing data, there are some functions for performing more complex analyses 
 that can either be triggered automatically or that can be called manually.
 
@@ -14,7 +14,7 @@ Installing Numpy and Scipy can be tricky so please refer to their respective sit
 ### Interacting with the data
 
 There are some GUIs available to interact with the data for either monitoring and adjusting online analysis
-or offline analysis. (TODO: Links to the GUIs).
+or offline analysis.
 
 Or you can access the data and the add-on API functions directly from a Python console:
 

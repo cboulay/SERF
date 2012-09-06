@@ -1,13 +1,13 @@
-# Evoked Electrophysiological Response Analysis Toolbox (EERAT)
+# Evoked Electrophysiological Response Feedback (EERF)
 
 ## Table of Contents
 
 1. Introduction
-2. [SQL Database](https://github.com/cboulay/EERAT/tree/master/core/datastore)
-3. [Python data API](https://github.com/cboulay/EERAT/tree/master/core/api/python)
-4. [Python apps](https://github.com/cboulay/EERAT/tree/master/addon/MyPythonApps)
-5. [Matlab data API](https://github.com/cboulay/EERAT/tree/master/core/api/matlab)
-6. [Matlab analysis apps](https://github.com/cboulay/EERAT/tree/master/addon/MyMatlabApps)
+2. [SQL Database](https://github.com/cboulay/EERF/tree/master/datastore)
+3. [Python data API](https://github.com/cboulay/EERF/tree/master/python/api)
+4. [Python apps](https://github.com/cboulay/EERF/tree/master/python/tools)
+5. [Matlab data API](https://github.com/cboulay/EERF/tree/master/matlab)
+6. [Matlab analysis apps](https://github.com/cboulay/EERF/tree/master/matlab/MyMatlabApps)
 
 ## Introduction
 
