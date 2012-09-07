@@ -6,7 +6,10 @@ dependencies = {
 }
 setup(name='EERF',
       version='1.0.0',
-      packages = ['API','tools'],
-      requires = [('%s (%s)' % (p,v)).replace(' ()','') for p,v in dependencies.items()],  # available in distutils from Python 2.5 onwards
-      install_requires = ['%s%s' % (p,v) for p,v in dependencies.items()],
+      description='Evoked Electrophysiological Response Feedback',
+      author='Chadwick Boulay',
+      author_email='chadwick.boulay@gmail.com',
+      url='https://github.com/cboulay/EERF',
+      packages = ['EERF','EERF.APIextension','EERF.tools'],
+      requires = [('%s (%s)' % (p,v)).replace(' ()','') for p,v in dependencies.items()]  # available in distutils from Python 2.5 onwards
 )
