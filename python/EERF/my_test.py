@@ -1,3 +1,3 @@
 from EERF.API import *
-
-sub = Subject()
+subject = Session().query(Subject).all()[0]
+subject.periods

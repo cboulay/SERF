@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 5.5.25, for Win64 (x86)
 --
--- Host: localhost    Database: eerat_subject_template
+-- Host: localhost    Database: eerf_subject_template
 -- ------------------------------------------------------
 -- Server version	5.5.25
 
@@ -34,7 +34,7 @@ CREATE TABLE `datum` (
   UNIQUE KEY `SECONDARY` (`datum_type_id`,`Number`,`span_type`),
   KEY `subj_dat` (`datum_type_id`,`IsGood`,`span_type`),
   KEY `d_dt` (`datum_type_id`),
-  CONSTRAINT `d_dt` FOREIGN KEY (`datum_type_id`) REFERENCES `eerat_settings`.`datum_type` (`datum_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `d_dt` FOREIGN KEY (`datum_type_id`) REFERENCES `eerf_settings`.`datum_type` (`datum_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
@@ -224,7 +224,7 @@ CREATE TABLE `datum_detail_value` (
   KEY `fk_datum_detail_value_datum_and_datum_type` (`datum_id`),
   KEY `ddv_dt` (`detail_type_id`),
   CONSTRAINT `fk_datum_detail_value_datum_and_datum_type` FOREIGN KEY (`datum_id`) REFERENCES `datum` (`datum_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `ddv_dt` FOREIGN KEY (`detail_type_id`) REFERENCES `eerat_settings`.`detail_type` (`detail_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `ddv_dt` FOREIGN KEY (`detail_type_id`) REFERENCES `eerf_settings`.`detail_type` (`detail_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -243,7 +243,7 @@ CREATE TABLE `datum_feature_value` (
   KEY `fk_datum_feature_value_datum_id` (`datum_id`),
   KEY `dfv_ft` (`feature_type_id`),
   CONSTRAINT `fk_datum_feature_value_datum_id` FOREIGN KEY (`datum_id`) REFERENCES `datum` (`datum_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `dfv_ft` FOREIGN KEY (`feature_type_id`) REFERENCES `eerat_settings`.`feature_type` (`feature_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `dfv_ft` FOREIGN KEY (`feature_type_id`) REFERENCES `eerf_settings`.`feature_type` (`feature_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -285,23 +285,7 @@ CREATE TABLE `datum_store` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `subject_detail_value`
---
-
-DROP TABLE IF EXISTS `subject_detail_value`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `subject_detail_value` (
-  `detail_type_id` int(11) NOT NULL,
-  `Value` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`detail_type_id`),
-  KEY `sdv_dt` (`detail_type_id`),
-  CONSTRAINT `sdv_dt` FOREIGN KEY (`detail_type_id`) REFERENCES `eerat_settings`.`detail_type` (`detail_type_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping routines for database 'eerat_subject_template'
+-- Dumping routines for database 'eerf_subject_template'
 --
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -313,4 +297,4 @@ CREATE TABLE `subject_detail_value` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2012-09-06 15:43:23
+-- Dump completed on 2012-09-07 17:12:24
