@@ -51,13 +51,15 @@ class System(Base):
 	pass
 
 class Detail_type(Base):
-	pass
-	#datum_types 		= association_proxy("datum_type_has_detail_type","datum_type")
-	#subject_types 		= association_proxy("subject_type_has_detail_type","subject_type")
+	#Association proxy wasn't instantiating this properly without column definitions.
+	detail_type_id	= Column(Integer, primary_key=True)
+	Name			= Column(String(45))
+	Description		= Column(String(45))
 	
 class Feature_type(Base):
-	pass
-	#datum_types 		= association_proxy("datum_type_has_feature_type","datum_type")
+	feature_type_id	= Column(Integer, primary_key=True)
+	Name			= Column(String(45))
+	Description		= Column(String(45))
 	
 #===============================================================================
 # class Datum_has_datum(Base):
@@ -70,10 +72,26 @@ Datum_has_datum = Table("datum_has_datum", Base.metadata,
 
 class Datum(Base):
 	#subject = relationship(Subject, backref=backref("data", cascade="all, delete-orphan"))
-	#datum_type = relationship(Datum_type, backref=backref("data", cascade="all, delete-orphan"))
-	#_store				= relationship(Datum_store, uselist=False, backref="datum")
 	datum_id			= Column(Integer, primary_key=True)
-	type_name			= association_proxy("datum_type","Name") #A shortcut to the type name.
+	#http://sqlalchemy.readthedocs.org/en/latest/orm/relationships.html#self-referential-many-to-many-relationship
+	trials				= relationship("Datum", secondary=Datum_has_datum, lazy="dynamic",
+							primaryjoin= datum_id==Datum_has_datum.c.parent_datum_id,
+							#primaryjoin = datum_id == Datum_has_datum.parent_datum_id,
+							secondaryjoin = datum_id==Datum_has_datum.c.child_datum_id,
+							backref=backref("periods", lazy="joined"))
+	#===========================================================================
+	# trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic",
+	#						backref=backref('period', remote_side=[datum_id], lazy="joined"))
+	#===========================================================================
+	#Datum_detail_value has a relationship backref'd here as _datum_feature_value
+	#Now create an association proxy to _datum_feature_value to expose only Value
+	detail_values 		= association_proxy("_datum_detail_value","Value",
+							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
+	feature_values 		= association_proxy("_datum_feature_value","Value",
+							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
+	#Now create an association proxy to _feautures to expose only Value as the 
+	#_store				= relationship(Datum_store, uselist=False, backref="datum")
+	
 	#erp, x_vec, channel_labels should only be accessed through datum.store
 	#erp 				= association_proxy("_store","erp")
 	#x_vec				= association_proxy("_store","x_vec")
@@ -81,19 +99,6 @@ class Datum(Base):
 	#n_channels and n_samples should only be accessed through datum._store
 	#n_channels 		= association_proxy("_store","n_channels")
 	#n_samples 			= association_proxy("_store","n_samples")
-	
-	feature_values 		= association_proxy("datum_feature_value","Value",
-							creator = lambda k, v: Datum_feature_value(feature_name=k, Value=v))
-	detail_values 		= association_proxy("datum_detail_value","Value",
-							creator = lambda k, v: Datum_detail_value(detail_name=k, Value=v))
-	#http://sqlalchemy.readthedocs.org/en/latest/orm/relationships.html#self-referential-many-to-many-relationship
-	trials				= relationship("Datum", secondary=Datum_has_datum, lazy="dynamic",
-							primaryjoin= datum_id==Datum_has_datum.c.parent_datum_id,
-							#primaryjoin = datum_id == Datum_has_datum.parent_datum_id,
-							secondaryjoin = datum_id==Datum_has_datum.c.child_datum_id,
-							backref=backref("periods", lazy="joined"))
-	#trials 			= relationship("Datum", order_by="Datum.Number", lazy="dynamic",
-	#						backref=backref('period', remote_side=[datum_id], lazy="joined"))
 	
 	def _get_store(self):
 		temp_store = self._store
@@ -163,50 +168,47 @@ class Datum(Base):
 				
 class Datum_store(Base):
 	datum				= relationship(Datum
-							, backref=backref("_store", cascade="all, delete-orphan", uselist=False, lazy="joined")
+							, backref=backref("_store", cascade="all, delete-orphan", uselist=False, lazy="joined", passive_deletes=True)
 							, innerjoin=True
 							, lazy="joined"
 							)
-	datum_type			= association_proxy("datum","type_name")
 
-class Datum_type(Base):
-	data 				= relationship(Datum
-							, backref=backref("datum_type", lazy="joined")
-							, cascade="all, delete-orphan"
-							)
-	detail_types		= relationship(Detail_type
-							, secondary="datum_type_has_detail_type"
-							, backref="datum_types")
-	feature_types		= relationship(Feature_type
-							, secondary="datum_type_has_feature_type"
-							, backref="datum_types")
-#	feature_types 		= association_proxy("datum_type_has_feature_type", "feature_type")
-#							,creator = lambda k, v: Datum_type_has_feature_type(_feature_name=k, feature_type=v)
-#							)
-#	detail_types 		= association_proxy("datum_type_has_detail_type", "detail_type"
-#							,creator = lambda det: Datum_type_has_detail_type(datum_type=self, detail_type=det)
-#							)
 							
 class Datum_detail_value(Base):
-	datum 				= relationship(Datum, backref=backref("datum_detail_value",
+	#Need a relationship with detail_type so we know our Name
+	dt					= relationship(Detail_type)
+	#expose detail_type's Name attribute directly on this object.
+	detail_name			= association_proxy('dt','Name')
+	#Create a relationship with Datum and use a proxy to dictionary_based collection using detail_name as the key.
+	datum 				= relationship(Datum, backref=backref("_datum_detail_value",
 							collection_class=attribute_mapped_collection("detail_name"),
-							cascade="all, delete-orphan", lazy="subquery")
+							cascade="all, delete-orphan", passive_deletes=True, lazy="subquery")
 							)
-	detail_type			= relationship(Detail_type, 
-							backref=backref("datum_detail_value", cascade="all, delete-orphan")
-							, lazy="joined")
-	detail_name			= association_proxy('detail_type','Name')
+	
+	def __init__(self, *args, **kwargs):
+		if 'detail_name' in kwargs:
+			self.dt = get_or_create(Detail_type, Name=kwargs['detail_name'], sess=Session.object_session(self))
+		if 'Value' in kwargs:
+			self.Value = kwargs['Value']
 	
 class Datum_feature_value(Base):
-	datum 				= relationship(Datum, backref=backref("datum_feature_value",
-							collection_class=attribute_mapped_collection("feature_name"),
-							cascade="all, delete-orphan", lazy="subquery")
-							)
-	feature_type		= relationship(Feature_type, 
-							backref=backref("datum_feature_value", cascade="all, delete-orphan")
+	#Need a relationship with feature_type so we know our feature_type_name
+	ft		= relationship(Feature_type, 
+							backref=backref("datum_feature_value", cascade="all, delete-orphan", passive_deletes=True)
 							, lazy="joined")
-	feature_name		= association_proxy('feature_type','Name')
-
+	#Expose self.feature_type.Name as self.feature_name
+	feature_name		= association_proxy('ft','Name')
+	#Create a relationship with Datum so it may access its feature values using feature_names as keys.
+	datum 				= relationship(Datum, backref=backref("_datum_feature_value",
+							collection_class=attribute_mapped_collection("feature_name"),
+							cascade="all, delete-orphan", passive_deletes=True, lazy="subquery")
+							)
+	def __init__(self, *args, **kwargs):
+		if 'feature_name' in kwargs:
+			self.ft = get_or_create(Feature_type, Name=kwargs['feature_name'], sess=Session.object_session(self))
+		if 'Value' in kwargs:
+			self.Value = kwargs['Value']
+	
 class Subject(Base):
 	data 				= relationship(Datum
 							, backref=backref("subject")
@@ -217,19 +219,8 @@ class Subject(Base):
 	periods				= relationship(Datum
 							#, cascade="all, delete-orphan"
 							, order_by="Datum.datum_id"
-							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type==3)"
+							, primaryjoin="and_(Subject.subject_id==Datum.subject_id, Datum.span_type=='period')"
 							, lazy="joined")
-	
-	def get_now_period_of_type(self,type):
-		session = Session.object_session(self)
-		per_id = session.query("period_id")\
-			.from_statement("SELECT getNowPeriodIdForSubjectIdDatumTypeId(:subject_id,:datum_type_id) AS period_id")\
-			.params(subject_id=self.subject_id,datum_type_id=type.datum_type_id).one()
-			#.params(subject_id=my_subject.subject_id,datum_type_id=my_dat_type.datum_type_id)\
-		if per_id[0]:
-			return session.query(Datum).filter(Datum.datum_id==per_id[0]).one()
-		else:
-			return None
 		
 #	def _get_periods(self):
 #		session = Session.object_session(self)
@@ -239,33 +230,6 @@ class Subject(Base):
 #	def _set_periods(self): pass #Read-only. 
 #	periods = property(_get_periods, _set_periods)
 	
-
-#
-#Do I need the below association tables as association objects? What about using secondaries?
-#
-
-class Datum_type_has_detail_type(Base):
-	pass
-#	datum_type 			= relationship(Datum_type, 
-#							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
-#							,collection_class = attribute_mapped_collection("detail_name")
-#							))
-#	detail_type 		= relationship(Detail_type, 
-#							backref=backref("datum_type_has_detail_type", cascade="all, delete-orphan"))
-#	_datum_name 		= association_proxy("datum_type","Name")
-#	_detail_name 		= association_proxy("detail_type","Name")
-#	
-class Datum_type_has_feature_type(Base):
-	pass
-#	datum_type 			= relationship(Datum_type, 
-#							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"
-#							,collection_class = attribute_mapped_collection("feature_name")
-#							))
-#	feature_type 		= relationship(Feature_type, 
-#							backref=backref("datum_type_has_feature_type", cascade="all, delete-orphan"))
-#	_datum_name 		= association_proxy("datum_type","Name")
-#	_feature_name 		= association_proxy("feature_type","Name")
-
 engine = create_engine("mysql://root@localhost/eerat", echo=False)#echo="debug" gives a ton.
 metadata = MetaData(bind=engine)#Base's metadata needs to reflect before I can call prepare.
 metadata.reflect() #http://docs.sqlalchemy.org/en/latest/core/schema.html#reflecting-all-tables-at-once

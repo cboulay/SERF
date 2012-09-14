@@ -71,7 +71,7 @@ class Subject:
 	__metaclass__=ExtendInplace
 	last_mvic = None
 	
-	def get_most_recent_period(self, datum_type=None, delay=99999):
+	def get_most_recent_period(self, delay=99999):
 		#delay specifies how far back, in hours, we will accept a period. Default is ~11 years
 		session = Session.object_session(self)
 		td = datetime.timedelta(hours=delay)
@@ -81,12 +81,10 @@ class Subject:
 					Datum.subject_id==self.subject_id,\
 					Datum.IsGood==True,\
 					Datum.EndTime >= datetime.datetime.now()-td)
-		if datum_type: query=query.filter(Datum.datum_type_id==datum_type.datum_type_id)
 		period = query.order_by(Datum.Number.desc()).first()#Does this return None if there are none?
-		if not period and datum_type:
+		if not period:
 			#If we did not find a period, then create one with default settings, including StartTime and EndTime
-			period = get_or_create(Datum, sess=session, span_type='period', subject=self, datum_type=datum_type, IsGood=1, Number=0)
-			session.flush()
+			period = get_or_create(Datum, sess=session, span_type='period', subject=self, IsGood=1, Number=0)
 		return period
 	
 	def _get_last_mvic(self, period=None):#If period is provided, we will use that date.
@@ -351,4 +349,4 @@ class Datum:
 					my_trial.detail_values['dat_TMS_powerB']=str(bci_stream.params['StimIntensityB'])#TODO: Use the state.
 					my_trial.detail_values['dat_TMS_ISI']=str(bci_stream.params['PulseInterval'])
 				my_trial.store={'x_vec':x_vec, 'data':dat, 'channel_labels': chan_labels}
-			Session.flush()
+			Session.commit()
