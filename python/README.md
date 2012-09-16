@@ -5,32 +5,43 @@
 This module provides access to the EERF datastore from Python.
 In addition to simple reading and writing data, there are some functions for performing more complex analyses 
 that can either be triggered automatically or that can be called manually.
+Furthermore, users may interact with the datastore through a web browser (TODO: Django web server).
 
 ### Installing Python and the API's dependencies
 
-Dependencies include SQLAlchemy, Numpy, and Scipy.
-Installing Numpy and Scipy can be tricky so please refer to their respective sites for instructions.
+Dependencies include Numpy, ?Scipy, Django, and MySQL-python.
+MySQL-python is a little tricky on OSX. Try the code below, but change the mysql directory as appropriate.
+
+```
+
+>sudo -i
+#export PATH=$PATH:/usr/local/mysql-5.5.17-osx10.6-x86_64/bin
+#export DYLD_LIBRARY_PATH=/usr/local/mysql/lib/
+#export ARCHFLAGS='-arch i386 -arch x86_64'
+#export CC=gcc-4.2
+#export PATH="/Library/Frameworks/Python.framework/Versions/2.7/bin:${PATH}"
+#easy_install mysql-python
+#sudo pip install MySQL-python==1.2.3c1
+
+```
 
 ### Interacting with the data
 
-There are some GUIs available to interact with the data for either monitoring and adjusting online analysis
-or offline analysis.
+TODO: Describe how to run the Django web server then access the data that way.
 
 Or you can access the data and the add-on API functions directly from a Python console:
 
 ```python
 
-from EeratAPI.API import *
-my_subj_type=get_or_create(Subject_type, Name='BCPy_healthy')
-my_subject=get_or_create(Subject, Name='CBB_TEST', subject_type=my_subj_type, species_type='human')
-#Assumes there is a last period and that it has trials. See how to create trials further below.
-temp_store = my_subject.periods[-1].trials[-1].store
-x=temp_store['x_vec']
-y=temp_store['data']
-chan_labels=temp_store['channel_labels']
+import os
+os.environ["DJANGO_SETTINGS_MODULE"] = 'eerf.eerf.settings'
+from api.models import *
+sub = Subject.objects.all()[0]
+
+
 #Note that the following assumes you are using IPython with the -pylab switch, or equivalent
-plots=plot(x,y.T,label=chan_labels)
-legend(plots,chan_labels)
+#plots=plot(x,y.T,label=chan_labels)
+#legend(plots,chan_labels)
 
 ```
 

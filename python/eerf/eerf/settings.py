@@ -1,4 +1,4 @@
-# Django settings for EERF project.
+# Django settings for eerf project.
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
@@ -12,7 +12,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': 'EERF',                      # Or path to database file if using sqlite3.
+        'NAME': 'eerf',                      # Or path to database file if using sqlite3.
         'USER': 'root',                      # Not used with sqlite3.
         'PASSWORD': '',                  # Not used with sqlite3.
         'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
@@ -78,7 +78,7 @@ STATICFILES_FINDERS = (
 )
 
 # Make this unique, and don't share it with anybody.
-SECRET_KEY = 'je&amp;**m!2zor7#g(^rd7%-eves3)tbc7y-9uvwtk0z1rh126y$s'
+SECRET_KEY = '9sz2rq2dsy17zw&amp;6jo3g7)_o&amp;19b)ak6$kzuq99^^73%jbf(-u'
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
@@ -97,10 +97,10 @@ MIDDLEWARE_CLASSES = (
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'EERF.urls'
+ROOT_URLCONF = 'eerf.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'EERF.wsgi.application'
+WSGI_APPLICATION = 'eerf.wsgi.application'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
@@ -110,7 +110,7 @@ TEMPLATE_DIRS = (
 
 INSTALLED_APPS = (
     #'django.contrib.auth',
-    'django.contrib.contenttypes',
+    #'django.contrib.contenttypes',
     #'django.contrib.sessions',
     #'django.contrib.sites',
     #'django.contrib.messages',
@@ -119,6 +119,7 @@ INSTALLED_APPS = (
     # 'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
+    "api"
 )
 
 # A sample logging configuration. The only tangible logging
