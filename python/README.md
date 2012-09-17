@@ -5,12 +5,12 @@
 This module provides access to the EERF datastore from Python.
 In addition to simple reading and writing data, there are some functions for performing more complex analyses 
 that can either be triggered automatically or that can be called manually.
-Furthermore, users may interact with the datastore through a web browser (TODO: Django web server).
+Furthermore, users may interact with the datastore through a web browser.
 
 ### Installing Python and the API's dependencies
 
 Dependencies include Numpy, ?Scipy, Django, and MySQL-python.
-MySQL-python is a little tricky on OSX. Try the code below, but change the mysql directory as appropriate.
+MySQL-python is a little tricky to install on OSX. Try the code below after changing the mysql directory to match your installed version.
 
 ```
 
@@ -28,6 +28,7 @@ MySQL-python is a little tricky on OSX. Try the code below, but change the mysql
 ### Interacting with the data
 
 TODO: Describe how to run the Django web server then access the data that way.
+
 
 Or you can access the data and the add-on API functions directly from a Python console:
 

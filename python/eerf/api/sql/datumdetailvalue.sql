@@ -1,0 +1,1 @@
+INSERT INTO datum_detail_value (datum_id, detail_type_id, value) VALUES (2, 4, '20.0'), (2, 5, '30.0');
