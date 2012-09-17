@@ -3,11 +3,10 @@
 ## Table of Contents
 
 1. Introduction
-2. [SQL Database](https://github.com/cboulay/EERF/tree/master/datastore)
-3. [Python data API](https://github.com/cboulay/EERF/tree/master/python/api)
-4. [Python apps](https://github.com/cboulay/EERF/tree/master/python/tools)
-5. [Matlab data API](https://github.com/cboulay/EERF/tree/master/matlab)
-6. [Matlab analysis apps](https://github.com/cboulay/EERF/tree/master/matlab/MyMatlabApps)
+2. [Python data API](https://github.com/cboulay/EERF/tree/master/python/api)
+3. [Python apps](https://github.com/cboulay/EERF/tree/master/python/tools)
+4. [Matlab data API](https://github.com/cboulay/EERF/tree/master/matlab)
+5. [Matlab analysis apps](https://github.com/cboulay/EERF/tree/master/matlab/MyMatlabApps)
 
 ## Introduction
 
