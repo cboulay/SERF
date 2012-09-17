@@ -10,7 +10,6 @@ setup(name='eerf',
       author='Chadwick Boulay',
       author_email='chadwick.boulay@gmail.com',
       url='https://github.com/cboulay/EERF',
-      packages = ['eerf.api','eerf.eerf'],
-      #packages = ['API','API.db'],
+      packages = ['eerf','eerf.eerfapi','eerf.eerf'],
       requires = [('%s (%s)' % (p,v)).replace(' ()','') for p,v in dependencies.items()]  # available in distutils from Python 2.5 onwards
 )

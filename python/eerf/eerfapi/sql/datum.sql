@@ -19,6 +19,7 @@ BEGIN
 END;
 ALTER TABLE datum MODIFY COLUMN number integer UNSIGNED NOT NULL DEFAULT 0;
 ALTER TABLE datum MODIFY COLUMN is_good bool NOT NULL DEFAULT 1;
-ALTER TABLE datum MODIFY COLUMN span_type ENUM('trial','day','period') NOT NULL DEFAULT 'trial';
-INSERT INTO datum (subject_id, span_type) VALUES (1, 'period'), (1, 'trial'), (1, 'trial');
+-- ALTER TABLE datum MODIFY COLUMN span_type ENUM('trial','day','period') NOT NULL DEFAULT 'trial';
+-- ALTER TABLE datum MODIFY COLUMN span_type smallint UNSIGNED NOT NULL DEFAULT '1';
+INSERT INTO datum (subject_id, span_type) VALUES (1, 3), (1, 1), (1, 1);
 INSERT INTO datum_has_datum (from_datum_id, to_datum_id) VALUES (1,2), (1,3)

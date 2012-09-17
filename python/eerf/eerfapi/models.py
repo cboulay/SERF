@@ -9,6 +9,29 @@
 
 from django.db import models
 
+#http://stackoverflow.com/questions/21454/specifying-a-mysql-enum-in-a-django-model
+class EnumField(models.Field):
+    """
+    A field class that maps to MySQL's ENUM type.
+
+    Usage:
+
+    Class Card(models.Model):
+        suit = EnumField(values=('Clubs', 'Diamonds', 'Spades', 'Hearts'))
+
+    c = Card()
+    c.suit = 'Clubs'
+    c.save()
+    """
+    def __init__(self, *args, **kwargs):
+        self.values = kwargs.pop('values')
+        kwargs['choices'] = [(v, v) for v in self.values]
+        kwargs['default'] = self.values[0]
+        super(EnumField, self).__init__(*args, **kwargs)
+
+    def db_type(self, connection):
+        return "enum({0})".format( ','.join("'%s'" % v for v in self.values) )
+    
 #http://stackoverflow.com/questions/759288/how-do-you-put-a-file-in-a-fixture-in-django
 class BlobValueWrapper(object):
     """Wrap the blob value so that we can override the unicode method.
@@ -57,14 +80,24 @@ class Subject(models.Model):
     height = models.PositiveIntegerField(null=True, blank=True)
     birthday = models.DateField(null=True, blank=True)
     headsize = models.CharField(max_length=135, null=True, blank=True)
-    sex = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'male'),(2,'female'),(3,'unspecified')), default=0)
-    handedness = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'right'),(2,'left'),(3,'equal')), default=0)
-    smoking = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    alcohol_abuse = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    drug_abuse = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    medication = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    visual_impairment = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'none'),(2,'yes'),(3,'corrected')), default=0)
-    heart_impairment = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes'),(3,'pacemaker')), default=0)
+    #===========================================================================
+    # sex = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'male'),(2,'female'),(3,'unspecified')), default=0)
+    # handedness = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'right'),(2,'left'),(3,'equal')), default=0)
+    # smoking = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
+    # alcohol_abuse = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
+    # drug_abuse = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
+    # medication = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
+    # visual_impairment = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'none'),(2,'yes'),(3,'corrected')), default=0)
+    # heart_impairment = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes'),(3,'pacemaker')), default=0)
+    #===========================================================================
+    sex = EnumField(values=('unknown', 'male', 'female', 'unspecified'))
+    handedness = EnumField(values=('unknown', 'right', 'left', 'equal'))
+    smoking = EnumField(values=('unknown', 'no', 'yes'))
+    alcohol_abuse = EnumField(values=('unknown', 'no', 'yes'))
+    drug_abuse = EnumField(values=('unknown', 'no', 'yes'))
+    medication = EnumField(values=('unknown', 'no', 'yes'))
+    visual_impairment = EnumField(values=('unknown', 'no', 'yes', 'corrected'))
+    heart_impairment = EnumField(values=('unknown', 'no', 'yes', 'pacemaker'))
     class Meta:
         db_table = u'subject'
         
@@ -79,12 +112,13 @@ class Subject(models.Model):
 
 class SubjectLog(models.Model):
     subject = models.ForeignKey(Subject)
-    number = models.PositiveIntegerField()
-    time = models.DateTimeField(null=True, blank=True)
+    time = models.DateTimeField(null=True, blank=True, auto_now=True)
     entry = models.TextField(blank=True)
     class Meta:
         db_table = u'subject_log'
-        unique_together = ("subject","number")
+        unique_together = ("subject","time")
+    def __unicode__(self):
+        return u"%s - %s: %s..." % (self.subject.name, self.time, self.entry[0:9])
         
 class DetailType(models.Model):
     detail_type_id = models.AutoField(primary_key=True)
@@ -107,7 +141,8 @@ class Datum(models.Model):
     datum_id = models.AutoField(primary_key=True)
     subject = models.ForeignKey(Subject, related_name="data")
     number = models.PositiveIntegerField(default=0)
-    span_type = models.PositiveSmallIntegerField(choices=((1,'trial'),(2,'day'),(3,'period')), default=1)
+    #span_type = models.PositiveSmallIntegerField(choices=((1,'trial'),(2,'day'),(3,'period')), default=1)
+    span_type = EnumField(values=('trial', 'day', 'period'))
     is_good = models.BooleanField(default=True)
     start_time = models.DateTimeField(auto_now=True, null=True)
     stop_time = models.DateTimeField(blank=True, null=True)

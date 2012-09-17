@@ -2,15 +2,15 @@
 
 ## Python data API
 
-This module provides access to the EERF datastore from Python.
-In addition to simple reading and writing data, there are some functions for performing more complex analyses 
-that can either be triggered automatically or that can be called manually.
-Furthermore, users may interact with the datastore through a web browser.
+This project createts a data store for use with EERF.
+This data store may be accessed through a simple web interface or directly from within Python.
 
 ### Installing Python and the API's dependencies
 
 Dependencies include Numpy, ?Scipy, Django, and MySQL-python.
-MySQL-python is a little tricky to install on OSX. Try the code below after changing the mysql directory to match your installed version.
+Numpy, Scipy, and Django all have extensive documentation on how to install those packages. Please consult their respective pages.
+MySQL-python is a little tricky to install on OSX and the information is difficult to find.
+Try the code below after changing the mysql directory to match your installed version.
 
 ```
 
@@ -27,26 +27,30 @@ MySQL-python is a little tricky to install on OSX. Try the code below after chan
 
 ### Interacting with the data
 
-TODO: Describe how to run the Django web server then access the data that way.
+In a terminal or command-prompt, change to the EERF/python/eerf directory, and execute
+`python manage.py syncdb`
+Go through the steps to create your admin account. Now, at the same prompt, type
+`python manage.py runserver`
+Open a browser and navigate to the specified page, and append `/admin/` to the end of the URL.
+This will provide you with basic access to the database models.
 
-
-Or you can access the data and the add-on API functions directly from a Python console:
+To access the ORM from within a separate Python app, we have to install this django project as a regular python package (i.e. in site-packages).
+In a terminal or command-prompt, change to the EERF/python directory, and execute
+`python setup.py install`
+Then your custom python script could have the following:
 
 ```python
 
 import os
 os.environ["DJANGO_SETTINGS_MODULE"] = 'eerf.eerf.settings'
-from api.models import *
+from eerf import eerfapi
+from eerf.eerfapi.models import *
 sub = Subject.objects.all()[0]
-
-
-#Note that the following assumes you are using IPython with the -pylab switch, or equivalent
-#plots=plot(x,y.T,label=chan_labels)
-#legend(plots,chan_labels)
+trial = sub.periods[0].trials.all()[0]
 
 ```
 
-#### Extended online analysis
+#### Everything below is out of date.
 
 Beyond plotting single trials there are futher analyses built-in to the OnlineAPIExtension.
 Many of these are for analyzing periods and the trials within them.
