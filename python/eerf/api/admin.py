@@ -1,4 +1,4 @@
-from eerfapi.models import *
+from api.models import *
 from django.contrib import admin
 
 class SubjectAdmin(admin.ModelAdmin):

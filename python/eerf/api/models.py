@@ -8,6 +8,10 @@
 # into your database.
 
 from django.db import models
+import django.utils.timezone
+import datetime
+import numpy as np
+from eerfx import feature_functions
 
 #http://stackoverflow.com/questions/21454/specifying-a-mysql-enum-in-a-django-model
 class EnumField(models.Field):
@@ -33,39 +37,47 @@ class EnumField(models.Field):
         return "enum({0})".format( ','.join("'%s'" % v for v in self.values) )
     
 #http://stackoverflow.com/questions/759288/how-do-you-put-a-file-in-a-fixture-in-django
-class BlobValueWrapper(object):
-    """Wrap the blob value so that we can override the unicode method.
-    After the query succeeds, Django attempts to record the last query
-    executed, and at that point it attempts to force the query string
-    to unicode. This does not work for binary data and generates an
-    uncaught exception.
-    """
-    def __init__(self, val):
-        self.val = val
-
-    def __str__(self):
-        return 'blobdata'
-
-    def __unicode__(self):
-        return u'blobdata'
-
-class BlobField(models.Field):
-    """A field for persisting binary data in databases that we support."""
+class NPArrayBlobField(models.Field):
+    description = "Store/retrieve numpy arrays as LONGBLOB"
     __metaclass__ = models.SubfieldBase
+    #===========================================================================
+    # def __init__(self, *args, **kwargs):
+    #    super(NPArrayBlobField, self).__init__(*args, **kwargs)
+    #===========================================================================
     def db_type(self, connection):
         return 'LONGBLOB'
-
-    def to_python(self, value):
+    def to_python(self, value):#From database to python
+        if value is not None:
+            value = np.frombuffer(value, dtype=float)
+            value.flags.writeable = True
+        return value
+    def get_db_prep_save(self, value, connection):#from python to database
+        if value is not None:
+            value = value.tostring()
         return value
 
-    def get_db_prep_save(self, value):
-        if value is None:
-            return None
+#http://justcramer.com/2008/08/08/custom-fields-in-django/
+class CSVStringField(models.TextField):
+    description = "Stores a list as a comma-separated string into a Text column"
+    __metaclass__ = models.SubfieldBase
+    def to_python(self, value):
+        if not value:
+            value = []
+        elif isinstance(value, list):
+            return value
         else:
-            return BlobValueWrapper(value)
-
-
-
+            value = value.split(',')
+        return value
+    
+    def get_db_prep_value(self, value, connection, prepared=False):
+        if not value:
+            return
+        return ','.join(unicode(s) for s in value)
+    
+    def value_to_string(self, obj):
+        value = self._get_val_from_obj(obj)
+        return self.get_db_prep_value(value)
+    
 class System(models.Model):
     name = models.CharField(max_length=135, primary_key=True)
     value = models.CharField(max_length=135, blank=True)
@@ -80,16 +92,6 @@ class Subject(models.Model):
     height = models.PositiveIntegerField(null=True, blank=True)
     birthday = models.DateField(null=True, blank=True)
     headsize = models.CharField(max_length=135, null=True, blank=True)
-    #===========================================================================
-    # sex = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'male'),(2,'female'),(3,'unspecified')), default=0)
-    # handedness = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'right'),(2,'left'),(3,'equal')), default=0)
-    # smoking = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    # alcohol_abuse = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    # drug_abuse = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    # medication = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes')), default=0)
-    # visual_impairment = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'none'),(2,'yes'),(3,'corrected')), default=0)
-    # heart_impairment = models.PositiveSmallIntegerField(choices=((0,'unknown'),(1,'no'),(2,'yes'),(3,'pacemaker')), default=0)
-    #===========================================================================
     sex = EnumField(values=('unknown', 'male', 'female', 'unspecified'))
     handedness = EnumField(values=('unknown', 'right', 'left', 'equal'))
     smoking = EnumField(values=('unknown', 'no', 'yes'))
@@ -109,6 +111,16 @@ class Subject(models.Model):
     def set_periods(self, periods):
         self.data.add(periods)
     periods = property(get_periods, set_periods)
+    
+    def get_or_create_recent_period(self,delay=9999):
+        td = datetime.timedelta(hours=delay)
+        periods = self.data.filter(span_type=3).filter(stop_time__gte=django.utils.timezone.now()-td).order_by('-stop_time')
+        if periods.count() > 0:
+            return periods[0]
+        else:
+            new_period = Datum.objects.create(subject=self, span_type='period')
+            return new_period
+        
 
 class SubjectLog(models.Model):
     subject = models.ForeignKey(Subject)
@@ -141,13 +153,14 @@ class Datum(models.Model):
     datum_id = models.AutoField(primary_key=True)
     subject = models.ForeignKey(Subject, related_name="data")
     number = models.PositiveIntegerField(default=0)
-    #span_type = models.PositiveSmallIntegerField(choices=((1,'trial'),(2,'day'),(3,'period')), default=1)
     span_type = EnumField(values=('trial', 'day', 'period'))
     is_good = models.BooleanField(default=True)
     start_time = models.DateTimeField(auto_now=True, null=True)
     stop_time = models.DateTimeField(blank=True, null=True)
-    _detail_types = models.ManyToManyField(DetailType, through="DatumDetailValue", related_name="+")#no need for a detail_type to know ALL its values.
-    _feature_types = models.ManyToManyField(FeatureType, through="DatumFeatureValue", related_name="+")
+    #===========================================================================
+    # _detail_types = models.ManyToManyField(DetailType, through="DatumDetailValue", related_name="+")#no need for a detail_type to know ALL its values.
+    # _feature_types = models.ManyToManyField(FeatureType, through="DatumFeatureValue", related_name="+")
+    #===========================================================================
     trials = models.ManyToManyField("self",
                                     db_table = u'datum_has_datum',
                                     symmetrical = False,
@@ -160,21 +173,66 @@ class Datum(models.Model):
         
     def __unicode__(self):
         return u"%s - %i" % (self.span_type, self.number)
+    
+    def detail_values_dict(self):#return a dict of detail values.
+        return dict([(item.detail_type.name,item.value) for item in self._detail_values.all()])
+    
+    def update_ddv(self,key,value):
+        new_ddv = DatumDetailValue.objects.get_or_create(datum=self, detail_type=DetailType.objects.get_or_create(name=key)[0])[0]
+        new_ddv.value = value
+        new_ddv.save()
+        
+    def feature_values_dict(self):#return a dict of detail values.
+        return dict([(item.feature_type.name,item.value) for item in self._feature_values.all()])
+    def update_dfv(self,key,value):
+        new_dfv = DatumFeatureValue.objects.get_or_create(datum=self, feature_type=FeatureType.objects.get_or_create(name=key)[0])[0]
+        new_dfv.value = value
+        new_dfv.save()
+        
+    def extend_stop_time(self):
+        td = datetime.timedelta(minutes = 5) if self.span_type=='period' else datetime.timedelta(seconds = 1)
+        new_time = django.utils.timezone.now() + td
+        if new_time>self.stop_time:
+            self.stop_time = new_time
+            
+    def recalculate_child_feature_values(self):
+        if self.span_type=='period':
+            my_trials = self.trials.all()
+            for tr in my_trials:
+                tr.calculate_all_features();
+    
+    def recalculate_all_features(self):
+        refdatum = None if self.span_type=='period' else self.periods.order_by('-datum_id').all()[0]#Assumes last parent is best parent.
+        for dfv in self._feature_values:
+            self.calculate_value_for_feature_name(dfv.feature_type.name, refdatum=refdatum)
+            
+    def calculate_value_for_feature_name(self, fname, refdatum=None):
+        #import EERF.APIextension.feature_functions
+        fxn=getattr(feature_functions,fname)#pulls the name of the function from the feature_functions module.
+        self.update_dfv(fname, fxn(self, refdatum=refdatum))
 
 class DatumStore(models.Model):
     datum = models.OneToOneField(Datum, primary_key=True, related_name = "store")
-    x_vec = BlobField(null=True, blank=True)
-    erp = BlobField(null=True, blank=True)
+    x_vec = NPArrayBlobField(null=True, blank=True)
+    erp = NPArrayBlobField(null=True, blank=True)
     #x_vec = models.TextField(blank=True)
     #erp = models.TextField(blank=True)
     n_channels = models.PositiveSmallIntegerField(null=True, blank=True)
     n_samples = models.PositiveIntegerField(null=True, blank=True)
-    channel_labels = models.TextField(null=True, blank=True)
+    channel_labels = CSVStringField(null=True, blank=True)
     class Meta:
         db_table = u'datum_store'
         
     def __unicode__(self):
         return u"%i samples x %i channels" % (self.n_samples, self.n_channels) if self.n_samples else "EMPTY"
+    
+    def get_data(self):
+        return self.erp.reshape((self.n_channels,self.n_samples))
+    def set_data(self, values):
+        self.erp = values
+        self.n_channels,self.n_samples = values.shape
+        self.save()
+    data = property(get_data,set_data)
         
 #===============================================================================
 # class DatumHasDatum(models.Model):
