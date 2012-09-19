@@ -48,8 +48,9 @@ class NPArrayBlobField(models.Field):
         return 'LONGBLOB'
     def to_python(self, value):#From database to python
         if value is not None:
-            value = np.frombuffer(value, dtype=float)
-            value.flags.writeable = True
+            if not hasattr(value, '__add__') or isinstance(value, basestring):
+                value = np.frombuffer(value, dtype=float)
+                value.flags.writeable = True
         return value
     def get_db_prep_save(self, value, connection):#from python to database
         if value is not None:
@@ -123,7 +124,8 @@ class Subject(models.Model):
         
 
 class SubjectLog(models.Model):
-    subject = models.ForeignKey(Subject)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    #on_delete=models.CASCADE is the default. Note that this does not use the DBMS property but instead uses internal code.
     time = models.DateTimeField(null=True, blank=True, auto_now=True)
     entry = models.TextField(blank=True)
     class Meta:
@@ -212,7 +214,7 @@ class Datum(models.Model):
         self.update_dfv(fname, fxn(self, refdatum=refdatum))
 
 class DatumStore(models.Model):
-    datum = models.OneToOneField(Datum, primary_key=True, related_name = "store")
+    datum = models.OneToOneField(Datum, primary_key=True, related_name = "store", on_delete=models.CASCADE)
     x_vec = NPArrayBlobField(null=True, blank=True)
     erp = NPArrayBlobField(null=True, blank=True)
     #x_vec = models.TextField(blank=True)
@@ -243,7 +245,7 @@ class DatumStore(models.Model):
 #===============================================================================
         
 class DatumDetailValue(models.Model):
-    datum = models.ForeignKey(Datum, related_name = "_detail_values")
+    datum = models.ForeignKey(Datum, related_name = "_detail_values", on_delete=models.CASCADE)
     detail_type = models.ForeignKey(DetailType)
     value = models.CharField(max_length=135, null=True, blank=True)
     class Meta:
@@ -253,7 +255,7 @@ class DatumDetailValue(models.Model):
         return u"%s=%s" % (self.detail_type.name, self.value)
 
 class DatumFeatureValue(models.Model):
-    datum = models.ForeignKey(Datum, related_name = "_feature_values")
+    datum = models.ForeignKey(Datum, related_name = "_feature_values", on_delete=models.CASCADE)
     feature_type = models.ForeignKey(FeatureType)
     value = models.FloatField(null=True, blank=True)
     class Meta:

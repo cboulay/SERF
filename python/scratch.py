@@ -1,8 +1,12 @@
+#Some code for testing.
 import sys
 import os
 sys.path.append(os.path.abspath('d:/tools/eerf/python/eerf'))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "eerf.settings")
 from api.models import *
+
+
+# For debugging online ERPExtension
 
 # Use these next few lines to help with debugging.
 self = lambda: None
