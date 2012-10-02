@@ -130,9 +130,9 @@ class SubjectLog(models.Model):
     entry = models.TextField(blank=True)
     class Meta:
         db_table = u'subject_log'
-        unique_together = ("subject","time")
+        #unique_together = ("subject","time")
     def __unicode__(self):
-        return u"%s - %s: %s..." % (self.subject.name, self.time, self.entry[0:9])
+        return u"%s - %s: %s..." % (self.subject.name, self.time, self.entry[0:min(40,len(self.entry))])
         
 class DetailType(models.Model):
     detail_type_id = models.AutoField(primary_key=True)
@@ -150,6 +150,9 @@ class FeatureType(models.Model):
     description = models.CharField(max_length=135, blank=True)
     class Meta:
         db_table = u'feature_type'
+        
+    def __unicode__(self):
+        return self.name
         
 class Datum(models.Model):
     datum_id = models.AutoField(primary_key=True)
@@ -184,12 +187,21 @@ class Datum(models.Model):
         new_ddv.value = value
         new_ddv.save()
         
+    def copy_details_from(self,ref_datum):
+        ref_details = ref_datum.detail_values_dict()
+        for kk in ref_details:
+            if kk in ['BG_start_ms','BG_stop_ms'] or\
+                (kk in ['MEP_start_ms','MEP_stop_ms','MEP_chan_label']) or\
+                (kk in ['MR_start_ms','MR_stop_ms','HR_start_ms','HR_stop_ms','HR_chan_label']):
+                self.update_ddv(kk,ref_details[kk])
+        
     def feature_values_dict(self):#return a dict of detail values.
         return dict([(item.feature_type.name,item.value) for item in self._feature_values.all()])
     def update_dfv(self,key,value):
         new_dfv = DatumFeatureValue.objects.get_or_create(datum=self, feature_type=FeatureType.objects.get_or_create(name=key)[0])[0]
         new_dfv.value = value
         new_dfv.save()
+        return value
         
     def extend_stop_time(self):
         td = datetime.timedelta(minutes = 5) if self.span_type=='period' else datetime.timedelta(seconds = 1)
@@ -198,20 +210,20 @@ class Datum(models.Model):
             self.stop_time = new_time
             
     def recalculate_child_feature_values(self):
+        #REcalculate implies we want to calculate using period's details,
+        #as the trial already has its features calculated using its details.
         if self.span_type=='period':
             my_trials = self.trials.all()
-            for tr in my_trials:
-                tr.calculate_all_features();
+            return [tr.calculate_all_features for tr in my_trials]
     
     def recalculate_all_features(self):
         refdatum = None if self.span_type=='period' else self.periods.order_by('-datum_id').all()[0]#Assumes last parent is best parent.
-        for dfv in self._feature_values:
-            self.calculate_value_for_feature_name(dfv.feature_type.name, refdatum=refdatum)
+        return [self.calculate_value_for_feature_name(dfv.feature_type.name, refdatum=refdatum) for dfv in self._feature_values]            
             
     def calculate_value_for_feature_name(self, fname, refdatum=None):
         #import EERF.APIextension.feature_functions
         fxn=getattr(feature_functions,fname)#pulls the name of the function from the feature_functions module.
-        self.update_dfv(fname, fxn(self, refdatum=refdatum))
+        return self.update_dfv(fname, fxn(self, refdatum=refdatum))
 
 class DatumStore(models.Model):
     datum = models.OneToOneField(Datum, primary_key=True, related_name = "store", on_delete=models.CASCADE)

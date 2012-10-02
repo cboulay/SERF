@@ -19,14 +19,15 @@ def get_aaa_for_datum_start_stop(datum,x_start,x_stop,chan_label):
 		return None
 	sub_mat=np.abs(sub_mat)
 	ax_ind = 1 if sub_mat.ndim==2 else 0
-	return np.average(sub_mat,axis=ax_ind)
+	return np.average(sub_mat,axis=ax_ind)[0]
 	
 def get_p2p_for_datum_start_stop(datum,x_start,x_stop,chan_label):
 	sub_mat=get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label)
 	if not np.any(sub_mat):
 		return None
 	ax_ind = 1 if sub_mat.ndim==2 else 0
-	return np.nanmax(sub_mat,axis=ax_ind)-np.nanmin(sub_mat,axis=ax_ind)
+	p2p = np.nanmax(sub_mat,axis=ax_ind)-np.nanmin(sub_mat,axis=ax_ind)
+	return p2p[0]
 
 def get_ddvs(datum, refdatum=None, keys=None):
 	if keys:
@@ -67,3 +68,44 @@ def MEP_p2p(datum, refdatum=None):
 
 def HR_res(datum, refdatum=None):
 	print "TODO: HR_res"
+	
+def MEP_res(datum, refdatum=None):
+	#===========================================================================
+	# The MEP residual is the amplitude of the MEP after subtracting the effects
+	# of the background EMG and the stimulus amplitude.
+	#===========================================================================
+	mep_feat = 'MEP_p2p' #Change this to 'MEP_aaa' if preferred.
+	prev_trial_limit = 100
+	
+	# Residuals only make sense when calculating for a single trial.
+	if datum.span_type=='period':
+		return None
+	
+	#Get the refdatum
+	if refdatum is None or refdatum.span_type=='trial':
+		refdatum = datum.periods.order_by('-datum_id').all()[0]
+	
+	#We will eventually need the BG, MEP, and stim for this trial.
+	output = [datum.calculate_value_for_feature_name(fname, refdatum=refdatum) for fname in ['BEMG_aaa', mep_feat]]
+	my_stim = datum.detail_values_dict()['TMS_powerA']
+	
+	#===========================================================================
+	# #Get background EMG, stimulus amplitude, and MEP_p2p for all trials (lim 100?) for this period.
+	# stim_ddvs = DatumDetailValue.objects.filter(datum__periods__pk=refdatum.datum_id, detail_type__name__contains='TMS_powerA').order_by('-id').all()[:prev_trial_limit]
+	# stim_did,stim_val = [ for stim_ddv in stim_ddvs]
+	# all_dfvs = DatumFeatureValue.objects.filter(datum__periods__pk=refdatum.datum_id) #Build a query set for all feature_values belonging to previous trials in the period.
+	# 
+	#===========================================================================
+	
+	
+	#Transform stimulus amplitude into something linearly related to MEP size.
+	
+	#Do a multiple regression (y=MEP_p2p, X=BEMG_aaa,stim_amp) to identify the coefficients
+	
+	#Calculate expected y given this trial's BEMG_aaa and stim_amp
+	expected_y = 0
+	#Get actual y for this trial
+	this_y = MEP_p2p(datum, refdatum)
+	
+	#return the residual (this trial's MEP_p2p - expected y)
+	return this_y - expected_y

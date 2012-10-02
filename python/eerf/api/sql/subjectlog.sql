@@ -1,0 +1,8 @@
+DROP TRIGGER IF EXISTS sl_bef_ins;
+CREATE TRIGGER sl_bef_ins BEFORE INSERT ON subject_log
+FOR EACH ROW
+BEGIN
+	IF NEW.time IS NULL THEN
+		SET NEW.time = NOW();
+  END IF;
+END;

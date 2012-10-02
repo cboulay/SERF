@@ -2,8 +2,8 @@
 
 ## Python data API
 
-This project createts a data store for use with EERF.
-This data store may be accessed through a simple web interface or directly from within Python.
+This project createts a database and API for evoked electrophysiological response data.
+This database may be accessed through a simple web interface or directly from within Python.
 
 ### Installing Python and the API's dependencies
 
@@ -66,4 +66,5 @@ my_subject = Subject.objects.get_or_create(name='Test')[0]
 See the Django documentation on how to work with these models or see (MyBCPyModules/ERPExtension)[https://github.com/cboulay/MyBCPyModules/blob/master/ERPExtension.py] 
 for an example of how to work with the models.
 
+(The following is in progress)
 By `import eerfx.online` into our program, we get access to a few extra functions:

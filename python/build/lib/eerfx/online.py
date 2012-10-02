@@ -4,9 +4,9 @@
 import numpy as np
 import time, os, datetime
 from scipy.optimize import curve_fit
-from EERF.API import *
-from sqlalchemy.orm import query
-from sqlalchemy import desc
+#from EERF.API import *
+#from sqlalchemy.orm import query
+#from sqlalchemy import desc
 import BCPy2000.BCI2000Tools.FileReader as FileReader
 from matplotlib.mlab import find
 
