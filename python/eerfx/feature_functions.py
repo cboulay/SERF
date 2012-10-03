@@ -86,10 +86,8 @@ def MEP_res(datum, refdatum=None):
 	if datum.span_type=='period':
 		return None
 	
-	
 	#TODO: Add a check for enough trials to fill the model.
-	
-	
+		
 	
 	#Get the refdatum
 	if refdatum is None or refdatum.span_type=='trial':
@@ -117,7 +115,7 @@ def MEP_res(datum, refdatum=None):
 	bg_vals = bg_vals[np.in1d(df_ids, uids)]
 	mep_vals = mep_vals[np.in1d(df_ids, uids)]
 
-	#Transform stimulus amplitude into something linearly related to MEP size.
+	#Transform stimulus amplitude into a linear predictor of MEP size.
 	p0=((np.max(stim_vals)-np.min(stim_vals))/2,0.1) #x0, k for sig_func
 	y = mep_vals - np.min(mep_vals)
 	mep_scale = np.max(y)
@@ -126,15 +124,19 @@ def MEP_res(datum, refdatum=None):
 	stim_vals_sig = np.min(mep_vals) + (mep_scale * sig_func(stim_vals, popt[0], popt[1]))
 	my_stim_sig = np.min(mep_vals) + (mep_scale * sig_func(my_stim, popt[0], popt[1]))
 	
-	return get_residual((my_bg, my_stim_sig), my_mep, np.column_stack((bg_vals, stim_vals_sig)), mep_vals)
+	return get_residual(np.column_stack((my_bg, my_stim_sig)), np.array(my_mep), np.column_stack((bg_vals, stim_vals_sig)), np.array(mep_vals))[0]
 
-def get_residual(test_x_tuple, test_y, train_x_array, train_y_array):
-	#TODO: z-score training and test data.
-	x = np.column_stack((np.ones(train_x_array.shape[0],),train_x_array))
-	coeffs = np.linalg.lstsq(x,train_y_array)[0]
-	expected_y = (coeffs[1:] * np.matrix(test_x_tuple).T)[(0,0)]
+def get_residual(test_x, test_y, train_x, train_y):
+	#Convert the input into z-scores
+	x_means = np.mean(train_x,0)
+	x_std = np.std(train_x,0)
+	zx = (train_x-x_means)/x_std #Built-in broadcasting
+	
+	#Calculate the coefficients for zy = a zx. Prepend zx with column of ones
+	coeffs = np.linalg.lstsq(np.column_stack((np.ones(zx.shape[0],),zx)),train_y)[0]
+	
+	#Calculate expected_y using the coefficients and test_x
+	test_zx = (test_x - x_means)/x_std
+	expected_y = dot(coeffs, np.column_stack((np.ones(test_zx.shape[0]),test_zx)).T)
+
 	return test_y - expected_y
-
-
-
-
