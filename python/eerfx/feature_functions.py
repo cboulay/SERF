@@ -126,11 +126,15 @@ def MEP_res(datum, refdatum=None):
 	stim_vals_sig = np.min(mep_vals) + (mep_scale * sig_func(stim_vals, popt[0], popt[1]))
 	my_stim_sig = np.min(mep_vals) + (mep_scale * sig_func(my_stim, popt[0], popt[1]))
 	
-	return get_residual((my_bg, my_stim_sig), my_mep, (bg_vals, stim_vals_sig), mep_vals)
+	return get_residual((my_bg, my_stim_sig), my_mep, np.column_stack((bg_vals, stim_vals_sig)), mep_vals)
 
-def get_residual(test_x_tuple, test_y, train_x_array_tuple, train_y_array):
-	x = np.column_stack(train_x_array_tuple)
-	x = sm.add_constant(x, prepend=True)
-	res = sm.OLS(train_y_array,x).fit()
-	expected_y = np.matrix(test_x_tuple) * np.matrix(res.params[1:]).T
-	return test_y - expected_y[(0,0)]
+def get_residual(test_x_tuple, test_y, train_x_array, train_y_array):
+	#TODO: z-score training and test data.
+	x = np.column_stack((np.ones(train_x_array.shape[0],),train_x_array))
+	coeffs = np.linalg.lstsq(x,train_y_array)[0]
+	expected_y = (coeffs[1:] * np.matrix(test_x_tuple).T)[(0,0)]
+	return test_y - expected_y
+
+
+
+
