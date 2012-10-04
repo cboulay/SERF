@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import curve_fit
-import statsmodels.api as sm
+#import statsmodels.api as sm
 
 #helper functions
 def get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label):

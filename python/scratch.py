@@ -3,48 +3,25 @@ import sys
 import os
 sys.path.append(os.path.abspath('d:/tools/eerf/python/eerf'))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "eerf.settings")
-from api.models import *
+from eerfd.models import *
 #import eerfx.online
 from eerfx.feature_functions import *
 from scipy.optimize import curve_fit
-import statsmodels.api as sm
-
-sub = Subject.objects.filter(name='Test').get()# Get our subject from the DB API.
-refdatum = sub.get_or_create_recent_period(delay=999)
-datum = refdatum.trials.order_by('-datum_id').all()[0]
-mep_feat = 'MEP_p2p' #Change this to 'MEP_aaa' if preferred.
-prev_trial_limit = 100
-my_bg, my_mep = [datum.calculate_value_for_feature_name(fname, refdatum=refdatum) for fname in ['BEMG_aaa', mep_feat]]
-my_stim = float(datum.detail_values_dict()['TMS_powerA'])
-
-#Get background EMG, stimulus amplitude, and MEP_p2p for all trials (lim 100?) for this period.
-stim_ddvs = DatumDetailValue.objects.filter(datum__periods__pk=refdatum.datum_id, detail_type__name__contains='TMS_powerA').order_by('-id').all()[:prev_trial_limit]
-dd_ids = [temp.datum_id for temp in stim_ddvs]
-stim_vals = np.array([temp.value for temp in stim_ddvs],dtype=float)
-
-all_dfvs = DatumFeatureValue.objects.filter(datum__periods__pk=refdatum.datum_id)
-bg_dfvs = all_dfvs.filter(feature_type__name__contains='BEMG_aaa').order_by('-id').all()[:prev_trial_limit]
-df_ids = [temp.datum_id for temp in bg_dfvs]
-bg_vals = np.array([temp.value for temp in bg_dfvs])
-mep_dfvs = all_dfvs.filter(feature_type__name__contains=mep_feat).order_by('-id').all()[:prev_trial_limit]
-mep_vals = np.array([temp.value for temp in mep_dfvs])
-
-#Restrict ourselves to trials where dd_ids and df_ids match.
-uids = np.intersect1d(dd_ids,df_ids,assume_unique=True)
-stim_vals = stim_vals[np.in1d(dd_ids, uids)]
-bg_vals = bg_vals[np.in1d(df_ids, uids)]
-mep_vals = mep_vals[np.in1d(df_ids, uids)]
 
 
+#===============================================================================
+# Calculate residual
+#===============================================================================
 #Fit a sigmoid to the relationship between stim_vals and mep_vals
 def sig_func(x, x0, k):
     return 1 / (1 + np.exp(-k*(x-x0)))
 
 #===============================================================================
 # #Fake data
-# stim_vals = np.linspace(0,100,1000)
-# bg_vals = 100*np.random.rand(1000)
-# mep_vals = 1000*sig_func(stim_vals, 50, 0.1) + bg_vals
+# stim_vals = np.linspace(0,100.0,1000.0)
+# bg_vals = 100.0*np.random.randn(1000)
+# mep_vals = -120 + 1000.0*sig_func(stim_vals, 50.0, 0.1) + 1.2*bg_vals
+# my_bg, my_stim, my_mep = (100.0, 50.0, 1000.0*sig_func(50.0, 50.0, 0.1) + 1.2*100.0)
 #===============================================================================
 
 p0=((np.max(stim_vals)-np.min(stim_vals))/2,0.1) #x0, k
@@ -54,16 +31,29 @@ y = y / mep_scale
 popt, pcov = curve_fit(sig_func, stim_vals, y, p0)
 stim_vals_sig = np.min(mep_vals) + (mep_scale * sig_func(stim_vals, popt[0], popt[1]))
 my_stim_sig = np.min(mep_vals) + (mep_scale * sig_func(my_stim, popt[0], popt[1]))
+
+#Simulate passing these variables off to another function
+test_x = np.column_stack((my_bg, my_stim_sig))
+test_y = np.array(my_mep)
+train_x = np.column_stack((bg_vals, stim_vals_sig))
+train_y = np.array(mep_vals)
+
+x_means = np.mean(train_x,0)
+x_std = np.std(train_x,0)
+zx = (train_x-x_means)/x_std #Built-in broadcasting
+
+#Calculate the coefficients for zy = a zx. Prepend zx with column of ones
+coeffs = np.linalg.lstsq(np.column_stack((np.ones(zx.shape[0],),zx)),train_y)[0]
+
+#Calculate expected_y using the coefficients and test_x
+test_zx = (test_x - x_means)/x_std
+expected_y = dot(coeffs, np.column_stack((np.ones(test_zx.shape[0]),test_zx)).T)
+residual = test_y - expected_y #Should be about 120 if using fake data.
     
-#Do a multiple regression (y=MEP_p2p, X=BEMG_aaa,stim_vals_sig) to identify the coefficients
-x = np.column_stack((bg_vals,stim_vals_sig))
-x = sm.add_constant(x, prepend=True)
-res = sm.OLS(y,x).fit()
 
-#Calculate expected y given this trial's BEMG_aaa and stim_amp
-expected_y = 0
-
-# For debugging online ERPExtension
+#===============================================================================
+# For debugging online ERPExtension 
+#===============================================================================
 
 # Use these next few lines to help with debugging.
 self = lambda: None

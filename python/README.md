@@ -45,6 +45,7 @@ In a terminal or command-prompt, change to the EERF/python/eerf directory and ex
 This will tell you the URL the server is running on.
 Open a browser and navigate to the specified URL and append `/admin/` to the end of the URL.
 This will provide you with basic access to the database models.
+Furthermore, you can access the /eerfd/ URL to get an interactive GUI (in progress).
 
 #### In a custom Python program
 
@@ -59,12 +60,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "eerf.settings")
 Now you can import the models and test it out.
 
 ```python
-from api.models import Subject
+from eerfd.models import Subject
 my_subject = Subject.objects.get_or_create(name='Test')[0]
 ```
 
 See the Django documentation on how to work with these models or see (MyBCPyModules/ERPExtension)[https://github.com/cboulay/MyBCPyModules/blob/master/ERPExtension.py] 
 for an example of how to work with the models.
 
-(The following is in progress)
-By `import eerfx.online` into our program, we get access to a few extra functions:
+eerfx.online is incomplete... but eventually it will provide a few extra functions that don't belong in the model definitions.

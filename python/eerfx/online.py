@@ -1,6 +1,4 @@
-#An extension to the API's period that calculates period-specific data that are only useful
-#while an online application is running.
-
+#This is pretty old. I'm keeping it around because it has some useful snippets I will likely need.
 import numpy as np
 import time, os, datetime
 from scipy.optimize import curve_fit

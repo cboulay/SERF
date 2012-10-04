@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.optimize import curve_fit
+#import statsmodels.api as sm
 
 #helper functions
 def get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label):
@@ -69,6 +71,9 @@ def MEP_p2p(datum, refdatum=None):
 def HR_res(datum, refdatum=None):
 	print "TODO: HR_res"
 	
+def sig_func(x, x0, k):
+	return 1 / (1 + np.exp(-k*(x-x0)))
+	   
 def MEP_res(datum, refdatum=None):
 	#===========================================================================
 	# The MEP residual is the amplitude of the MEP after subtracting the effects
@@ -81,31 +86,57 @@ def MEP_res(datum, refdatum=None):
 	if datum.span_type=='period':
 		return None
 	
+	#TODO: Add a check for enough trials to fill the model.
+		
+	
 	#Get the refdatum
 	if refdatum is None or refdatum.span_type=='trial':
 		refdatum = datum.periods.order_by('-datum_id').all()[0]
-	
-	#We will eventually need the BG, MEP, and stim for this trial.
-	output = [datum.calculate_value_for_feature_name(fname, refdatum=refdatum) for fname in ['BEMG_aaa', mep_feat]]
+		
+	#Get the X and Y for this trial
+	my_bg, my_mep = [datum.calculate_value_for_feature_name(fname, refdatum=refdatum) for fname in ['BEMG_aaa', mep_feat]]
 	my_stim = datum.detail_values_dict()['TMS_powerA']
 	
-	#===========================================================================
-	# #Get background EMG, stimulus amplitude, and MEP_p2p for all trials (lim 100?) for this period.
-	# stim_ddvs = DatumDetailValue.objects.filter(datum__periods__pk=refdatum.datum_id, detail_type__name__contains='TMS_powerA').order_by('-id').all()[:prev_trial_limit]
-	# stim_did,stim_val = [ for stim_ddv in stim_ddvs]
-	# all_dfvs = DatumFeatureValue.objects.filter(datum__periods__pk=refdatum.datum_id) #Build a query set for all feature_values belonging to previous trials in the period.
-	# 
-	#===========================================================================
+	#Get background EMG, stimulus amplitude, and MEP_p2p for all trials (lim 100?) for this period.
+	stim_ddvs = DatumDetailValue.objects.filter(datum__periods__pk=refdatum.datum_id, detail_type__name__contains='TMS_powerA').order_by('-id').all()[:prev_trial_limit]
+	dd_ids = [temp.datum_id for temp in stim_ddvs]
+	stim_vals = np.array([temp.value for temp in stim_ddvs],dtype=float)
 	
+	all_dfvs = DatumFeatureValue.objects.filter(datum__periods__pk=refdatum.datum_id)
+	bg_dfvs = all_dfvs.filter(feature_type__name__contains='BEMG_aaa').order_by('-id').all()[:prev_trial_limit]
+	df_ids = [temp.datum_id for temp in bg_dfvs]
+	bg_vals = np.array([temp.value for temp in bg_dfvs])
+	mep_dfvs = all_dfvs.filter(feature_type__name__contains=mep_feat).order_by('-id').all()[:prev_trial_limit]
+	mep_vals = np.array([temp.value for temp in mep_dfvs])
 	
-	#Transform stimulus amplitude into something linearly related to MEP size.
+	#Restrict ourselves to trials where dd_ids and df_ids match.
+	uids = np.intersect1d(dd_ids,df_ids,assume_unique=True)
+	stim_vals = stim_vals[np.in1d(dd_ids, uids)]
+	bg_vals = bg_vals[np.in1d(df_ids, uids)]
+	mep_vals = mep_vals[np.in1d(df_ids, uids)]
+
+	#Transform stimulus amplitude into a linear predictor of MEP size.
+	p0=((np.max(stim_vals)-np.min(stim_vals))/2,0.1) #x0, k for sig_func
+	y = mep_vals - np.min(mep_vals)
+	mep_scale = np.max(y)
+	y = y / mep_scale
+	popt, pcov = curve_fit(sig_func, stim_vals, y, p0)
+	stim_vals_sig = np.min(mep_vals) + (mep_scale * sig_func(stim_vals, popt[0], popt[1]))
+	my_stim_sig = np.min(mep_vals) + (mep_scale * sig_func(my_stim, popt[0], popt[1]))
 	
-	#Do a multiple regression (y=MEP_p2p, X=BEMG_aaa,stim_amp) to identify the coefficients
+	return get_residual(np.column_stack((my_bg, my_stim_sig)), np.array(my_mep), np.column_stack((bg_vals, stim_vals_sig)), np.array(mep_vals))[0]
+
+def get_residual(test_x, test_y, train_x, train_y):
+	#Convert the input into z-scores
+	x_means = np.mean(train_x,0)
+	x_std = np.std(train_x,0)
+	zx = (train_x-x_means)/x_std #Built-in broadcasting
 	
-	#Calculate expected y given this trial's BEMG_aaa and stim_amp
-	expected_y = 0
-	#Get actual y for this trial
-	this_y = MEP_p2p(datum, refdatum)
+	#Calculate the coefficients for zy = a zx. Prepend zx with column of ones
+	coeffs = np.linalg.lstsq(np.column_stack((np.ones(zx.shape[0],),zx)),train_y)[0]
 	
-	#return the residual (this trial's MEP_p2p - expected y)
-	return this_y - expected_y
+	#Calculate expected_y using the coefficients and test_x
+	test_zx = (test_x - x_means)/x_std
+	expected_y = dot(coeffs, np.column_stack((np.ones(test_zx.shape[0]),test_zx)).T)
+
+	return test_y - expected_y

@@ -1,0 +1,6 @@
+<h1>{{ subject.name }}</h1>
+<ul>
+	{% for per in subject.periods.all %}
+	<li><a href="/api/period/{{ per.datum_id }}/">{{ per }}</a></li>
+	{% endfor %}
+</ul>

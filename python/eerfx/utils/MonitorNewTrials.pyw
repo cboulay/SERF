@@ -6,7 +6,7 @@ from Tkinter import *
 import os
 sys.path.append(os.path.abspath('d:/tools/eerf/python/eerf'))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "eerf.settings")
-from api.models import *
+from eerfd.models import *
 #from eerfx.online import *
 
 #===============================================================================
