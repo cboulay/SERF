@@ -14,6 +14,7 @@
 {% endblock %}
 {% block content %}
 	{% for chlb in channel_labels %}
+		<div>{{chlb}}</div>
 		<div class="placeholder {{chlb}}" style="width:780px; height:500px"></div>
 	{% endfor %}
 	<p>You selected: <span id="selection"></span></p>

@@ -45,19 +45,21 @@ def monitor(request, pk, n_erps = 5):
             n_channels = [st.n_channels for st in stores]
             channel_labels = stores[np.nonzero(n_channels==np.max(n_channels))[0][0]].channel_labels
             #data = [{"label": st.pk, "data": np.column_stack((st.x_vec.T,st.data.T[:,0])).tolist()} for st in stores]
-            #This next line is incredibly complicated. it's the equivalent of the following loops.
-            data = {}
-            for chlb in channel_labels:#for each channel
-                data[chlb] = []
-                for i in range(n_stores):#For each returned ERP
-                    st = stores[i]
-                    data[chlb].append({})
-                    data[chlb][i]['label'] = st.pk
-                    x_bool = np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)
-                    x_vals = st.x_vec[x_bool]
-                    y_vals = st.data[channel_labels.index(chlb),x_bool]
-                    data[chlb][i]['data'] = [x_vals, y_vals]
-                data[chlb].reverse()
+            #===================================================================
+            # This next line is incredibly complicated. it's the equivalent of the following loops.
+            # data = {}
+            # for chlb in channel_labels:#for each channel
+            #    data[chlb] = []
+            #    for i in range(n_stores):#For each returned ERP
+            #        st = stores[i]
+            #        data[chlb].append({})
+            #        data[chlb][i]['label'] = st.pk
+            #        x_bool = np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)
+            #        x_vals = st.x_vec[x_bool]
+            #        y_vals = st.data[channel_labels.index(chlb),x_bool]
+            #        data[chlb][i]['data'] = [x_vals, y_vals]
+            #    data[chlb].reverse()
+            #===================================================================
             data = dict([(chlb, [{'label': st.pk, 'data': np.column_stack((st.x_vec[np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)], st.data[channel_labels.index(chlb),np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)])).tolist()} for st in reversed(stores)]) for chlb in channel_labels])    
             oldest_pk = stores[n_stores-1].pk
             
