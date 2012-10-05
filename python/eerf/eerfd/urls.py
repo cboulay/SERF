@@ -36,5 +36,6 @@ urlpatterns = patterns('eerfd.views',
    url(r'^erps/(?P<trial_pk_csv>(?:\d+,*)*)', 'erps'),
    url(r'^$', 'index'),
    url(r'^store_pk_check/(?P<pk>\d*)', 'store_pk_check'),
-   url(r'^monitor/(?P<pk>\d*)$', 'monitor'),
+   url(r'^monitor/(?P<pk>\d*)/$', 'monitor'),
+   url(r'^set_details/(?P<pk>\d+)/$', 'set_details'),
 )

@@ -1,7 +1,8 @@
 from django.template import RequestContext
 from django.shortcuts import render_to_response, get_object_or_404
+from django.core.urlresolvers import reverse
 from eerfd.models import *
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, HttpResponseRedirect
 import json
 import numpy as np
 
@@ -64,7 +65,8 @@ def monitor(request, pk, n_erps = 5):
             oldest_pk = stores[n_stores-1].pk
             
     #return HttpResponse(json.dumps(data))
-    return render_to_response('eerfd/monitor.html', {'oldest_pk': oldest_pk, 'data': json.dumps(data), 'channel_labels': channel_labels, 'channel_labels_s': json.dumps(channel_labels)})
+    return render_to_response('eerfd/monitor.html', {'oldest_pk': oldest_pk, 'data': json.dumps(data), 'channel_labels': channel_labels, 'channel_labels_s': json.dumps(channel_labels)},
+                              context_instance=RequestContext(request))
 
 def erps(request, trial_pk_csv='0'):
     #convert trial_pk_csv to trial_pk_list
@@ -79,3 +81,10 @@ def erps(request, trial_pk_csv='0'):
         data = '{}'
     return render_to_response('eerfd/erp_data.html',{'data': data})
                     #,context_instance=RequestContext(request))
+                    
+def set_details(request, pk):
+    datum = get_object_or_404(Datum, pk=pk)
+    refdatum = datum if datum.span_type=='period' else datum.periods.all()[datum.periods.count()-1]
+    for key in request.POST:
+        refdatum.update_ddv(key, request.POST[key])
+    return HttpResponseRedirect(reverse('eerfd.views.monitor', args=(pk,)))

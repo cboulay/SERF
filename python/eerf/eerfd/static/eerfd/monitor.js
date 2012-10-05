@@ -10,23 +10,28 @@ $(document).ready(function () {
         selection: { mode: "x" }
     };
     
+    var selected_range=[];
     var placeholder=[];
     var plot=[];
     for (var i=0; i<channel_labels_s.length; i++){
     	placeholder[i] = $(".placeholder."+channel_labels_s[i]);
     	placeholder[i].bind("plotselected", function (event, ranges) {
-	        $("#selection").text(ranges.xaxis.from.toFixed(1) + " to " + ranges.xaxis.to.toFixed(1));
+    		selected_range = [ranges.xaxis.from, ranges.xaxis.to];
+	        //$("#selection").text(ranges.xaxis.from.toFixed(1) + " to " + ranges.xaxis.to.toFixed(1));
+	        $("#MEP_start_ms").val(selected_range[0].toFixed(1));
+	        $("#MEP_stop_ms").val(selected_range[1].toFixed(1));
 	 
 	        var zoom = $("#zoom").attr("checked");
 	        if (zoom)
 	            plot[i] = $.plot(placeholder[i], mydata[channel_labels_s[i]],
 	                          $.extend(true, {}, options, {
-	                              xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to }
+	                              xaxis: { min: selected_range[0], max: selected_range[1] }
 	                          }));
 	    });
 	 
 	    placeholder[i].bind("plotunselected", function (event) {
-	        $("#selection").text("");
+	    	$("#MEP_start_ms").val("");
+	        $("#MEP_stop_ms").val("");
 	    });
 	    
 	    plot[i] = $.plot(placeholder[i], mydata[channel_labels_s[i]], options);

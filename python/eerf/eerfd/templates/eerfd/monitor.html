@@ -17,7 +17,18 @@
 		<div>{{chlb}}</div>
 		<div class="placeholder {{chlb}}" style="width:780px; height:500px"></div>
 	{% endfor %}
-	<p>You selected: <span id="selection"></span></p>
+	<form action="/eerfd/set_details/{{ oldest_pk }}/" method="post">
+		{% csrf_token %}
+		Start: <input type="text" id="MEP_start_ms" name="MEP_start_ms">
+		Stop: <input type="text" id="MEP_stop_ms" name="MEP_stop_ms">
+		<input type="submit" value="Set MEP start and stop" />
+	</form>
+	<form action="/eerfd/set_details/{{ oldest_pk }}/" method="post">
+		{% csrf_token %}
+		Start: <input type="text" id="BG_start_ms" name="BG_start_ms">
+		Stop: <input type="text" id="BG_stop_ms" name="BG_stop_ms">
+		<input type="submit" value="Set BG start and stop" />
+	</form>
 	<p><input id="clearSelection" type="button" value="Clear selection" /></p>
 	<p><label><input id="zoom" type="checkbox" />Zoom to selection.</label></p>
 {% endblock %}
