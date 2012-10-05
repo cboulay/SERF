@@ -5,14 +5,17 @@
 	<script type="text/javascript" src="/static/flot/jquery.flot.selection.js"></script>
 	
 	<script type="text/javascript">
-		window.pk={{pk}};
-		window.chaddata={{data|safe}}.reverse();
+		window.oldest_pk={{oldest_pk}};
+		window.mydata={{data|safe}};
+		window.channel_labels_s={{channel_labels_s|safe}};
 	</script>
 	
 	<script type='text/javascript' src='/static/eerfd/monitor.js'></script>
 {% endblock %}
 {% block content %}
-	<div id="placeholder" style="width:780px; height:500px"></div>
+	{% for chlb in channel_labels %}
+		<div class="placeholder {{chlb}}" style="width:780px; height:500px"></div>
+	{% endfor %}
 	<p>You selected: <span id="selection"></span></p>
 	<p><input id="clearSelection" type="button" value="Clear selection" /></p>
 	<p><label><input id="zoom" type="checkbox" />Zoom to selection.</label></p>
