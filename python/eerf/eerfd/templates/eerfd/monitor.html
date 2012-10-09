@@ -15,7 +15,7 @@
 {% block content %}
 	{% for chlb in channel_labels %}
 		<div>{{chlb}}</div>
-		<div class="placeholder {{chlb}}" style="width:780px; height:500px"></div>
+		<div class="placeholder {{chlb}}" style="width:680px; height:300px"></div>
 	{% endfor %}
 	<form action="/eerfd/set_details/{{ oldest_pk }}/" method="post">
 		{% csrf_token %}

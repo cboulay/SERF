@@ -33,14 +33,14 @@ def get_p2p_for_datum_start_stop(datum,x_start,x_stop,chan_label):
 
 def get_ddvs(datum, refdatum=None, keys=None):
 	if keys:
-		if refdatum is None: refdatum=datum
-		ddvs = refdatum.detail_values_dict()
-		x_start = float(ddvs[keys[0]])
-		x_stop = float(ddvs[keys[1]])
-		chan_label = ddvs[keys[2]]
-		return x_start, x_stop, chan_label
+		if refdatum is None: 
+			ddvs = datum.subject.detail_values_dict()
+		else:
+			ddvs = refdatum.detail_values_dict()
+		values = [ddvs[key] for key in keys]
+		return values
 	else:
-		return None, None, None
+		return None
 
 #feature_functions
 def BEMG_aaa(datum, refdatum=None):

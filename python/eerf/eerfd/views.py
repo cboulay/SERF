@@ -84,7 +84,8 @@ def erps(request, trial_pk_csv='0'):
                     
 def set_details(request, pk):
     datum = get_object_or_404(Datum, pk=pk)
-    refdatum = datum if datum.span_type=='period' else datum.periods.all()[datum.periods.count()-1]
-    for key in request.POST:
-        refdatum.update_ddv(key, request.POST[key])
+    my_dict = dict([(key,request.POST[key]) for key in request.POST])
+    my_dict.pop('csrfmiddlewaretoken', None)#Remove the token provided by the POST command
+    for key in my_dict:
+        datum.subject.update_ddv(key, my_dict[key])
     return HttpResponseRedirect(reverse('eerfd.views.monitor', args=(pk,)))

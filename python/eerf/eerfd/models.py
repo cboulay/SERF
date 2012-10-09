@@ -13,6 +13,10 @@ import datetime
 import numpy as np
 from eerfx import feature_functions
 
+
+#===============================================================================
+# Define custom fields here
+#===============================================================================
 #http://stackoverflow.com/questions/21454/specifying-a-mysql-enum-in-a-django-model
 class EnumField(models.Field):
     """
@@ -79,6 +83,11 @@ class CSVStringField(models.TextField):
         value = self._get_val_from_obj(obj)
         return self.get_db_prep_value(value)
     
+    
+#===============================================================================
+# Define custom models here.
+#===============================================================================
+    
 class System(models.Model):
     name = models.CharField(max_length=135, primary_key=True)
     value = models.CharField(max_length=135, blank=True)
@@ -107,21 +116,28 @@ class Subject(models.Model):
     def __unicode__(self):
         return self.name
     
-    def get_periods(self):
-        return self.data.filter(span_type=3)
-    def set_periods(self, periods):
-        self.data.add(periods)
-    periods = property(get_periods, set_periods)
-    
-    def get_or_create_recent_period(self,delay=9999):
-        td = datetime.timedelta(hours=delay)
-        periods = self.data.filter(span_type=3).filter(stop_time__gte=django.utils.timezone.now()-td).order_by('-stop_time')
-        if periods.count() > 0:
-            return periods[0]
-        else:
-            new_period = Datum.objects.create(subject=self, span_type='period')
-            return new_period
-        
+    #===========================================================================
+    # def get_periods(self):
+    #    return self.data.filter(span_type=3)
+    # def set_periods(self, periods):
+    #    self.data.add(periods)
+    # periods = property(get_periods, set_periods)
+    # 
+    # def get_or_create_recent_period(self,delay=9999):
+    #    td = datetime.timedelta(hours=delay)
+    #    periods = self.data.filter(span_type=3).filter(stop_time__gte=django.utils.timezone.now()-td).order_by('-stop_time')
+    #    if periods.count() > 0:
+    #        return periods[0]
+    #    else:
+    #        new_period = Datum.objects.create(subject=self, span_type='period')
+    #        return new_period
+    #===========================================================================
+    def detail_values_dict(self):#return a dict of detail values.
+        return dict([(item.detail_type.name,item.value) for item in self._detail_values.all()])
+    def update_ddv(self,key,value):
+        new_sdv = SubjectDetailValue.objects.get_or_create(subject=self, detail_type=DetailType.objects.get_or_create(name=key)[0])[0]
+        new_sdv.value = value
+        new_sdv.save()
 
 class SubjectLog(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
@@ -153,6 +169,16 @@ class FeatureType(models.Model):
         
     def __unicode__(self):
         return self.name
+    
+class SubjectDetailValue(models.Model):
+    subject = models.ForeignKey(Subject, related_name = "_detail_values", on_delete=models.CASCADE)
+    detail_type = models.ForeignKey(DetailType)
+    value = models.CharField(max_length=135, null=True, blank=True)
+    class Meta:
+        db_table = u'subject_detail_value'
+        unique_together = ("subject", "detail_type")
+    def __unicode__(self):
+        return u"%s=%s" % (self.detail_type.name, self.value)
         
 class Datum(models.Model):
     datum_id = models.AutoField(primary_key=True)
@@ -179,22 +205,6 @@ class Datum(models.Model):
     def __unicode__(self):
         return u"%s - %i" % (self.span_type, self.number)
     
-    def detail_values_dict(self):#return a dict of detail values.
-        return dict([(item.detail_type.name,item.value) for item in self._detail_values.all()])
-    
-    def update_ddv(self,key,value):
-        new_ddv = DatumDetailValue.objects.get_or_create(datum=self, detail_type=DetailType.objects.get_or_create(name=key)[0])[0]
-        new_ddv.value = value
-        new_ddv.save()
-        
-    def copy_details_from(self,ref_datum):
-        ref_details = ref_datum.detail_values_dict()
-        for kk in ref_details:
-            if kk in ['BG_start_ms','BG_stop_ms'] or\
-                (kk in ['MEP_start_ms','MEP_stop_ms','MEP_chan_label']) or\
-                (kk in ['MR_start_ms','MR_stop_ms','HR_start_ms','HR_stop_ms','HR_chan_label']):
-                self.update_ddv(kk,ref_details[kk])
-        
     def feature_values_dict(self):#return a dict of detail values.
         return dict([(item.feature_type.name,item.value) for item in self._feature_values.all()])
     def update_dfv(self,key,value):
@@ -202,6 +212,23 @@ class Datum(models.Model):
         new_dfv.value = value
         new_dfv.save()
         return value
+
+    def detail_values_dict(self):#return a dict of detail values.
+        return dict([(item.detail_type.name,item.value) for item in self._detail_values.all()])
+    def update_ddv(self,key,value):
+        new_ddv = DatumDetailValue.objects.get_or_create(datum=self, detail_type=DetailType.objects.get_or_create(name=key)[0])[0]
+        new_ddv.value = value
+        new_ddv.save()
+    #===========================================================================
+    # def copy_details_from(self,ref_datum):
+    #    ref_details = ref_datum.detail_values_dict()
+    #    for kk in ref_details:
+    #        if kk in ['BG_start_ms','BG_stop_ms'] or\
+    #            (kk in ['MEP_start_ms','MEP_stop_ms','MEP_chan_label']) or\
+    #            (kk in ['MR_start_ms','MR_stop_ms','HR_start_ms','HR_stop_ms','HR_chan_label']):
+    #            self.update_ddv(kk,ref_details[kk])
+    #    
+    #===========================================================================
         
     def extend_stop_time(self):
         td = datetime.timedelta(minutes = 5) if self.span_type=='period' else datetime.timedelta(seconds = 1)
@@ -210,14 +237,12 @@ class Datum(models.Model):
             self.stop_time = new_time
             
     def recalculate_child_feature_values(self):
-        #REcalculate implies we want to calculate using period's details,
-        #as the trial already has its features calculated using its details.
+        #REcalculate implies we want to calculate using period's details.
         if self.span_type=='period':
             my_trials = self.trials.all()
-            return [tr.calculate_all_features for tr in my_trials]
+            return [tr.calculate_all_features(refdatum=self) for tr in my_trials]
     
-    def recalculate_all_features(self):
-        refdatum = None if self.span_type=='period' else self.periods.order_by('-datum_id').all()[0]#Assumes last parent is best parent.
+    def calculate_all_features(self, refdatum=None):
         return [self.calculate_value_for_feature_name(dfv.feature_type.name, refdatum=refdatum) for dfv in self._feature_values]            
             
     def calculate_value_for_feature_name(self, fname, refdatum=None):
@@ -255,17 +280,6 @@ class DatumStore(models.Model):
 #    class Meta:
 #        db_table = u'datum_has_datum'
 #===============================================================================
-        
-class DatumDetailValue(models.Model):
-    datum = models.ForeignKey(Datum, related_name = "_detail_values", on_delete=models.CASCADE)
-    detail_type = models.ForeignKey(DetailType)
-    value = models.CharField(max_length=135, null=True, blank=True)
-    class Meta:
-        db_table = u'datum_detail_value'
-        unique_together = ("datum", "detail_type")
-    def __unicode__(self):
-        return u"%s=%s" % (self.detail_type.name, self.value)
-
 class DatumFeatureValue(models.Model):
     datum = models.ForeignKey(Datum, related_name = "_feature_values", on_delete=models.CASCADE)
     feature_type = models.ForeignKey(FeatureType)
@@ -275,3 +289,13 @@ class DatumFeatureValue(models.Model):
         unique_together = ("datum", "feature_type")
     def __unicode__(self):
         return u"%s=%f" % (self.feature_type.name, self.value)
+
+class DatumDetailValue(models.Model):
+    datum = models.ForeignKey(Datum, related_name = "_detail_values", on_delete=models.CASCADE)
+    detail_type = models.ForeignKey(DetailType)
+    value = models.CharField(max_length=135, null=True, blank=True)
+    class Meta:
+        db_table = u'datum_detail_value'
+        unique_together = ("datum", "detail_type")
+    def __unicode__(self):
+        return u"%s=%s" % (self.detail_type.name, self.value)
