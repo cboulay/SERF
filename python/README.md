@@ -1,11 +1,11 @@
 # Evoked Electrophysiological Response Feedback (EERF)
 
-[eerf](https://github.com/cboulay/EERF/tree/master/python/eerf) is a Django project and app.
-[eerfx](https://github.com/cboulay/EERF/tree/master/python/eerfx) is a simple Python package
+- [eerf](https://github.com/cboulay/EERF/tree/master/python/eerf) is a Django project and app.
+- [eerfx](https://github.com/cboulay/EERF/tree/master/python/eerfx) is a simple Python package
 that contains a few helpers for EERF. It can be installed as a Python package using setup.py
 found in this directory.
-scratch.py is a file I use for quick debugging of test code. You can ignore it.
-standalone.py has some examples for using the Django ORM outside of a Django web server environment.
+- scratch.py is a file I use for quick debugging of test code. You can ignore it.
+- standalone.py has some examples for using the Django ORM outside of a Django web server environment.
 
 ### Installing Python and some Python packages
 
