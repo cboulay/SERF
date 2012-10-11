@@ -41,13 +41,13 @@ For OSX, try the code below (modify the PATH to match your installed version)
 
 We need to add some useful tools for dealing with the eerf data. Change to the EERF/python directory and execute
 
-```python
+```
 python setup.py install
 ```
 
 Tell Django to setup the database. From a console, switch to the EERF/python/eerf directory and execute:
 
-```python
+```
 python manage.py syncdb
 ```
 
@@ -83,5 +83,5 @@ from eerfd.models import Subject
 my_subject = Subject.objects.get_or_create(name='Test')[0]
 ```
 
-See the Django documentation on how to work with these models or see (MyBCPyModules/ERPExtension)[https://github.com/cboulay/MyBCPyModules/blob/master/ERPExtension.py] 
+See the Django documentation on how to work with these models or see [MyBCPyModules/ERPExtension](https://github.com/cboulay/MyBCPyModules/blob/master/ERPExtension.py) 
 for an example of how to work with the models.
