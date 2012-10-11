@@ -1,0 +1,9 @@
+<script type="text/javascript"> window.subject_pk = {{subject.pk}}; </script>
+<form action="/eerfd/my_session/" method="post">
+	{% csrf_token %}
+	Trials from: <input type="text" class="trial_start" name="trial_start">
+	until: <input type="text" class="trial_stop" name="trial_stop">
+	<input type="checkbox" class="monitor" name="monitor">Monitor for new trials.
+	<input type="button" value="Defaults" class="reset_trial_settings">
+	<input type="submit" value="Save" />
+</form>

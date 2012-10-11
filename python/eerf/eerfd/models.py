@@ -52,7 +52,10 @@ class NPArrayBlobField(models.Field):
         return 'LONGBLOB'
     def to_python(self, value):#From database to python
         if value is not None:
-            if not hasattr(value, '__add__') or isinstance(value, basestring):
+            if not hasattr(value, '__add__'):# or isinstance(value, basestring):
+                value = np.frombuffer(value, dtype=float)
+                value.flags.writeable = True
+            if isinstance(value, basestring) and value not in ['EMPTY']:
                 value = np.frombuffer(value, dtype=float)
                 value.flags.writeable = True
         return value
@@ -186,7 +189,7 @@ class Datum(models.Model):
     number = models.PositiveIntegerField(default=0)
     span_type = EnumField(values=('trial', 'day', 'period'))
     is_good = models.BooleanField(default=True)
-    start_time = models.DateTimeField(auto_now=True, null=True)
+    start_time = models.DateTimeField(blank=True, null=True, default=datetime.datetime.now)
     stop_time = models.DateTimeField(blank=True, null=True)
     #===========================================================================
     # _detail_types = models.ManyToManyField(DetailType, through="DatumDetailValue", related_name="+")#no need for a detail_type to know ALL its values.

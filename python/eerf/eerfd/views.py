@@ -1,20 +1,103 @@
+import json
+import numpy as np
 from django.template import RequestContext
 from django.shortcuts import render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
-from eerfd.models import *
+from django.views.decorators.http import require_http_methods
 from django.http import HttpResponse, Http404, HttpResponseRedirect
-import json
-import numpy as np
+from django.contrib.sessions.models import Session
+from django.core.serializers.json import DjangoJSONEncoder
+from eerfd.models import *
 
 def index(request):
     return render_to_response('eerfd/index.html')
 
-def store_pk_check(request, pk):
-    #Given a pk, return how many DatumStore objects we have with pk greater
-    pk = int(pk) if len(pk)>0 else 0
-    n_stores = DatumStore.objects.filter(pk__gte=pk).count()
-    return HttpResponse(json.dumps(n_stores))
+#===============================================================================
+# Helper
+#===============================================================================
+def store_man_for_request_subject(request, pk): #Helper function to return a filtered DatumStore manager.
+    store_man = DatumStore.objects.filter(datum__subject__pk=pk).filter(datum__span_type=1).filter(n_samples__gt=0)
+    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    if my_session.has_key('trial_start'):
+        store_man = store_man.filter(datum__start_time__gte=my_session['trial_start'])
+    if my_session.has_key('trial_stop'):
+        store_man = store_man.filter(datum__stop_time__lte=my_session['trial_stop'])
+    return store_man
 
+#===============================================================================
+# Model-specific views
+#===============================================================================
+#/subject/, /subject/pk/, and /period/ are all automatic views.
+def view_data(request, pk):#View data for subject with pk
+    subject = Subject.objects.get(pk=pk)
+    return render_to_response('eerfd/subject_view_data.html',
+                              {'subject': subject
+                               },
+                              context_instance=RequestContext(request))
+    
+#GET or POST details for subject. Non-rendering.
+@require_http_methods(["GET", "POST"])
+def set_details(request, pk):
+     #==========================================================================
+     # return HttpResponse(json.dumps(request.POST.copy()))
+     #==========================================================================
+     subject = get_object_or_404(Subject, pk=pk)
+     my_dict = request.POST.copy()
+     my_dict.pop('csrfmiddlewaretoken', None)#Remove the token provided by the POST command
+     for key in my_dict:
+        subject.update_ddv(key, my_dict[key])
+     #return HttpResponseRedirect(reverse('eerfd.views.monitor', args=(pk,)))
+     return HttpResponseRedirect(request.META['HTTP_REFERER'])
+
+@require_http_methods(["GET"])
+def get_detail_values(request, pk, detail_name):
+    detail_type = get_object_or_404(DetailType, name=detail_name)
+    ddvs_man = DatumDetailValue.objects.filter(datum__subject__pk=pk).filter(detail_type=detail_type)
+    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    if my_session.has_key('trial_start'):
+        ddvs_man = ddvs_man.filter(datum__start_time__gte=my_session['trial_start'])
+    if my_session.has_key('trial_stop'):
+        ddvs_man = ddvs_man.filter(datum__stop_time__lte=my_session['trial_stop'])
+    ddvs = [ddv.value for ddv in ddvs_man]
+    return HttpResponse(json.dumps(ddvs))
+
+@require_http_methods(["GET"])
+def get_feature_values(request, pk, feature_name):
+    feature_type = get_object_or_404(FeatureType, name=feature_name)
+    dfvs_man = DatumFeatureValue.objects.filter(datum__subject__pk=pk).filter(feature_type=feature_type)
+    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    if my_session.has_key('trial_start'):
+        dfvs_man = dfvs_man.filter(datum__start_time__gte=my_session['trial_start'])
+    if my_session.has_key('trial_stop'):
+        dfvs_man = dfvs_man.filter(datum__stop_time__lte=my_session['trial_stop'])
+    dfvs = [dfv.value for dfv in dfvs_man]
+    return HttpResponse(json.dumps(dfvs))
+    
+
+@require_http_methods(["GET"])
+def count_trials(request, pk): #GET number of trials for subject. Uses session variables. Non-rendering
+    store_man = store_man_for_request_subject(request, pk)
+    return HttpResponse(json.dumps(store_man.count()))
+
+@require_http_methods(["GET"])
+def erp_data(request, pk): #Gets ERP data for a subject. Uses session variables. Non-rendering.
+    [x_min,x_max] = [-10.0,100.0]
+    
+    store_man = store_man_for_request_subject(request, pk)
+    n_stores = store_man.count()
+    
+    if n_stores>0:
+        n_channels = [st.n_channels for st in store_man]
+        channel_labels = store_man[np.nonzero(n_channels==np.max(n_channels))[0][0]].channel_labels
+        data = dict([(chlb, [{'label': st.pk, 'data': np.column_stack((st.x_vec[np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)], st.data[channel_labels.index(chlb),np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)])).tolist()} for st in reversed(store_man)]) for chlb in channel_labels])
+    else:
+        channel_labels = ''
+        data = {}
+        
+    return HttpResponse(json.dumps({'data': data, 'channel_labels': channel_labels}))
+#===============================================================================
+# Rendering views that are not specific to a model
+#===============================================================================
 def monitor(request, pk, n_erps = 5):
     [x_min,x_max] = [-10.0,100.0]
     #Shows most recent n_erps ERPs with pk greater than or equal to pk
@@ -66,7 +149,38 @@ def monitor(request, pk, n_erps = 5):
             
     #return HttpResponse(json.dumps(data))
     return render_to_response('eerfd/monitor.html', {'oldest_pk': oldest_pk, 'data': json.dumps(data), 'channel_labels': channel_labels, 'channel_labels_s': json.dumps(channel_labels)},
-                              context_instance=RequestContext(request))
+                              context_instance=RequestContext(request)) 
+
+#===============================================================================
+# Non-rendering views for some simple API tools
+#===============================================================================
+
+
+#GET or POST session dictionary.
+@require_http_methods(["GET", "POST"])
+def my_session(request):
+    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    if request.method == 'GET':
+        return HttpResponse(json.dumps(my_session, cls=DjangoJSONEncoder))
+    elif request.method == 'POST':
+        my_post = request.POST.copy()#mutable copy of POST
+        my_session['trial_start'] = datetime.datetime.strptime(my_post['trial_start'], '%Y-%m-%dT%H:%M:%S') if my_post.has_key('trial_start') else request.session.get('trial_start', datetime.datetime.now())
+        my_session['trial_stop'] = datetime.datetime.strptime(my_post['trial_stop'], '%Y-%m-%dT%H:%M:%S') if my_post.has_key('trial_stop') else request.session.get('trial_stop', datetime.datetime.now() + datetime.timedelta(hours = 1))    
+        my_session['monitor'] = my_post.has_key('monitor') if my_post.has_key('trial_start') else True
+        for key in my_session: request.session[key] = my_session[key] #Put the values back into request.session
+        return HttpResponseRedirect(request.META['HTTP_REFERER'])
+    
+@require_http_methods(["GET"])
+def detail_types(request):
+    dts = DetailType.objects.all()
+    dt_names = [dt.name for dt in dts]
+    return HttpResponse(json.dumps(dt_names))
+
+def store_pk_check(request, pk):
+    #Given a pk, return how many DatumStore objects we have with pk greater
+    pk = int(pk) if len(pk)>0 else 0
+    n_stores = DatumStore.objects.filter(pk__gte=pk).count()
+    return HttpResponse(json.dumps(n_stores))
 
 def erps(request, trial_pk_csv='0'):
     #convert trial_pk_csv to trial_pk_list
@@ -81,11 +195,3 @@ def erps(request, trial_pk_csv='0'):
         data = '{}'
     return render_to_response('eerfd/erp_data.html',{'data': data})
                     #,context_instance=RequestContext(request))
-                    
-def set_details(request, pk):
-    datum = get_object_or_404(Datum, pk=pk)
-    my_dict = dict([(key,request.POST[key]) for key in request.POST])
-    my_dict.pop('csrfmiddlewaretoken', None)#Remove the token provided by the POST command
-    for key in my_dict:
-        datum.subject.update_ddv(key, my_dict[key])
-    return HttpResponseRedirect(reverse('eerfd.views.monitor', args=(pk,)))

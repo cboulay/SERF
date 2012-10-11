@@ -1,0 +1,17 @@
+<div class="channel_wrapper">
+</div>
+<div class="plot_wrapper">
+</div>
+<select name="Start:" class="first_detail">
+</select>
+<select name="Stop:" class="second_detail">
+</select>
+<select name="Channel:" class="channel_detail">
+</select>
+<form action="/eerfd/subject/{{ subject.pk }}/set_details/" method="post">
+	{% csrf_token %}
+	<input type="text" class="first_detail">
+	<input type="text" class="second_detail">
+	<input type="text" class="channel_detail">
+	<input type="submit" value="Save" />
+</form>

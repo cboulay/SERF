@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}EERF API{% endblock title %}
+{% block head %}
+	<script type='text/javascript' src='/static/eerfd/trial_settings.js'></script>
+	<script type="text/javascript" src="/static/flot/jquery.flot.selection.js"></script>
+	<script type='text/javascript' src='/static/eerfd/raw_erp.js'></script>
+	<script type='text/javascript' src='/static/eerfd/recruitment_curve.js'></script>
+{% endblock head %}
+{% block content %}
+	{% include "eerfd/trial_settings.html" %}
+	{% include "eerfd/raw_erp.html" %}
+	{% include "eerfd/recruitment_curve.html" %}
+{% endblock content %}
