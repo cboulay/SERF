@@ -16,6 +16,7 @@ requires an older version of IPython (0.10) which is incompatible with Python >=
 VisionEgg which is incompatible with newer versions of PyOpenGL. Work is underway to make BCPy2000
 compatible with newer versions of Python and these other packages, but for now, you are probably
 better off simply installing Python as described on the BCPy2000 page.
+See [here](http://www.bci2000.org/phpbb/viewtopic.php?f=1&t=1330) for a discussion on using BCPy2000 with modern packages.
 
 Beyond the installation listed there, this project also requires MySQL, Django and MySQL-python.
 [Django](https://docs.djangoproject.com/en/1.4/intro/install/) has extensive documentation on 
