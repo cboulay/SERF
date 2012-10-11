@@ -51,13 +51,15 @@ class NPArrayBlobField(models.Field):
     def db_type(self, connection):
         return 'LONGBLOB'
     def to_python(self, value):#From database to python
-        if value is not None:
+        if value is not None and len(value)>0:
             if not hasattr(value, '__add__'):# or isinstance(value, basestring):
                 value = np.frombuffer(value, dtype=float)
                 value.flags.writeable = True
             if isinstance(value, basestring) and value not in ['EMPTY']:
                 value = np.frombuffer(value, dtype=float)
                 value.flags.writeable = True
+        else:
+            value = np.array([])
         return value
     def get_db_prep_save(self, value, connection):#from python to database
         if value is not None:

@@ -33,7 +33,11 @@ $(document).ready(function () {
     	function () {
     		if ($(".monitor")[0].checked) {
     			$.get("http://127.0.0.1:8000/eerfd/subject/" + subject_pk + "/count_trials/", {}, function(resp) {
-	    			if (resp != n_trials){ window.location.reload(); }
+	    			if (resp != n_trials){ 
+	    				//window.location.reload();
+	    				$(window).trigger("new_data");
+	    				n_trials = resp;
+    				}
 				});
     		}
     	}

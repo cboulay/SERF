@@ -21,6 +21,8 @@ urlpatterns = patterns('eerfd.views',
     #url(r'^store_pk_check/(?P<pk>\d*)', 'store_pk_check'),
     url(r'^my_session/$', 'my_session'), #GET or POST session details.
     url(r'^detail_types/$', 'detail_types'),#GET ALL detail types
+    url(r'^feature_types/$', 'feature_types'),#GET ALL feature types
+    url(r'^get_xy/$', 'get_xy'), #GET data of detail (x) and feature (y)
     
     #===========================================================================
     # URLs for models
@@ -44,6 +46,7 @@ urlpatterns = patterns('eerfd.views',
     url(r'^subject/(?P<pk>\d+)/feature_values/(?P<feature_name>\w*)/$', 'get_feature_values'), #GET the values for a feature name
     url(r'^subject/(?P<pk>\d+)/count_trials/$', 'count_trials'), #GET the number of trials, filtered by session variables.
     url(r'^subject/(?P<pk>\d+)/erp_data/$', 'erp_data'), #GET the erp_data for this subject, filtered by session variables.
+    url(r'^subject/(?P<pk>\d+)/recalculate_feature/(?P<feature_name>\w+)/$', 'recalculate_feature'), #Recalculate feature values
     url(r'^period/(?P<pk>\d+)/$',
         DetailView.as_view(
             model=Datum,

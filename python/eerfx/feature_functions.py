@@ -4,6 +4,8 @@ from scipy.optimize import curve_fit
 
 #helper functions
 def get_submat_for_datum_start_stop_chans(datum,x_start,x_stop,chan_label):
+	if isinstance(x_start,unicode): x_start=float(x_start)
+	if isinstance(x_stop,unicode): x_stop=float(x_stop)
 	temp_store=datum.store
 	x_vec=temp_store.x_vec
 	y_mat=temp_store.data
