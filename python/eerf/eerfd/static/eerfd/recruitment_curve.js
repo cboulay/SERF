@@ -40,6 +40,8 @@ $(document).ready(function () {
     	, {"subject_pk": subject_pk, "x_name": $('select.x_name').val(), "y_name": $('select.y_name').val()}
     	, function(result){
     		result = JSON.parse(result);
+    		var last_xy = result[0].data[result[0].data.length-1];
+    		result[1] = {"label": "Last", "data": [last_xy]};
     		$.plot($('div.recruitment_wrapper'), result, recruitment_options);
     	});
     };
