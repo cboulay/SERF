@@ -2,8 +2,12 @@ $(document).ready(function () {
 		
     var erp_options = {
         series: {
-            lines: { show: true },
-            points: { show: false }
+            lines: {
+            	show: true,
+            	lineWidth: 1
+        	},
+            points: { show: false },
+            shadowSize: 0
         },
         legend: { show: false },
         xaxis: { tickDecimals: 0 },
@@ -11,36 +15,45 @@ $(document).ready(function () {
     };
     
     //Download the data and plot the ERPs.
-    var placeholder=[];
-    var checkboxes=[];
-    var plot=[];
     var plot_erps = function() {
     	$.get("http://127.0.0.1:8000/eerfd/subject/" + subject_pk + "/erp_data/", {}, function(response) {
 	    	response = JSON.parse(response);
 	    	
 	    	//Empty the wrappers
-	    	$('div.erp_wrapper').empty();
 	    	$('div.channel_wrapper').empty();
+	    	$('div.erp_wrapper').empty();
 	    	
 		    for (var i=0; i<response['channel_labels'].length; i++){
 		    	//Plots
 		    	var new_div = $('<div style="width:680px; height:300px"></div>');
 		    	new_div.addClass(response.channel_labels[i]);
 		    	$('div.erp_wrapper').append(new_div);
-		    	placeholder[i] = $("."+ response.channel_labels[i]);
-			    plot[i] = $.plot(placeholder[i], response.data[response.channel_labels[i]], erp_options);
+		    	
+		    	//Hook into plot so we can modify the (first?) series' options
+		    	var ch_data = response.data[response.channel_labels[0]];
+		    	window.newest_label = ch_data[ch_data.length-1].label;
+		    	var series_hook = function(plot, canvascontext, series) {
+		    		if (series.label==window.newest_label){
+		    			series.color = "rgb(255,0,0)";
+		    			series.lines.lineWidth = 5;
+		    			series.shadowSize=5;
+		    		}
+		    	};
+		    	
+			    var plot = $.plot(new_div, response.data[response.channel_labels[i]], $.extend(erp_options, { hooks: { drawSeries: [series_hook] }}));
 			    
 			    //Checkboxes for channel labels.
+			    var new_hidden = $('<input type="hidden" value="off" name=' + response.channel_labels[i] + ' />')
+			    $('div.channel_wrapper').append(new_hidden);
 		    	var new_check = $('<input type="checkbox" name=' + response.channel_labels[i] + ' checked>' + response.channel_labels[i] + '</input>');
 		    	new_check.addClass(response.channel_labels[i]);
 		    	$('div.channel_wrapper').append(new_check);
-		    	checkboxes[i] = $("input."+response.channel_labels[i]);
-		    	checkboxes[i].click(function(el){
+		    	$("input."+response.channel_labels[i]).change(function(el){
 		    		$('div.'+el.srcElement.className).toggle($('input.'+el.srcElement.className)[0].checked);
 		    	});
-		    	
+			    
 		    	//Binding for clicking on the plot
-		    	placeholder[i].bind("plotselected", function (event, ranges) {
+		    	new_div.bind("plotselected", function (event, ranges) {
 		    		selected_range = [ranges.xaxis.from, ranges.xaxis.to];
 			        //$("#selection").text(ranges.xaxis.from.toFixed(1) + " to " + ranges.xaxis.to.toFixed(1));
 			        $('input.first_detail').val(selected_range[0].toFixed(1));
@@ -48,6 +61,18 @@ $(document).ready(function () {
 			        $('input.channel_detail').val(event.target.className);
 			    });
 		    };
+		    
+		    //Get the session values and uncheck boxes that were saved as unchecked.
+		    $.get("http://127.0.0.1:8000/eerfd/my_session/", {}, function(result) {
+				result = JSON.parse(result);
+				var checkboxes = $('div.channel_wrapper').children('input:checkbox');
+				for (var i=0; i<checkboxes.length; i++){
+					if (result.hasOwnProperty(checkboxes[i].name)){
+						checkboxes[i].checked = result[checkboxes[i].name]=="on";
+						$('div.'+checkboxes[i].className).toggle(checkboxes[i].checked);
+					}
+				}
+			});
 	    });
     };
     $(window).on("new_data", plot_erps);
@@ -71,8 +96,7 @@ $(document).ready(function () {
     		$('input.' + my_class).attr('name', $('select.'+my_class).val());
     	});
     }
-    
-    
+        
     //Plot the erps initially
     plot_erps();
 });

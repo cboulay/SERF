@@ -100,17 +100,22 @@ def count_trials(request, pk): #GET number of trials for subject. Uses session v
 def erp_data(request, pk): #Gets ERP data for a subject. Uses session variables. Non-rendering.
     [x_min,x_max] = [-10.0,100.0]
     
-    store_man = store_man_for_request_subject(request, pk)
-    n_stores = store_man.count()
+    #Get the manager for datum_store... and reverse its order
+    store_man = store_man_for_request_subject(request, pk).order_by('-pk')
     
-    if n_stores>0:
+    #Get the last trial_limit trials
+    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    trial_limit = int(my_session['trial_limit']) if my_session.has_key('trial_limit') and int(my_session['trial_limit'])>0 else store_man.count()
+    store_man = store_man[0:trial_limit]
+    
+    #Return the channel_labels and data
+    if store_man.count()>0:
         n_channels = [st.n_channels for st in store_man]
         channel_labels = store_man[np.nonzero(n_channels==np.max(n_channels))[0][0]].channel_labels
         data = dict([(chlb, [{'label': st.pk, 'data': np.column_stack((st.x_vec[np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)], st.data[channel_labels.index(chlb),np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)])).tolist()} for st in reversed(store_man)]) for chlb in channel_labels])
     else:
         channel_labels = ''
-        data = {}
-        
+        data = {}        
     return HttpResponse(json.dumps({'data': data, 'channel_labels': channel_labels}))
 
 #===============================================================================
@@ -139,10 +144,19 @@ def my_session(request):
         return HttpResponse(json.dumps(my_session, cls=DjangoJSONEncoder))
     elif request.method == 'POST':
         my_post = request.POST.copy()#mutable copy of POST
-        my_session['trial_start'] = datetime.datetime.strptime(my_post['trial_start'], '%Y-%m-%dT%H:%M:%S') if my_post.has_key('trial_start') else request.session.get('trial_start', datetime.datetime.now())
-        my_session['trial_stop'] = datetime.datetime.strptime(my_post['trial_stop'], '%Y-%m-%dT%H:%M:%S') if my_post.has_key('trial_stop') else request.session.get('trial_stop', datetime.datetime.now() + datetime.timedelta(hours = 1))    
-        my_session['monitor'] = my_post.has_key('monitor') if my_post.has_key('trial_start') else True
-        for key in my_session: request.session[key] = my_session[key] #Put the values back into request.session
+        my_post.pop('csrfmiddlewaretoken', None)
+        
+        #Fix date values
+        date_format = '%b %d %Y %X'#date_format = '%Y-%m-%dT%H:%M:%S'
+        date_keys = ['trial_start', 'trial_stop']
+        for key in date_keys:
+            my_post[key] = datetime.datetime.strptime(my_post[key], date_format) if my_post.has_key(key) else request.session.get(key, datetime.datetime.now())
+            
+        #Other values to fix
+        my_post['monitor'] = my_post.has_key('monitor') if my_post.has_key('trial_start') else True
+        
+        #Put the values back into request.session
+        for key in my_post: request.session[key] = my_post[key]
         return HttpResponseRedirect(request.META['HTTP_REFERER'])
     
 @require_http_methods(["GET"])
@@ -176,59 +190,3 @@ def erps(request, trial_pk_csv='0'):
         data = '{}'
     return render_to_response('eerfd/erp_data.html',{'data': data})
                     #,context_instance=RequestContext(request))
-                    
-#===============================================================================
-# Rendering views that are not specific to a model
-#===============================================================================
-def monitor(request, pk, n_erps = 5):
-    [x_min,x_max] = [-10.0,100.0]
-    #Shows most recent n_erps ERPs with pk greater than or equal to pk
-    pk = int(pk) if len(pk)>0 else 0#pk after which to get trial data
-    stores = DatumStore.objects.filter(pk__gte=pk).order_by('-pk')[0:n_erps]#trial data
-    #stores = [st for st in stores]#if using iterator()
-    #n_stores = len(stores)#how many trials with data were found
-    n_stores = stores.count()
-    #===========================================================================
-    # Situations:
-    # 1: We got here with pk=0 and there are no trials: no data, oldest_pk = 0. default.
-    # 2: We got here with pk=0 and there are some old trials: no data, oldest_pk is future pk
-    # 3: We got here with pk>0 and there are no trials (future pk): no data, oldest_pk is still future pk, also default
-    # 4: We got here with pk>0 and there are some trials: data, oldest_pk is that of the oldest returned trial
-    #===========================================================================
-    #data = [{ "label": pk, "data": [[-50,100],[0,0]]}]
-    data = []
-    oldest_pk = pk
-    channel_labels = []
-    if pk==0:
-        if n_stores==0:#1
-            pass
-        else:#2
-            oldest_pk = stores[0].pk + 1
-    else:
-        if n_stores==0:#3
-            pass
-        else:#4
-            n_channels = [st.n_channels for st in stores]
-            channel_labels = stores[np.nonzero(n_channels==np.max(n_channels))[0][0]].channel_labels
-            #data = [{"label": st.pk, "data": np.column_stack((st.x_vec.T,st.data.T[:,0])).tolist()} for st in stores]
-            #===================================================================
-            # This next line is incredibly complicated. it's the equivalent of the following loops.
-            # data = {}
-            # for chlb in channel_labels:#for each channel
-            #    data[chlb] = []
-            #    for i in range(n_stores):#For each returned ERP
-            #        st = stores[i]
-            #        data[chlb].append({})
-            #        data[chlb][i]['label'] = st.pk
-            #        x_bool = np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)
-            #        x_vals = st.x_vec[x_bool]
-            #        y_vals = st.data[channel_labels.index(chlb),x_bool]
-            #        data[chlb][i]['data'] = [x_vals, y_vals]
-            #    data[chlb].reverse()
-            #===================================================================
-            data = dict([(chlb, [{'label': st.pk, 'data': np.column_stack((st.x_vec[np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)], st.data[channel_labels.index(chlb),np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)])).tolist()} for st in reversed(stores)]) for chlb in channel_labels])    
-            oldest_pk = stores[n_stores-1].pk
-            
-    #return HttpResponse(json.dumps(data))
-    return render_to_response('eerfd/monitor.html', {'oldest_pk': oldest_pk, 'data': json.dumps(data), 'channel_labels': channel_labels, 'channel_labels_s': json.dumps(channel_labels)},
-                              context_instance=RequestContext(request)) 

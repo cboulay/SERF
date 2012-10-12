@@ -1,5 +1,9 @@
-<div class="channel_wrapper">
-</div>
+<form action="/eerfd/my_session/" method="post">
+	{% csrf_token %}
+	<div class="channel_wrapper">
+	</div>
+	<input type="submit" value="Save" />
+</form>
 <div class="erp_wrapper">
 </div>
 <select name="Start:" class="first_detail">
