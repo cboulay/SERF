@@ -3,7 +3,7 @@
 - [eerf](https://github.com/cboulay/EERF/tree/master/python/eerf) is a Django project and app.
 - [eerfx](https://github.com/cboulay/EERF/tree/master/python/eerfx) is a simple Python package
 that contains a few helpers for EERF. It can be installed as a Python package using setup.py
-found in this directory.
+found in this directory. eerfx also contains feature_functions.py which is a list of functions for calculating features from raw ERP waveforms.
 - scratch.py is a file I use for quick debugging of test code. You can ignore it.
 - standalone.py has some examples for using the Django ORM outside of a Django web server environment.
 
@@ -17,6 +17,8 @@ VisionEgg which is incompatible with newer versions of PyOpenGL. Work is underwa
 compatible with newer versions of Python and these other packages, but for now, you are probably
 better off simply installing Python as described on the BCPy2000 page.
 See [here](http://www.bci2000.org/phpbb/viewtopic.php?f=1&t=1330) for a discussion on using BCPy2000 with modern packages.
+I use Python 2.6 and it is possible that some of my code does not work with Python 2.5. If that is the case,
+please let me know and I will help you get a Python 2.6 installation with the correct versions of the dependencies.
 
 Beyond the installation listed there, this project also requires MySQL, Django and MySQL-python.
 [Django](https://docs.djangoproject.com/en/1.4/intro/install/) has extensive documentation on 
@@ -33,13 +35,13 @@ For OSX, try the code below (modify the PATH to match your installed version)
 #export CC=gcc-4.2
 #export PATH="/Library/Frameworks/Python.framework/Versions/2.7/bin:${PATH}"
 #easy_install mysql-python
-#sudo pip install MySQL-python==1.2.3c1
+#pip install MySQL-python==1.2.3c1
 
 ```
 
 ### Installing this project/app
 
-We need to add some useful tools for dealing with the eerf data. Change to the EERF/python directory and execute
+Install eerfx first. Change to the EERF/python directory and execute
 
 ```
 python setup.py install
@@ -51,8 +53,8 @@ Tell Django to setup the database. From a console, switch to the EERF/python/eer
 python manage.py syncdb
 ```
 
-This should setup the database for use with Django. You should now be able to use 
-[MyBCPyModules](https://github.com/cboulay/MyBCPyModules) with this provided ORM.
+This should setup the database for use with Django.
+[MyBCPyModules](https://github.com/cboulay/MyBCPyModules) should now be able to use this ORM.
 
 ### Interacting with the data
 
@@ -69,6 +71,7 @@ and then viewing its data.
 #### In a custom Python program
 
 To access the ORM from within a separate Python program, we have to set the proper environment variable so the module knows where to find the ORM. 
+Your script should start with the following (change the directory as needed).
 
 ```python
 import os

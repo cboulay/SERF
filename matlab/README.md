@@ -1,5 +1,6 @@
-This is out of date. I'm working on a new API.
+This is out of date. I'm working on a new API that uses the new schema and ORM.
 
+--------------------------------
 This is the API for accessing the EERAT database in MATLAB.
 Try it as follows (see test.m):
 >>tools_paths; %Script to set the paths.
