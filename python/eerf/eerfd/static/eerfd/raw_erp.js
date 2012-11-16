@@ -29,7 +29,7 @@ $(document).ready(function () {
 		    	new_div.addClass(response.channel_labels[i]);
 		    	$('div.erp_wrapper').append(new_div);
 		    	
-		    	//Hook into plot so we can modify the (first?) series' options
+		    	//Hook into plot so we can modify the (last?) series' options
 		    	var ch_data = response.data[response.channel_labels[0]];
 		    	window.newest_label = ch_data[ch_data.length-1].label;
 		    	var series_hook = function(plot, canvascontext, series) {
@@ -40,7 +40,34 @@ $(document).ready(function () {
 		    		}
 		    	};
 		    	
-			    var plot = $.plot(new_div, response.data[response.channel_labels[i]], $.extend(erp_options, { hooks: { drawSeries: [series_hook] }}));
+		    	//Get min and max values for the y-axis in a certain range.
+		    	var miny = Infinity;
+		    	var maxy = -Infinity;
+		    	var yst = 3.0;
+		    	for (var tt=0; tt<ch_data.length; tt++){
+		    		var trial_data = ch_data[tt].data;
+		    		for (var ss=0; ss<trial_data.length; ss++){
+		    			if (trial_data[ss][0] >= yst) {
+		    				miny = Math.min(miny, trial_data[ss][1]);
+		    				maxy = Math.max(maxy, trial_data[ss][1]);
+		    			}
+		    		}
+		    		/*
+		    		miny = trial_data.reduce(function(previousValue, currentValue, index, array){
+		    			return currentValue[0]>= yst ? Math.min(previousValue, currentValue[1]) : previousValue;
+		    		}, miny);
+		    		maxy = trial_data.reduce(function(previousValue, currentValue, index, array){
+		    			return currentValue[0] >= yst ? Math.max(previousValue, currentValue[1]) : previousValue;
+		    		}, maxy);*/
+		    	}
+		    	
+			    var plot = $.plot(new_div,
+			    	response.data[response.channel_labels[i]],
+			    	$.extend(erp_options, {
+			    		hooks: { drawSeries: [series_hook] },
+			    		yaxis: {min: miny, max: maxy}
+		    		})
+		    	);
 			    
 			    //Checkboxes for channel labels.
 			    var new_hidden = $('<input type="hidden" value="off" name=' + response.channel_labels[i] + ' />')

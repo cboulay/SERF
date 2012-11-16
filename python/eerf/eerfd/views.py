@@ -98,7 +98,7 @@ def count_trials(request, pk): #GET number of trials for subject. Uses session v
 
 @require_http_methods(["GET"])
 def erp_data(request, pk): #Gets ERP data for a subject. Uses session variables. Non-rendering.
-    [x_min,x_max] = [-10.0,100.0]
+    [x_min,x_max] = [-10,100.0]
     
     #Get the manager for datum_store... and reverse its order
     store_man = store_man_for_request_subject(request, pk).order_by('-pk')
