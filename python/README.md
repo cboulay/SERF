@@ -9,21 +9,35 @@ found in this directory. eerfx also contains feature_functions.py which is a lis
 
 ### Installing Python and some Python packages
 
-Since these packages are designed to be used with [BCPy2000](http://bci2000.org/downloads/BCPy2000/BCPy2000.html),
-I will assume that you at least have read [its page](http://bci2000.org/downloads/BCPy2000/Download.html)
-on how to download and install Python and some packages for use with BCPy2000. As of this writing, BCPy2000
-requires an older version of IPython (0.10) which is incompatible with Python >=2.7. It also relies on
-VisionEgg which is incompatible with newer versions of PyOpenGL. Work is underway to make BCPy2000
-compatible with newer versions of Python and these other packages, but for now, you are probably
-better off simply installing Python as described on the BCPy2000 page.
-See [here](http://www.bci2000.org/phpbb/viewtopic.php?f=1&t=1330) for a discussion on using BCPy2000 with modern packages.
-I use Python 2.6 and it is possible that some of my code does not work with Python 2.5. If that is the case,
-please let me know and I will help you get a Python 2.6 installation with the correct versions of the dependencies.
+#### Before you start
+If you intend on using this repo with [BCPy2000](http://bci2000.org/downloads/BCPy2000/BCPy2000.html)
+and [MyBCPyModules](https://github.com/cboulay/MyBCPyModules) then please follow the instructions
+at MyBCPyModules first. Then return here and skip the next step on Installing Python.
 
-Beyond the installation listed there, this project also requires MySQL, Django and MySQL-python.
+### Installing Python
+I use the [graphical installer](http://www.python.org/download/).
+If you are using BCPy2000 then you should have already isntalled [this](http://www.python.org/download/releases/2.6.6/).
+Add the Python folder to your PATH environment variable.
+
+### Installing MySQL
+Download [here](http://dev.mysql.com/downloads/).
+Run the installer. Choose a custom install. Install Server, the Connectors, Workbench (optional) but not the Excel applications.
+Also make sure to set your data folder somewhere with lots of empty space.
+The default options are acceptable during the MySQL setup.
+[MySQL Workbench](http://dev.mysql.com/downloads/workbench/) is invaluable for basic database administration.
+
+### Installing Python packages/libraries
+The easiest way to install Python packages on Windows is to find the pre-compiled installers [here](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
+The best way to install packages is to use pip. The best way to install pip is with setup_tools. Get [that first](http://pypi.python.org/pypi/setuptools).
+After setuptools is installed, go to a command prompt and run 'easy_install pip'.
+Once pip is installed, almost all packages can be installed with 'pip install $packagename'
+
+#### Django
 [Django](https://docs.djangoproject.com/en/1.4/intro/install/) has extensive documentation on 
-how to download and install it with some links to help with MySQL installation. MySQL-python is
-mostly easy to install, but there are some tricks for OSX.
+how to download and install it with some links to help with MySQL installation.
+
+#### MySQL-python
+MySQL-python is mostly easy to install, but there are some tricks for OSX.
 For OSX, try the code below (modify the PATH to match your installed version)
 
 ```
@@ -38,6 +52,10 @@ For OSX, try the code below (modify the PATH to match your installed version)
 #pip install MySQL-python==1.2.3c1
 
 ```
+
+### Other packages
+This also relies on certain python packages that are also requirements of BCPy2000, which you may have installed already, including:
+numpy and scipy.
 
 ### Installing this project/app
 
@@ -56,9 +74,9 @@ python manage.py syncdb
 This should setup the database for use with Django.
 [MyBCPyModules](https://github.com/cboulay/MyBCPyModules) should now be able to use this ORM.
 
-### Interacting with the data
+### Interacting with the data...
 
-#### In a web browser
+#### ...In a web browser
 
 In a terminal or command-prompt, change to the EERF/python/eerf directory and execute
 `python manage.py runserver`
@@ -68,7 +86,7 @@ This will provide you with basic access to the database models.
 Furthermore, you can access the /eerfd/ URL to get an interactive GUI. Try choosing a subject
 and then viewing its data.
 
-#### In a custom Python program
+#### ...In a custom Python program
 
 To access the ORM from within a separate Python program, we have to set the proper environment variable so the module knows where to find the ORM. 
 Your script should start with the following (change the directory as needed).
