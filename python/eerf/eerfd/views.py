@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import pdb
 from django.template import RequestContext
 from django.shortcuts import render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
@@ -11,6 +12,8 @@ from eerfd.models import *
 
 def index(request):
     #return render_to_response('eerfd/index.html')
+    #pdb.set_trace()
+    request.session.flush()
     return HttpResponseRedirect('/eerfd/subject/')
 
 #===============================================================================
@@ -35,7 +38,7 @@ def view_data(request, pk):#View data for subject with pk
                               {'subject': subject
                                },
                               context_instance=RequestContext(request))
-    
+
 #GET or POST details for subject. Non-rendering.
 @require_http_methods(["GET", "POST"])
 def set_details(request, pk):
@@ -80,7 +83,7 @@ def get_feature_values(request, pk, feature_name, json_vals_only=True):
     else:
         return dfvs_man
 
-def recalculate_feature(request, pk, feature_name):    
+def recalculate_feature(request, pk, feature_name):
     trial_man = Datum.objects.filter(subject__pk=pk, span_type=1, store__n_samples__gt=0)
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
     if my_session.has_key('trial_start'):
@@ -99,15 +102,15 @@ def count_trials(request, pk): #GET number of trials for subject. Uses session v
 @require_http_methods(["GET"])
 def erp_data(request, pk): #Gets ERP data for a subject. Uses session variables. Non-rendering.
     [x_min,x_max] = [-10,100.0]
-    
+
     #Get the manager for datum_store... and reverse its order
     store_man = store_man_for_request_subject(request, pk).order_by('-pk')
-    
+
     #Get the last trial_limit trials
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
     trial_limit = int(my_session['trial_limit']) if my_session.has_key('trial_limit') and int(my_session['trial_limit'])>0 else store_man.count()
     store_man = store_man[0:trial_limit]
-    
+
     #Return the channel_labels and data
     if store_man.count()>0:
         n_channels = [st.n_channels for st in store_man]
@@ -115,7 +118,7 @@ def erp_data(request, pk): #Gets ERP data for a subject. Uses session variables.
         data = dict([(chlb, [{'label': st.pk, 'data': np.column_stack((st.x_vec[np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)], st.data[channel_labels.index(chlb),np.logical_and(st.x_vec>=x_min,st.x_vec<=x_max)])).tolist()} for st in reversed(store_man)]) for chlb in channel_labels])
     else:
         channel_labels = ''
-        data = {}        
+        data = {}
     return HttpResponse(json.dumps({'data': data, 'channel_labels': channel_labels}))
 
 #===============================================================================
@@ -127,7 +130,7 @@ def get_xy(request):
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
     trial_man = Datum.objects.filter(subject__pk=getter['subject_pk'], span_type=1)
     trial_man = trial_man.filter(start_time__gte=my_session['trial_start']) if my_session.has_key('trial_start') else trial_man
-    trial_man = trial_man.filter(stop_time__lte=my_session['trial_stop']) if my_session.has_key('trial_stop') else trial_man 
+    trial_man = trial_man.filter(stop_time__lte=my_session['trial_stop']) if my_session.has_key('trial_stop') else trial_man
     trial_man = trial_man.filter(_detail_values__detail_type__name=getter['x_name'])
     trial_man = trial_man.filter(_feature_values__feature_type__name=getter['y_name'])
     trial_man = trial_man.distinct()
@@ -145,20 +148,22 @@ def my_session(request):
     elif request.method == 'POST':
         my_post = request.POST.copy()#mutable copy of POST
         my_post.pop('csrfmiddlewaretoken', None)
-        
-        #Fix date values
-        date_format = '%b %d %Y %X'#date_format = '%Y-%m-%dT%H:%M:%S'
+
+        #Fix date values. %b->Sep, %d->11, %Y->2001, %X->locale time
+        #Returned as '1/25/2013 6:46:03 AM'
+        #date_format = '%b %d %Y %X'#date_format = '%Y-%m-%dT%H:%M:%S'
+        date_format = '%m/%d/%Y %I:%M:%S %p'
         date_keys = ['trial_start', 'trial_stop']
         for key in date_keys:
             my_post[key] = datetime.datetime.strptime(my_post[key], date_format) if my_post.has_key(key) else request.session.get(key, datetime.datetime.now())
-            
+
         #Other values to fix
         my_post['monitor'] = my_post.has_key('monitor') if my_post.has_key('trial_start') else True
-        
+
         #Put the values back into request.session
         for key in my_post: request.session[key] = my_post[key]
         return HttpResponseRedirect(request.META['HTTP_REFERER'])
-    
+
 @require_http_methods(["GET"])
 def detail_types(request):
     dts = DetailType.objects.all()
