@@ -9,7 +9,7 @@ BEGIN
             ORDER BY datum.number DESC LIMIT 1); --
     END IF; --
     IF NEW.span_type = 'trial' THEN
-        -- If an stop_time was not specified, make the trial duration 1 second.
+        -- If a stop_time was not specified, make the trial duration 1 second.
         SET NEW.stop_time = COALESCE(NEW.stop_time, NEW.start_time + INTERVAL 1 SECOND); --
     END IF; --
     IF NEW.span_type = 'period' THEN
