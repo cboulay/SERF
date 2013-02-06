@@ -60,7 +60,7 @@ This Django project also relies on certain python packages that are also require
 ### Installing this project/app
 
 Install eerfx first: Change to the EERF/python directory and execute `python setup.py install`.
-
+Edit settings.py
 Tell Django to setup the database: From a console, switch to the EERF/python/eerf and execute
 `python manage.py syncdb`
 
