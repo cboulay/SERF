@@ -9,7 +9,7 @@ eerfd contains the app
 - templates/eerfd contains HTML for the GUI
 - static/eerfd contains javascript for the GUI
 - urls.py is where the browser's URL is matched to a function
-- views.py is where the mached functions reside
+- views.py is where the matched functions reside
 - models.py describes the data classes
 
 To understand the above, you should probably familiarize yourself with [Django](https://www.djangoproject.com/)
