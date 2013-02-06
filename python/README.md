@@ -83,8 +83,7 @@ This Django project also relies on certain python packages that are also require
 
 Install eerfx first: Change to the EERF/python directory and execute `python setup.py install`.
 
-Install the Django app next.
-
+Configure the Django app next.
 Edit python\eerf\eerf\settings.py and set the MySQL username and password, and further down set
 the [TIME_ZONE](http://www.postgresql.org/docs/8.1/static/datetime-keywords.html#DATETIME-TIMEZONE-SET-TABLE). 
 
@@ -93,7 +92,8 @@ Tell Django to setup the database: From a console, switch to the EERF/python/eer
 During this process, you should configure your project admin username and password.
 This should setup the database for use with Django.
 You may get some errors finishing with `_mysql_exceptions.ProgrammingError: (2014, "Commands out of sync; you can't run
-this command now")` but that doesn't seem to stop this from working.
+this command now")`
+but that doesn't seem to stop this from working.
 [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) should now be able to use this ORM.
 
 ### Interacting with the data...
