@@ -1,11 +1,12 @@
 <form action="/eerfd/my_session/" method="post">
-	{% csrf_token %}
-	<div class="channel_wrapper">
-	</div>
-	<input type="submit" value="Save" />
+    {% csrf_token %}
+    <div class="channel_wrapper">
+    </div>
+    <input type="submit" value="Save" />
 </form>
 <div class="erp_wrapper">
 </div>
+<p><label><input id="zoom" type="checkbox" />Zoom to selection.</label></p>
 <select name="Start:" class="first_detail">
 </select>
 <select name="Stop:" class="second_detail">
@@ -13,9 +14,9 @@
 <select name="Channel:" class="channel_detail">
 </select>
 <form action="/eerfd/subject/{{ subject.pk }}/set_details/" method="post">
-	{% csrf_token %}
-	<input type="text" class="first_detail">
-	<input type="text" class="second_detail">
-	<input type="text" class="channel_detail">
-	<input type="submit" value="Save" />
+    {% csrf_token %}
+    <input type="text" class="first_detail">
+    <input type="text" class="second_detail">
+    <input type="text" class="channel_detail">
+    <input type="submit" value="Save" />
 </form>
