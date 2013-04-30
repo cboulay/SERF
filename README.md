@@ -23,7 +23,7 @@ in a web app.
 Examples of using this ORM in a standalone application include
 [one of my BCPy2000 modules](https://github.com/cboulay/BCPyElectrophys/blob/master/ERPExtension.py),
 or a simple app [here](https://github.com/cboulay/EERF/blob/master/python/eerfx/utils/MonitorNewTrials.pyw).
-A generalized standalone implementation is [here](https://github.com/cboulay/EERF/blob/master/python/standalone.py)
+A generalized standalone template is [here](https://github.com/cboulay/EERF/blob/master/python/standalone.py)
 
 The provided Python Django project also includes a web app to interact with the data through a web browser and
 to export the data to a common data format (GDF). (Data export not yet implemented).
