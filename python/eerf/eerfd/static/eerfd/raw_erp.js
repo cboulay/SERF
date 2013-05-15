@@ -23,9 +23,16 @@ $(document).ready(function () {
             $('div.channel_wrapper').empty();
             $('div.erp_wrapper').empty();
 
+            var series_hook = function(plot, canvascontext, series) {
+                if (series.label==window.newest_label){
+                    series.color = "rgb(255,0,0)";
+                    series.lines.lineWidth = 3; //TODO: Make this configurable
+                    series.shadowSize=1; //TODO: Make this configurable
+                }
+            };
+
             var opt_extend = {
                     hooks: { drawSeries: [series_hook] },
-                    yaxis: {min: miny, max: maxy}
             };
             if ($("#zoom").attr("checked")==="checked" & parseFloat($('input.first_detail').val())){
                 $.extend(opt_extend, {
@@ -45,18 +52,11 @@ $(document).ready(function () {
                 //Hook into plot so we can modify the (last?) series' options
                 var ch_data = response.data[response.channel_labels[0]];
                 window.newest_label = ch_data[ch_data.length-1].label;
-                var series_hook = function(plot, canvascontext, series) {
-                    if (series.label==window.newest_label){
-                        series.color = "rgb(255,0,0)";
-                        series.lines.lineWidth = 1; //TODO: Make this configurable
-                        series.shadowSize=1; //TODO: Make this configurable
-                    }
-                };
 
                 //Get min and max values for the y-axis in a certain range.
                 var miny = Infinity;
                 var maxy = -Infinity;
-                var yst = 3.0;
+                var yst = 5.0;
                 for (var tt=0; tt<ch_data.length; tt++){
                     var trial_data = ch_data[tt].data;
                     for (var ss=0; ss<trial_data.length; ss++){
@@ -74,6 +74,10 @@ $(document).ready(function () {
                     }, maxy);*/
                 }
 
+                $.extend(opt_extend, {
+                    yaxis: {min: miny, max: maxy}
+                });
+
                 var plot = $.plot(new_div,
                     response.data[response.channel_labels[i]],
                     $.extend(erp_options, opt_extend)
@@ -88,16 +92,16 @@ $(document).ready(function () {
                 $("input."+response.channel_labels[i]).change(function(el){
                     $('div.'+el.srcElement.className).toggle($('input.'+el.srcElement.className)[0].checked);
                 });
-            };
 
-            //Binding for clicking on the plot
-            new_div.bind("plotselected", function (event, ranges) {
-                selected_range = [ranges.xaxis.from, ranges.xaxis.to];
-                //$("#selection").text(ranges.xaxis.from.toFixed(1) + " to " + ranges.xaxis.to.toFixed(1));
-                $('input.first_detail').val(selected_range[0].toFixed(1));
-                $('input.second_detail').val(selected_range[1].toFixed(1));
-                $('input.channel_detail').val(event.target.className);
-            });
+              //Binding for clicking on the plot
+                new_div.bind("plotselected", function (event, ranges) {
+                    selected_range = [ranges.xaxis.from, ranges.xaxis.to];
+                    //$("#selection").text(ranges.xaxis.from.toFixed(1) + " to " + ranges.xaxis.to.toFixed(1));
+                    $('input.first_detail').val(selected_range[0].toFixed(1));
+                    $('input.second_detail').val(selected_range[1].toFixed(1));
+                    $('input.channel_detail').val(event.target.className);
+                });
+            };
 
             //Get the session values and uncheck boxes that were saved as unchecked.
             $.get("http://127.0.0.1:8000/eerfd/my_session/", {}, function(result) {
