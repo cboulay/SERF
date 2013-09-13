@@ -1,0 +1,196 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <Name>eerf</Name>
+    <RootNamespace>eerf</RootNamespace>
+    <InterpreterId>{2af0f10d-7135-4994-9156-5d01c9c11b7e}</InterpreterId>
+    <InterpreterVersion>2.6</InterpreterVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>201c87b3-882f-4cbe-a6e9-a9b4be2fa776</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <ProjectTypeGuids>{5F0BE9CA-D677-4A4D-8806-6076C0FAAD37};{349c5851-65df-11da-9384-00065b846f21};{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <StartupFile>manage.py</StartupFile>
+    <SearchPath>
+    </SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <LaunchProvider>Django launcher</LaunchProvider>
+    <OutputPath>.</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="eerfd\admin.py" />
+    <Compile Include="eerfd\models.py" />
+    <Compile Include="eerfd\tests.py" />
+    <Compile Include="eerfd\urls.py" />
+    <Compile Include="eerfd\views.py" />
+    <Compile Include="eerfd\__init__.py" />
+    <Compile Include="manage.py" />
+    <Compile Include="eerf\__init__.py" />
+    <Compile Include="eerf\settings.py" />
+    <Compile Include="eerf\urls.py" />
+    <Compile Include="eerf\wsgi.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <WebPiReference Include="https://www.microsoft.com/web/webpi/3.0/toolsproductlist.xml%3fDjango">
+      <Feed>https://www.microsoft.com/web/webpi/3.0/toolsproductlist.xml</Feed>
+      <ProductId>Django</ProductId>
+      <FriendlyName>Django 1.4</FriendlyName>
+    </WebPiReference>
+    <WebPiReference Include="https://www.microsoft.com/web/webpi/3.0/toolsproductlist.xml%3fPython27">
+      <Feed>https://www.microsoft.com/web/webpi/3.0/toolsproductlist.xml</Feed>
+      <ProductId>Python27</ProductId>
+      <FriendlyName>Python 2.7</FriendlyName>
+    </WebPiReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="eerfd\" />
+    <Folder Include="eerfd\sql\" />
+    <Folder Include="eerfd\static\" />
+    <Folder Include="eerfd\static\eerfd\" />
+    <Folder Include="eerfd\templates\" />
+    <Folder Include="eerfd\templates\eerfd\" />
+    <Folder Include="eerf\" />
+    <Folder Include="eerf\static\" />
+    <Folder Include="eerf\static\flot\" />
+    <Folder Include="eerf\static\flot\examples\" />
+    <Folder Include="eerf\templates\" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="{2af0f10d-7135-4994-9156-5d01c9c11b7e}\2.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="eerfd\admin.pyc" />
+    <Content Include="eerfd\models.pyc" />
+    <Content Include="eerfd\sql\datum.sql" />
+    <Content Include="eerfd\sql\datumhasdatum.sql" />
+    <Content Include="eerfd\sql\detailtype.sql" />
+    <Content Include="eerfd\sql\featuretype.sql" />
+    <Content Include="eerfd\sql\subject.sql" />
+    <Content Include="eerfd\sql\subjectdetailvalue.sql" />
+    <Content Include="eerfd\sql\subjectlog.sql" />
+    <Content Include="eerfd\static\eerfd\raw_erp.js" />
+    <Content Include="eerfd\static\eerfd\recruitment_curve.js" />
+    <Content Include="eerfd\static\eerfd\trial_settings.js" />
+    <Content Include="eerfd\templates\eerfd\erp_data.html" />
+    <Content Include="eerfd\templates\eerfd\index.html" />
+    <Content Include="eerfd\templates\eerfd\period_detail.html" />
+    <Content Include="eerfd\templates\eerfd\raw_erp.html" />
+    <Content Include="eerfd\templates\eerfd\recruitment_curve.html" />
+    <Content Include="eerfd\templates\eerfd\subject_detail.html" />
+    <Content Include="eerfd\templates\eerfd\subject_list.html" />
+    <Content Include="eerfd\templates\eerfd\subject_view_data.html" />
+    <Content Include="eerfd\templates\eerfd\trial_settings.html" />
+    <Content Include="eerfd\urls.pyc" />
+    <Content Include="eerfd\views.pyc" />
+    <Content Include="eerfd\__init__.pyc" />
+    <Content Include="eerf\static\flot\API.txt" />
+    <Content Include="eerf\static\flot\examples\ajax.html" />
+    <Content Include="eerf\static\flot\examples\annotating.html" />
+    <Content Include="eerf\static\flot\examples\arrow-down.gif" />
+    <Content Include="eerf\static\flot\examples\arrow-left.gif" />
+    <Content Include="eerf\static\flot\examples\arrow-right.gif" />
+    <Content Include="eerf\static\flot\examples\arrow-up.gif" />
+    <Content Include="eerf\static\flot\examples\basic.html" />
+    <Content Include="eerf\static\flot\examples\data-eu-gdp-growth-1.json" />
+    <Content Include="eerf\static\flot\examples\data-eu-gdp-growth-2.json" />
+    <Content Include="eerf\static\flot\examples\data-eu-gdp-growth-3.json" />
+    <Content Include="eerf\static\flot\examples\data-eu-gdp-growth-4.json" />
+    <Content Include="eerf\static\flot\examples\data-eu-gdp-growth-5.json" />
+    <Content Include="eerf\static\flot\examples\data-eu-gdp-growth.json" />
+    <Content Include="eerf\static\flot\examples\data-japan-gdp-growth.json" />
+    <Content Include="eerf\static\flot\examples\data-usa-gdp-growth.json" />
+    <Content Include="eerf\static\flot\examples\graph-types.html" />
+    <Content Include="eerf\static\flot\examples\hs-2004-27-a-large_web.jpg" />
+    <Content Include="eerf\static\flot\examples\image.html" />
+    <Content Include="eerf\static\flot\examples\index.html" />
+    <Content Include="eerf\static\flot\examples\interacting-axes.html" />
+    <Content Include="eerf\static\flot\examples\interacting.html" />
+    <Content Include="eerf\static\flot\examples\layout.css" />
+    <Content Include="eerf\static\flot\examples\multiple-axes.html" />
+    <Content Include="eerf\static\flot\examples\navigate.html" />
+    <Content Include="eerf\static\flot\examples\percentiles.html" />
+    <Content Include="eerf\static\flot\examples\pie.html" />
+    <Content Include="eerf\static\flot\examples\realtime.html" />
+    <Content Include="eerf\static\flot\examples\resize.html" />
+    <Content Include="eerf\static\flot\examples\selection.html" />
+    <Content Include="eerf\static\flot\examples\setting-options.html" />
+    <Content Include="eerf\static\flot\examples\stacking.html" />
+    <Content Include="eerf\static\flot\examples\symbols.html" />
+    <Content Include="eerf\static\flot\examples\thresholding.html" />
+    <Content Include="eerf\static\flot\examples\time.html" />
+    <Content Include="eerf\static\flot\examples\tracking.html" />
+    <Content Include="eerf\static\flot\examples\turning-series.html" />
+    <Content Include="eerf\static\flot\examples\visitors.html" />
+    <Content Include="eerf\static\flot\examples\zooming.html" />
+    <Content Include="eerf\static\flot\excanvas.js" />
+    <Content Include="eerf\static\flot\excanvas.min.js" />
+    <Content Include="eerf\static\flot\FAQ.txt" />
+    <Content Include="eerf\static\flot\jquery.colorhelpers.js" />
+    <Content Include="eerf\static\flot\jquery.flot.crosshair.js" />
+    <Content Include="eerf\static\flot\jquery.flot.fillbetween.js" />
+    <Content Include="eerf\static\flot\jquery.flot.image.js" />
+    <Content Include="eerf\static\flot\jquery.flot.js" />
+    <Content Include="eerf\static\flot\jquery.flot.navigate.js" />
+    <Content Include="eerf\static\flot\jquery.flot.pie.js" />
+    <Content Include="eerf\static\flot\jquery.flot.resize.js" />
+    <Content Include="eerf\static\flot\jquery.flot.selection.js" />
+    <Content Include="eerf\static\flot\jquery.flot.stack.js" />
+    <Content Include="eerf\static\flot\jquery.flot.symbol.js" />
+    <Content Include="eerf\static\flot\jquery.flot.threshold.js" />
+    <Content Include="eerf\static\flot\jquery.js" />
+    <Content Include="eerf\static\flot\LICENSE.txt" />
+    <Content Include="eerf\static\flot\Makefile" />
+    <Content Include="eerf\static\flot\NEWS.txt" />
+    <Content Include="eerf\static\flot\PLUGINS.txt" />
+    <Content Include="eerf\static\flot\README.txt" />
+    <Content Include="eerf\static\jquery-1.8.2.min.js" />
+    <Content Include="eerf\templates\404.html" />
+    <Content Include="eerf\templates\base.html" />
+  </ItemGroup>
+  <Import Project="$(VSToolsPath)\Python Tools\Microsoft.PythonTools.Django.targets" />
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <AutoAssignPort>True</AutoAssignPort>
+          <UseCustomServer>True</UseCustomServer>
+          <CustomServerUrl>http://localhost</CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}" User="">
+        <WebProjectProperties>
+          <StartPageUrl>
+          </StartPageUrl>
+          <StartAction>CurrentPage</StartAction>
+          <AspNetDebugging>True</AspNetDebugging>
+          <SilverlightDebugging>False</SilverlightDebugging>
+          <NativeDebugging>False</NativeDebugging>
+          <SQLDebugging>False</SQLDebugging>
+          <ExternalProgram>
+          </ExternalProgram>
+          <StartExternalURL>
+          </StartExternalURL>
+          <StartCmdLineArguments>
+          </StartCmdLineArguments>
+          <StartWorkingDirectory>
+          </StartWorkingDirectory>
+          <EnableENC>False</EnableENC>
+          <AlwaysStartWebServerOnDebug>False</AlwaysStartWebServerOnDebug>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+</Project>
