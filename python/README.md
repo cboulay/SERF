@@ -127,3 +127,10 @@ my_subject = Subject.objects.get_or_create(name='Test')[0]
 
 See the Django documentation on how to work with these models or see [MyBCPyModules/ERPExtension](https://github.com/cboulay/MyBCPyModules/blob/master/ERPExtension.py)
 for an example of how to work with the models.
+
+### Data Description
+
+Run the server then navigate to http://127.0.0.1:8000/admin/doc/
+You can also find the models in models.png
+Finally, you can install django_extensions, and GraphViz, then issue the following command:
+`python manage.py graph_models -a -o models.png`

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # This is an auto-generated Django model module.
 # You'll have to do the following manually to clean this up:
 #     * Rearrange models' order
@@ -94,12 +95,18 @@ class CSVStringField(models.TextField):
 #===============================================================================
     
 class System(models.Model):
+    """
+    A quick identifier of the system. I cannot remember what this is useful for.
+    """
     name = models.CharField(max_length=135, primary_key=True)
     value = models.CharField(max_length=135, blank=True)
     class Meta:
         db_table = u'system'
         
 class Subject(models.Model):
+    """
+    A subject/animal/patient. Has detail_values_dict, a dict of its :model:`eerfd.SubjectDetailValue`.
+    """
     subject_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=135, unique=True)
     id = models.CharField(max_length=135, null=True, blank=True)
@@ -145,6 +152,11 @@ class Subject(models.Model):
         new_sdv.save()
 
 class SubjectLog(models.Model):
+    """
+    One-to-many child of :model:`eerfd.Subject`.
+    Contains an entry for significant changes to the subject.
+    Some changes, e.g. to subject_detail_values, are auto-generated.
+    """
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     #on_delete=models.CASCADE is the default. Note that this does not use the DBMS property but instead uses internal code.
     time = models.DateTimeField(null=True, blank=True, auto_now=True)

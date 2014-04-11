@@ -1,6 +1,6 @@
 INSERT INTO detail_type (Name, Description) VALUES
 	('BG_start_ms','Background start in ms'),
-	('BG_stop_ms','Background start in ms'),
+	('BG_stop_ms','Background stop in ms'),
 	('BG_chan_label','Background channel label'),
 	('MR_start_ms','M-response start in ms'),
 	('MR_stop_ms','M-response start in ms'),
