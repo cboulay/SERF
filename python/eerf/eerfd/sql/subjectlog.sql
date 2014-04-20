@@ -1,2 +1,0 @@
-CREATE TRIGGER sl_bef_ins BEFORE INSERT ON subject_log
-FOR EACH ROW SET NEW.time = COALESCE(NEW.time, NOW());

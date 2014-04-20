@@ -1,87 +1,85 @@
 # Evoked Electrophysiological Response Feedback (EERF)
 
-- [eerf](https://github.com/cboulay/EERF/tree/master/python/eerf) is a Django project and app.
-- [eerfx](https://github.com/cboulay/EERF/tree/master/python/eerfx) is a simple Python package
-that contains a few helpers for EERF. It can be installed as a Python package using setup.py
-found in this directory. eerfx also contains feature_functions.py which is a list of functions for calculating features from raw ERP waveforms.
-- scratch.py is a file I use for quick debugging of test code. You can ignore it.
-- standalone.py has some examples for using the Django ORM outside of a Django web server environment.
+This repository contains some tools to manage and analyze evoked electrophysiological response data.
+The data are stored in a database. The data are accessed either through an API mediated by Django (a Python package), or by Matlab.
+There are also some scripts, in both Python and Matlab, to help with data management and analysis.
 
-### Installing Python and some dependencies
+- [eerfapp](https://github.com/cboulay/EERF/tree/master/eerfapp) is a [Django](https://www.djangoproject.com/) (v >= 1.7) app.
+- eerfapp.sql Is some SQL to add some functionality when using non-Django API.
+- [eerfhelper](https://github.com/cboulay/EERF/tree/master/eerfhelper) is a simple 
+Python package that contains a few helper functions and classes for working with the data.
+- [eerfmatlab](https://github.com/cboulay/EERF/tree/master/eerfmatlab) contains 
+some tools for working with the data in Matlab (wildly outdated).
+- models.png is an image showing the relations between tables in the schema.
+- setup.py is a script to install eerfhelper (TODO: Remove reliance on installing it as a package).
+- standalone.py has some examples for how to interact with the data in Python without running a webserver.
 
-#### Before you start
-If you intend on using this repo with [BCPy2000](http://bci2000.org/downloads/BCPy2000/BCPy2000.html)
-and [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) then please follow the instructions
-at BCPyElectrophys first. Then return here and skip the next step on Installing Python.
+## Installation
 
-### Installing Python
-I used [Canopy](https://enthought.com/products/canopy/academic/), which came with Python 2.76 at the time.
+### Python and Django and Databases
 
-### Installing a database server.
-Since we will be using the database primarily with Django, it makes sense to use
-Django's [database installation instructions](https://docs.djangoproject.com/en/dev/topics/install/#database-installation).
-I'd like to use postgres eventually, but I am in a hurry and more familiar with MySQL, so I used that (MySQL Community Server 5.6.17).
+The main parts of these tools are the database and its API. The database
+schema is installed and configured using (Django)[https://www.djangoproject.com/download/],
+a (Python)[https://www.python.org/]-based web framework.
 
-Test that your database server is running.
+If you do not already have them installed, go ahead and install Python and Django.
+Note that I used Python 2.7.6 (via Canopy)[https://enthought.com/products/canopy/academic/]
+and Django 1.7b1 when writing this guide.
 
-#### Create a database called eerf
-E.g., in MySQL, this can be done either with the Workbench (a database is also called a schema) or the command line interface.
-The SQL command is `CREATE DATABASE eerf;`
+After Python and Django are installed, proceed with the Django tutorial 
+(found on the Django website; not linked because they are version-specific).
 
-#### Advanced MySQL
-MySQL has many security features and optimization features. For example, it is probably not a good idea to use
-the root mysql user for Django. Instead, you should create a separate mysql user that has limited read and write
-access. MySQL documentation is abundant on the web.
+Exactly which database management system is theoretically not important, but
+I only tested against MySQL Community Server 5.6.17. Furthers, if you plan 
+to convert from Elizan data then you should use MySQL.
 
-### Installing Python packages/libraries
-Python packages can be installed by [binary installers on Windows](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
-On any platform, Python packages can be installed using pip. pip may already be installed if you used a distribution (e.g., Canopy),
-otherwise you can install it with [setup_tools](http://pypi.python.org/pypi/setuptools) using the command 'easy_install pip'.
+#### MySQL-Python & OSX
 
-### Installing Django
-[Django](https://www.djangoproject.com/download/). I used v 1.6.2.
+If you are using MySQL then you will need to use [MySQL-Python](https://pypi.python.org/pypi/MySQL-python)
+to get Django to talk to the database back end. This can be rather tricky on a Mac.
+It seems that the MySQL bin and lib directories both need to be added to the path,
+and not just the user environment path but also the system path.
 
-#### Database-Python Connector
-This should already be in the Django database-installation instructions.
-
-Note, getting [MySQL-Python](https://pypi.python.org/pypi/MySQL-python) to work
-on a Mac can be rather tricky. You should add both the MySQL bin and lib directories to the path.
-(Not just the user environment path, but the system path that will Python will run in.)
-
-### Other packages
+#### Other Python packages
 Canopy should contain all the packages you need. If not using Canopy,
-you need numpy, ... (more to come).
+you need numpy, scipy, matplotlib, ... (more to come).
 
-### Installing this project/app
+#### Installing eerfhelper
+Change to the eerfhelper directory and run `python setup.py install`.
+TODO: Instead of installing it, try to make it sufficient to leave it in place
+and rely on its folder being in the path (usually true).
 
-Install eerfx first: Change to the EERF/python directory and execute `python setup.py install`.
+#### Installing eerfapp
 
-Configure the Django app next.
-Edit python\eerf\eerf\settings.py and set the MySQL username and password, and further down set
-the [TIME_ZONE](http://www.postgresql.org/docs/8.1/static/datetime-keywords.html#DATETIME-TIMEZONE-SET-TABLE). 
+- Install and configure a Django project.
+- Copy eerfapp folder, eerfapp.sql, eerfhelper folder next to your project's `manage.py`.
+- Edit your Django project's settings.py file and add 'eerfapp' to the list of INSTALLED_APPS.
 
-Tell Django to setup the database: From a console, switch to the EERF/python/eerf and execute
-`python manage.py syncdb`.
-During this process, you should configure your project admin username and password.
-This should setup the database for use with Django.
+Tell Django to setup the databases for this app. From a console,
+run the Django command(s) listed in the tutorial for your Django version.
+For me, it was a two step process:
 
-TODO: Fix these errors
+- `python manage.py makemigrations eerfapp`
+- `python manage.py migrate`
 
-```
-Failed to install custom SQL for eerfd.SubjectDetailValue model: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1")
-Failed to install custom SQL for eerfd.Datum model: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1")
-```
+#### Installing SQL triggers
 
-There's a bug where multi-line statements cannot be added automatically by Django. There was a workaround, but that no longer seems to work.
-So, for each of the following files, copy-paste the code into your SQL editor (e.g., MySQL Workbench) and run it.
-EERF/python/eerf/eerfd/sql/subjectdetailvalue.sql
-EERF/python/eerf/eerfd/sql/datum.sql
+While not strictly necessary, there are some triggers in eerfapp.sql that add some features.
+- Automatically log a new entry or a change to subject_detail_value
+- Automatically set the stop_time field of a datum to +1s for trials or +1 day for days/periods.*
+- Automatically set the number of a new datum to be the next integer greater than the latest for that subject/span_type.*
+
+*(Only necessary if using Matlab or other non-Django interface,
+otherwise this feature is built-in to eerfapp)
+
+These triggers can be installed by opening a shell and running
+`mysql -uroot mysite < eerfapp.sql`
+
+### Interacting with the data...
 
 Installing the database back-end is now done.
 
 [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) should now be able to use this ORM.
-
-### Interacting with the data...
 
 #### ...In a web browser
 
@@ -90,25 +88,25 @@ In a terminal or command-prompt, change to the EERF/python/eerf directory and ex
 This will start the development server and tell you the URL the server is running on.
 Open a browser and navigate to the specified URL and append `/admin/` to the end of the URL.
 Enter the credentials you specified in the previous step. This will provide you with basic access to the database models.
-Furthermore, you can access the /eerfd/ URL to get an interactive GUI. There isn't much data to look at just yet.
+
+Some of the views that come with eerfapp require your project to have jquery and flot available.
+
+TODO: Change the static\*.js to use relative paths.
 
 #### ...In a custom Python program
 
-To access the ORM from within a separate Python program, we have to set the proper environment variable so the program knows where to find the ORM.
-Your script should start with the following commands (change the directory as needed).
+See [standalone.py](https://github.com/cboulay/EERF/tree/master/standalone.py)
+for an example of how to load the data into Python without using a web server.
 
-```python
-import os
-sys.path.append(os.path.abspath('d:/tools/eerf/python/eerf'))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "eerf.settings")
-```
+#### ...In a custom non-Python program
 
-Now you can import the models and test it out.
+Note that I cannot currently get non-Django interfaces to do CASCADE ON DELETE.
+This is because Django creates foreign keys with a unique hash, and I cannot
+use custom SQL (e.g., via migrations) to access the key name, drop it, then
+add a new foreign key constraint with CASCADE ON DELETE set to on.
 
-```python
-from eerfd.models import Subject
-my_subject = Subject.objects.get_or_create(name='Test')[0]
-```
+Thus, to delete using an API other than Django, you'll have to delete items
+in order so as not to violate foreign key constraints.
+For example, to delete a subject, you'll have to delete all of its data in this order:
 
-See the Django documentation on how to work with these models or see [MyBCPyModules/ERPExtension](https://github.com/cboulay/MyBCPyModules/blob/master/ERPExtension.py)
-for an example of how to work with the models.
+DatumFeatureValue > DatumDetailValue > DatumStore > Datum > SubjectDetailValue > SubjectLog > Subject

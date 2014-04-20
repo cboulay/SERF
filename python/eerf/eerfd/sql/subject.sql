@@ -1,1 +1,0 @@
-INSERT INTO subject (Name) VALUES ('Test');
