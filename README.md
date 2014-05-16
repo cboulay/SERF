@@ -22,23 +22,23 @@ The main parts of these tools are the database and its API. The database
 schema is installed and configured using (Django)[https://www.djangoproject.com/download/],
 a (Python)[https://www.python.org/]-based web framework.
 
-If you do not already have them installed, go ahead and install Python and Django.
+If you do not already have them installed, go ahead and install Python then Django.
 Note that I used Python 2.7.6 (via Canopy)[https://enthought.com/products/canopy/academic/]
 and Django 1.7b1 when writing this guide.
 
+As part of the Django installation, you should (setup your database)[https://docs.djangoproject.com/en/dev/topics/install/#database-installation].
+I used MySQL Community Server 5.6.17 (any DBMS should work, but converting Elizan data requires MySQL).
+I used the MyISAM storage engine (because InnoDB is harder to tweak for performance with Elizan data)
+and I used the [MySQL-Python](https://pypi.python.org/pypi/MySQL-python) connector.
+On a Mac, it may be necessary to add both the MySQL bin and lib directories to both the user path and system path.
+
 After Python and Django are installed, proceed with the Django tutorial 
 (found on the Django website; not linked because they are version-specific).
-
-Exactly which database management system is theoretically not important, but
-I only tested against MySQL Community Server 5.6.17. Furthers, if you plan 
-to convert from Elizan data then you should use MySQL.
-
-#### MySQL-Python & OSX
-
-If you are using MySQL then you will need to use [MySQL-Python](https://pypi.python.org/pypi/MySQL-python)
-to get Django to talk to the database back end. This can be rather tricky on a Mac.
-It seems that the MySQL bin and lib directories both need to be added to the path,
-and not just the user environment path but also the system path.
+Some key steps you’ll need (please consult Django documentation if these fail):
+1 - Create a database named `mysite`. e.g., `echo "create database mysite character set utf8” | mysql -uroot`
+2 - Create the Django project. `django-admin.py startproject mysite`
+3 - Edit mysite/mysite/settings.py to point to your database. `’ENGINE’: ‘django.db.backends.mysql’, ’NAME’: ‘mysite’, ’USER’: ‘root’, ‘HOST’: ’127.0.0.1’, ‘PORT’: ‘3306’`
+4 - Install the base Django tables. `python manage.py migrate`
 
 #### Other Python packages
 Canopy should contain all the packages you need. If not using Canopy,
@@ -51,16 +51,13 @@ and rely on its folder being in the path (usually true).
 
 #### Installing eerfapp
 
-- Install and configure a Django project.
 - Copy eerfapp folder, eerfapp.sql, eerfhelper folder next to your project's `manage.py`.
 - Edit your Django project's settings.py file and add 'eerfapp' to the list of INSTALLED_APPS.
-
-Tell Django to setup the databases for this app. From a console,
-run the Django command(s) listed in the tutorial for your Django version.
-For me, it was a two step process:
-
-- `python manage.py makemigrations eerfapp`
+- Skip this step because I’ve done it for you: `python manage.py makemigrations eerfapp`
 - `python manage.py migrate`
+- Edit mysite/mysite/urls.py and add `url(r'^eerfapp/', include('eerfapp.urls')),` before `url(r'^admin/', include(admin.site.urls)),`
+
+If you get an error about missing sqlparse then you can either install it (`pip install sqlparse`) or turn off debugging in settings.py.
 
 #### Installing SQL triggers
 
@@ -83,13 +80,13 @@ Installing the database back-end is now done.
 
 #### ...In a web browser
 
-In a terminal or command-prompt, change to the EERF/python/eerf directory and execute
+In a terminal or command-prompt, change to the my site directory and execute
 `python manage.py runserver`.
 This will start the development server and tell you the URL the server is running on.
 Open a browser and navigate to the specified URL and append `/admin/` to the end of the URL.
 Enter the credentials you specified in the previous step. This will provide you with basic access to the database models.
 
-Some of the views that come with eerfapp require your project to have jquery and flot available.
+You can also go to URL/eerfapp/ . These are pages for interacting with eerfapp. Some of the pages that come with eerfapp require your project to have jquery and flot available.
 
 TODO: Change the static\*.js to use relative paths.
 
@@ -110,3 +107,11 @@ in order so as not to violate foreign key constraints.
 For example, to delete a subject, you'll have to delete all of its data in this order:
 
 DatumFeatureValue > DatumDetailValue > DatumStore > Datum > SubjectDetailValue > SubjectLog > Subject
+
+### Tips for installing MySQL
+
+Make sure your data directory is owned by mysql, group wheel, with drwxr-xr-x.
+Create a defaults file (usually /etc/my.cnf) with all of your settings.
+Run `sudo mysql_install_db --user=mysql --defaults-file=/etc/my.cnf`
+Run `mysqld_safe & --defaults-file=/etc/my.cnf`
+It is not necessary to specify the defaults file when using the default location (/etc/my.cnf).
