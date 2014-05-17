@@ -26,7 +26,9 @@ defdets = [('BG_start_ms','Background start in ms'),
 	('TMS_coil_rot','Coil rotation in deg'),
 	('Task_condition','Which task was used this trial? (e.g. 0 or 1)'),
 	('Task_start_ms','Task analysis window start in ms'),
-	('Task_stop_ms','Task analysis window stop in ms')]
+	('Task_stop_ms','Task analysis window stop in ms'),
+	('Conditioned_feature_name','feature_type.name of conditioned feature'),
+	('Conditioned_result','Whether the conditioned feature was rewarded')]
 	
 def def_det_typ(apps, schema_editor):
     DetailType = apps.get_model("eerfapp", "DetailType")

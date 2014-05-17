@@ -1,4 +1,4 @@
-from eerfd.models import *
+from eerfapp.models import *
 from django.contrib import admin
 
 class SubjectAdmin(admin.ModelAdmin):

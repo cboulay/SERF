@@ -19,19 +19,28 @@ some tools for working with the data in Matlab (wildly outdated).
 ### Python and Django and Databases
 
 The main parts of these tools are the database and its API. The database
-schema is installed and configured using (Django)[https://www.djangoproject.com/download/],
-a (Python)[https://www.python.org/]-based web framework.
+schema is installed and configured using [Django](https://www.djangoproject.com/download/),
+a [Python](https://www.python.org/)-based web framework.
 
 If you do not already have them installed, go ahead and install Python and Django.
-Note that I used Python 2.7.6 (via Canopy)[https://enthought.com/products/canopy/academic/]
+Note that I used Python 2.7.6 [via Canopy](https://enthought.com/products/canopy/academic/)
 and Django 1.7b1 when writing this guide.
 
 After Python and Django are installed, proceed with the Django tutorial 
 (found on the Django website; not linked because they are version-specific).
 
 Exactly which database management system is theoretically not important, but
-I only tested against MySQL Community Server 5.6.17. Furthers, if you plan 
+I only tested against MySQL Community Server 5.6.17. Further, if you plan
 to convert from Elizan data then you should use MySQL.
+MySQL will need to be optimized depending on your needs. At least make the following changes
+to your /etc/my.cnf (maybe using MySQL Workbench):
+```
+default-storage-engine = MyISAM
+query_cache_type = 1
+key_buffer_size = 2G
+query_cache_limit = 400M
+```
+
 
 #### MySQL-Python & OSX
 
@@ -52,15 +61,13 @@ and rely on its folder being in the path (usually true).
 #### Installing eerfapp
 
 - Install and configure a Django project.
-- Copy eerfapp folder, eerfapp.sql, eerfhelper folder next to your project's `manage.py`.
+- Copy the eerfapp folder, eerfapp.sql, and the eerfhelper folder next to your Django project's `manage.py`.
 - Edit your Django project's settings.py file and add 'eerfapp' to the list of INSTALLED_APPS.
 
 Tell Django to setup the databases for this app. From a console,
 run the Django command(s) listed in the tutorial for your Django version.
-For me, it was a two step process:
-
-- `python manage.py makemigrations eerfapp`
-- `python manage.py migrate`
+I've already made the migrations for you with `python manage.py makemigrations eerfapp`.
+All you need to do is install them using `python manage.py migrate`.
 
 #### Installing SQL triggers
 
