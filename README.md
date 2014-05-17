@@ -115,3 +115,11 @@ Create a defaults file (usually /etc/my.cnf) with all of your settings.
 Run `sudo mysql_install_db --user=mysql --defaults-file=/etc/my.cnf`
 Run `mysqld_safe & --defaults-file=/etc/my.cnf`
 It is not necessary to specify the defaults file when using the default location (/etc/my.cnf).
+
+Consider adding the following to my.cnf
+```
+default-storage-engine = MyISAM
+query_cache_type = 1
+key_buffer_size = 2G
+query_cache_limit = 400M
+```
