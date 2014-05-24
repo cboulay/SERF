@@ -32,6 +32,17 @@ def store_man_for_request_subject(request, pk): #Helper function to return a fil
 # Model-specific views
 #===============================================================================
 #/subject/, /subject/pk/, and /period/ are all automatic views.
+
+def subject_list(request): #View list of subjects and option to import
+	mySubjects = Subject.objects.all()
+	return render_to_response('eerfapp/subject_list.html',
+							{'subject_list': mySubjects},
+							context_instance=RequestContext(request))
+							
+def subject_import(request):
+	#
+	return render_to_response('eerfapp/subject_import.html', {}, context_instance=RequestContext(request))
+							
 def view_data(request, pk):#View data for subject with pk
     subject = Subject.objects.get(pk=pk)
     return render_to_response('eerfapp/subject_view_data.html',

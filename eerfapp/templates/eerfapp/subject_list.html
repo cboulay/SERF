@@ -1,9 +1,10 @@
 {% if subject_list %}
     <ul>
     {% for sub in subject_list %}
-        <li><a href="/eerfapp/subject/{{ sub.subject_id }}/">{{ sub }}</a></li>
+        <li><a href="{% url 'subject_list' sub.subject_id %}">{{ sub }}</a></li>
     {% endfor %}
     </ul>
 {% else %}
     <p>No subjects are available.</p>
+    <a href="{% url 'subject_import' %}">Import?</a>
 {% endif %}
