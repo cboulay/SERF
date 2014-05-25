@@ -1,15 +1,19 @@
 import json
 import numpy as np
-import pdb
-from django.template import RequestContext
-from django.shortcuts import render_to_response, get_object_or_404
-from django.core.urlresolvers import reverse
+import datetime
+from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods
-from django.http import HttpResponse, Http404, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect#, Http404
 from django.contrib.sessions.models import Session
 from django.core.serializers.json import DjangoJSONEncoder
-from eerfapp.models import *
+from eerfapp import models
+#import pdb
+#from django.core.urlresolvers import reverse
+#from django.template import RequestContext, loader
 
+#===============================================================================
+# Index. For now this is a redirect to something useful.
+#===============================================================================
 def index(request):
     #return render_to_response('eerfapp/index.html')
     #pdb.set_trace()
@@ -17,11 +21,11 @@ def index(request):
     return HttpResponseRedirect('/eerfapp/subject/')
 
 #===============================================================================
-# Helper
+# Helper functions (not views)
 #===============================================================================
 def store_man_for_request_subject(request, pk): #Helper function to return a filtered DatumStore manager.
-    store_man = DatumStore.objects.filter(datum__subject__pk=pk).filter(datum__span_type=1).filter(n_samples__gt=0)
-    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    store_man = models.DatumStore.objects.filter(datum__subject__pk=pk).filter(datum__span_type=1).filter(n_samples__gt=0)
+    my_session = models.Session.objects.get(pk=request.session.session_key).get_decoded()
     if my_session.has_key('trial_start'):
         store_man = store_man.filter(datum__start_time__gte=my_session['trial_start'])
     if my_session.has_key('trial_stop'):
@@ -29,34 +33,45 @@ def store_man_for_request_subject(request, pk): #Helper function to return a fil
     return store_man
 
 #===============================================================================
-# Model-specific views
+# Rendering views
 #===============================================================================
+
 #/subject/, /subject/pk/, and /period/ are all automatic views.
 
 def subject_list(request): #View list of subjects and option to import
-	mySubjects = Subject.objects.all()
-	return render_to_response('eerfapp/subject_list.html',
-							{'subject_list': mySubjects},
-							context_instance=RequestContext(request))
+    mySubjects = models.Subject.objects.all()
+    context = {'subject_list': mySubjects}
+    return render(request, 'eerfapp/subject_list.html', context)
 							
 def subject_import(request):
-	#
-	return render_to_response('eerfapp/subject_import.html', {}, context_instance=RequestContext(request))
+    #TODO: Get list of elizan subjects. Mark those that are already imported.
+    context = {'elizan_subjects': {} }
+    return render(request, 'eerfapp/subject_import.html', context)
 							
 def view_data(request, pk):#View data for subject with pk
-    subject = Subject.objects.get(pk=pk)
-    return render_to_response('eerfapp/subject_view_data.html',
-                              {'subject': subject
-                               },
-                              context_instance=RequestContext(request))
+    subject = get_object_or_404(models.Subject, pk=pk)
+    context = {'subject': subject}
+    return render(request, 'eerfapp/subject_view_data.html', context)
+    
+def erps(request, trial_pk_csv='0'):
+    #convert trial_pk_csv to trial_pk_list
+    trial_pk_list = trial_pk_csv.split(',')
+    if len(trial_pk_list[0])>0:
+        trial_pk_list = [int(val) for val in trial_pk_list]
+        stores = models.DatumStore.objects.filter(pk__in=trial_pk_list)
+        #subject = get_object_or_404(Subject, pk=subject_id)
+        data = ','.join(['"' + str(st.datum_id) + '": ' + json.dumps(st.erp.tolist()) for st in stores])
+        data = '{' + data + '}'
+    else:
+        data = '{}'
+    return render(request, 'eerfapp/erp_data.html',{'data': data})
 
-#GET or POST details for subject. Non-rendering.
+#===============================================================================
+# API: GET or POST. Non-rendering.
+#===============================================================================
 @require_http_methods(["GET", "POST"])
 def set_details(request, pk):
-     #==========================================================================
-     # return HttpResponse(json.dumps(request.POST.copy()))
-     #==========================================================================
-     subject = get_object_or_404(Subject, pk=pk)
+     subject = get_object_or_404(models.Subject, pk=pk)
      my_dict = request.POST.copy()
      my_dict.pop('csrfmiddlewaretoken', None)#Remove the token provided by the POST command
      for key in my_dict:
@@ -66,8 +81,8 @@ def set_details(request, pk):
 
 @require_http_methods(["GET"])
 def get_detail_values(request, pk, detail_name, json_vals_only=True):
-    detail_type = get_object_or_404(DetailType, name=detail_name)
-    ddvs_man = DatumDetailValue.objects.filter(datum__subject__pk=pk).filter(detail_type=detail_type)
+    detail_type = get_object_or_404(models.DetailType, name=detail_name)
+    ddvs_man = models.DatumDetailValue.objects.filter(datum__subject__pk=pk).filter(detail_type=detail_type)
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
     if my_session.has_key('trial_start'):
         ddvs_man = ddvs_man.filter(datum__start_time__gte=my_session['trial_start'])
@@ -81,8 +96,8 @@ def get_detail_values(request, pk, detail_name, json_vals_only=True):
 
 @require_http_methods(["GET"])
 def get_feature_values(request, pk, feature_name, json_vals_only=True):
-    feature_type = get_object_or_404(FeatureType, name=feature_name)
-    dfvs_man = DatumFeatureValue.objects.filter(datum__subject__pk=pk).filter(feature_type=feature_type)
+    feature_type = get_object_or_404(models.FeatureType, name=feature_name)
+    dfvs_man = models.DatumFeatureValue.objects.filter(datum__subject__pk=pk).filter(feature_type=feature_type)
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
     if my_session.has_key('trial_start'):
         dfvs_man = dfvs_man.filter(datum__start_time__gte=my_session['trial_start'])
@@ -95,7 +110,7 @@ def get_feature_values(request, pk, feature_name, json_vals_only=True):
         return dfvs_man
 
 def recalculate_feature(request, pk, feature_name):
-    trial_man = Datum.objects.filter(subject__pk=pk, span_type=1, store__n_samples__gt=0)
+    trial_man = models.Datum.objects.filter(subject__pk=pk, span_type=1, store__n_samples__gt=0)
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
     if my_session.has_key('trial_start'):
         trial_man = trial_man.filter(start_time__gte=my_session['trial_start'])
@@ -132,14 +147,11 @@ def erp_data(request, pk): #Gets ERP data for a subject. Uses session variables.
         data = {}
     return HttpResponse(json.dumps({'data': data, 'channel_labels': channel_labels}))
 
-#===============================================================================
-# Non-rendering views for some simple API tools
-#===============================================================================
 @require_http_methods(["GET"])
 def get_xy(request):
     getter = request.GET.copy()
     my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
-    trial_man = Datum.objects.filter(subject__pk=getter['subject_pk'], span_type=1)
+    trial_man = models.Datum.objects.filter(subject__pk=getter['subject_pk'], span_type=1)
     trial_man = trial_man.filter(start_time__gte=my_session['trial_start']) if my_session.has_key('trial_start') else trial_man
     trial_man = trial_man.filter(stop_time__lte=my_session['trial_stop']) if my_session.has_key('trial_stop') else trial_man
     trial_man = trial_man.filter(_detail_values__detail_type__name=getter['x_name'])
@@ -177,32 +189,30 @@ def my_session(request):
 
 @require_http_methods(["GET"])
 def detail_types(request):
-    dts = DetailType.objects.all()
+    dts = models.DetailType.objects.all()
     dt_names = [dt.name for dt in dts]
     return HttpResponse(json.dumps(dt_names))
 
 @require_http_methods(["GET"])
 def feature_types(request):
-    fts = FeatureType.objects.all()
+    fts = models.FeatureType.objects.all()
     ft_names = [ft.name for ft in fts]
     return HttpResponse(json.dumps(ft_names))
 
 def store_pk_check(request, pk):
     #Given a pk, return how many DatumStore objects we have with pk greater
     pk = int(pk) if len(pk)>0 else 0
-    n_stores = DatumStore.objects.filter(pk__gte=pk).count()
+    n_stores = models.DatumStore.objects.filter(pk__gte=pk).count()
     return HttpResponse(json.dumps(n_stores))
 
-def erps(request, trial_pk_csv='0'):
-    #convert trial_pk_csv to trial_pk_list
-    trial_pk_list = trial_pk_csv.split(',')
-    if len(trial_pk_list[0])>0:
-        trial_pk_list = [int(val) for val in trial_pk_list]
-        stores = DatumStore.objects.filter(pk__in=trial_pk_list)
-        #subject = get_object_or_404(Subject, pk=subject_id)
-        data = ','.join(['"' + str(st.datum_id) + '": ' + json.dumps(st.erp.tolist()) for st in stores])
-        data = '{' + data + '}'
-    else:
-        data = '{}'
-    return render_to_response('eerfapp/erp_data.html',{'data': data})
-                    #,context_instance=RequestContext(request))
+    
+@require_http_methods(["POST"])
+def import_elizan(request):
+    my_session = Session.objects.get(pk=request.session.session_key).get_decoded()
+    my_post = request.POST.copy()#mutable copy of POST
+    my_post.pop('csrfmiddlewaretoken', None)
+    selected_sub = my_post.has_key('subject_select')
+    subject_json = my_post['subject_json']
+    #TODO: parse JSON
+    #TODO: import subject.
+    return HttpResponseRedirect(request.META['HTTP_REFERER'])

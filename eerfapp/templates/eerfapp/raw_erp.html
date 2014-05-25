@@ -1,4 +1,4 @@
-<form action="{% url 'my_session' %}" method="post">
+<form action="{% url 'eerfapp:my_session' %}" method="post">
     {% csrf_token %}
     <div class="channel_wrapper">
     </div>
@@ -13,7 +13,7 @@
 </select>
 <select name="Channel:" class="channel_detail">
 </select>
-<form action="{% url 'set_details' subject.pk %}" method="post">
+<form action="{% url 'eerfapp:set_details' subject.pk %}" method="post">
     {% csrf_token %}
     <input type="text" class="first_detail">
     <input type="text" class="second_detail">

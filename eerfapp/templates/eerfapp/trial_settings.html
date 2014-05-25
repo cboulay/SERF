@@ -1,5 +1,5 @@
 <script type="text/javascript"> window.subject_pk = {{subject.pk}}; </script>
-<form action="{% url 'my_session' %}" method="post">
+<form action="{% url 'eerfapp:my_session' %}" method="post">
 	{% csrf_token %}
 	Trials from: <input type="text" class="trial_start" name="trial_start">
 	until: <input type="text" class="trial_stop" name="trial_stop">
