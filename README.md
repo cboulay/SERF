@@ -19,14 +19,14 @@ some tools for working with the data in Matlab (wildly outdated).
 ### Python and Django and Databases
 
 The main parts of these tools are the database and its API. The database
-schema is installed and configured using (Django)[https://www.djangoproject.com/download/],
-a (Python)[https://www.python.org/]-based web framework.
+schema is installed and configured using [Django](https://www.djangoproject.com/download/),
+a [Python](https://www.python.org/)-based web framework.
 
 If you do not already have them installed, go ahead and install Python then Django.
-Note that I used Python 2.7.6 (via Canopy)[https://enthought.com/products/canopy/academic/]
+Note that I used Python 2.7.6 [via Canopy](https://enthought.com/products/canopy/academic/)
 and Django 1.7b1 when writing this guide.
 
-As part of the Django installation, you should (setup your database)[https://docs.djangoproject.com/en/dev/topics/install/#database-installation].
+As part of the Django installation, you should [setup your database](https://docs.djangoproject.com/en/dev/topics/install/#database-installation).
 I used MySQL Community Server 5.6.17 (any DBMS should work, but converting Elizan data requires MySQL).
 I used the MyISAM storage engine (because InnoDB is harder to tweak for performance with Elizan data)
 and I used the [MySQL-Python](https://pypi.python.org/pypi/MySQL-python) connector.
@@ -59,6 +59,8 @@ and rely on its folder being in the path (usually true).
 
 If you get an error about missing sqlparse then you can either install it (`pip install sqlparse`) or turn off debugging in settings.py.
 
+TODO: [Make as a package](https://docs.djangoproject.com/en/dev/intro/reusable-apps/)
+
 #### Installing SQL triggers
 
 While not strictly necessary, there are some triggers in eerfapp.sql that add some features.
@@ -86,7 +88,7 @@ This will start the development server and tell you the URL the server is runnin
 Open a browser and navigate to the specified URL and append `/admin/` to the end of the URL.
 Enter the credentials you specified in the previous step. This will provide you with basic access to the database models.
 
-You can also go to URL/eerfapp/ . These are pages for interacting with eerfapp. Some of the pages that come with eerfapp require your project to have jquery and flot available.
+You can also go to URL/eerfapp/ . These are pages for interacting with eerfapp.
 
 TODO: Change the static\*.js to use relative paths.
 
