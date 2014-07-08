@@ -23,10 +23,10 @@ classdef TFBox < handle
             if nargin>2
                 tfparms = varargin{2};
             else
-                tfparms.ft_type = EERAT.TFBox.ft_type;
-                tfparms.freq_edges_hz = EERAT.TFBox.freq_edges_hz;
-                tfparms.win_sec = EERAT.TFBox.win_sec;
-                tfparms.win_step_sec = EERAT.TFBox.win_step_sec;
+                tfparms.ft_type = EERF.TFBox.ft_type;
+                tfparms.freq_edges_hz = EERF.TFBox.freq_edges_hz;
+                tfparms.win_sec = EERF.TFBox.win_sec;
+                tfparms.win_step_sec = EERF.TFBox.win_step_sec;
             end
             
             %Prepare the analysis.
@@ -50,10 +50,10 @@ classdef TFBox < handle
             if strcmpi(tfparms.ft_type,'filterbank')
                 if ~isfield(tfparms,'filterbank')
                     persistent filterbank%#ok<TLEV> %Instantiating a filterbank on every trial is rather slow.
-                    if ~strcmpi(class(filterbank),'EERAT.Filterbank')
+                    if ~strcmpi(class(filterbank),'EERF.Filterbank')
                         filter_meta.fs = fs;
                         filter_meta.freq_edges = tfparms.freq_edges_hz;
-                        filterbank = EERAT.Filterbank(filter_meta);
+                        filterbank = EERF.Filterbank(filter_meta);
                     end
                     tfparms.filterbank = filterbank;
                 end

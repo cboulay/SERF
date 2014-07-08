@@ -1,4 +1,4 @@
-classdef ERDTrial < EERAT.TFTrial
+classdef ERDTrial < EERF.TFTrial
     %Assumes the trial has a baseline window and a prestim window.
     %These windows are relative to trial.tvec.
     %For ana, requires that we have a buffer (see Fifobuffer)
@@ -21,7 +21,7 @@ classdef ERDTrial < EERAT.TFTrial
     end
     methods
         function obj = ERDTrial(varargin)
-            obj = obj@EERAT.TFTrial(varargin{:});
+            obj = obj@EERF.TFTrial(varargin{:});
             %TODO: set the buffer object if provided.
         end
         

@@ -1,4 +1,4 @@
-classdef System < EERAT.Db_obj
+classdef System < EERF.Db_obj
     properties (Constant) %These are abstract in parent class
         table_name='system';
         key_names={'Name'};
@@ -9,7 +9,7 @@ classdef System < EERAT.Db_obj
     end
     methods
         function obj = System(varargin)
-            obj = obj@EERAT.Db_obj(varargin{:});
+            obj = obj@EERF.Db_obj(varargin{:});
         end
         function value=get.Value(obj)
             value=obj.get_col_value('Value');

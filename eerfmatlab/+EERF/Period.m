@@ -1,21 +1,29 @@
-classdef Period < EERAT.Datum
+classdef Period < EERF.Datum
     properties (Dependent = true, Transient = true)
         trials
-        trial_class
     end
 %     properties (Hidden = true)
 %         trial_class = 'Trial'; %Saved to disk.
 %     end
     methods
         function period = Period(varargin)
-            period = period@EERAT.Datum(varargin{:});
+            period = period@EERF.Datum(varargin{:});
         end
         function trials = get.trials(period)
             %Since I have not implemented span_type="day", the only
             %possible children are trials, thus I can use the parent class
             %method.
-            trials=period.get_many_to_many('datum_has_datum',...
-                'parent_datum_id','datum_id','child_datum_id','datum_id',period.trial_class);
+            stmnt = sprintf(['SELECT datum_id FROM datum WHERE subject_id={Si} '...
+                'AND span_type=''trial'' AND start_time>=''%s'' AND stop_time<=''%s'''], period.StartTime, period.StopTime);
+            mo = period.dbx.statement(stmnt, {period.subject.subject_id});
+            n_trials = length(mo.datum_id);
+            if n_trials>0
+                trials(n_trials) = EERF.Trial(period.dbx);
+                trial_ids = num2cell(mo.datum_id);
+                [trials(:).datum_id] = trial_ids{:};
+            else
+                trials = [];
+            end
         end
         
         %The following functions are provided for convenience to speed up
@@ -110,12 +118,6 @@ classdef Period < EERAT.Datum
                 end
                 period.dbx.statement('COMMIT');
             end
-        end
-        
-        function trial_class = get.trial_class(period)
-            stmnt = 'SELECT TrialClass FROM datum_type WHERE datum_type_id = {Si}';
-            mo = period.dbx.statement(stmnt,{period.datum_type.datum_type_id});
-            trial_class = mo.TrialClass{1};
         end
     end
 end

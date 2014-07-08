@@ -1,4 +1,4 @@
-classdef MEPTrial < EERAT.TFTrial
+classdef MEPTrial < EERF.TFTrial
     properties (Dependent = true)
         mep
         isi
@@ -7,7 +7,7 @@ classdef MEPTrial < EERAT.TFTrial
     end
     methods
         function obj = MEPTrial(varargin)
-            obj = obj@EERAT.TFTrial(varargin{:});
+            obj = obj@EERF.TFTrial(varargin{:});
         end
         function mep = get.mep(trial)
             mep = trial.get_single_feature('MEP_p2p');

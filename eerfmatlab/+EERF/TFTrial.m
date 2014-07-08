@@ -1,4 +1,4 @@
-classdef TFTrial < EERAT.Trial
+classdef TFTrial < EERF.Trial
     %A trial that also has access to a time-frequency representation of the
     %erp data
     %I may also use the class for calculating specific spectral features
@@ -16,13 +16,13 @@ classdef TFTrial < EERAT.Trial
     end
     methods
         function obj = TFTrial(varargin)
-            obj = obj@EERAT.Trial(varargin{:});
+            obj = obj@EERF.Trial(varargin{:});
         end
         function tf_pow = get.tf_pow(trial)
             if isnan(trial.tf_pow_)
                 %Use the static methods of TFBox to calculate the
                 %time-frequency of this trial. Then store the results.
-                [tf_amp, trial.tf_tvec_, trial.tf_fvec_] = EERAT.TFBox.process(trial.erp, trial.xvec);
+                [tf_amp, trial.tf_tvec_, trial.tf_fvec_] = EERF.TFBox.process(trial.erp, trial.xvec);
                 trial.tf_pow_ = tf_amp.^2;
             end
             tf_pow = trial.tf_pow_;

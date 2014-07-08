@@ -1,4 +1,4 @@
-classdef DatumType < EERAT.GenericType
+classdef DatumType < EERF.GenericType
     properties (Constant) %These are abstract in parent class
         table_name='datum_type';
         key_names={'datum_type_id'};
@@ -13,7 +13,7 @@ classdef DatumType < EERAT.GenericType
     end
     methods
         function obj = DatumType(varargin)
-            obj = obj@EERAT.GenericType(varargin{:});
+            obj = obj@EERF.GenericType(varargin{:});
         end
         function detail_types=get.detail_types(self)
             detail_types=self.get_many_to_many('datum_type_has_detail_type',...

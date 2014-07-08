@@ -1,7 +1,7 @@
-classdef ERDMEPTrial < EERAT.ERDTrial & EERAT.MEPTrial
+classdef ERDMEPTrial < EERF.ERDTrial & EERF.MEPTrial
     methods
         function obj = ERDMEPTrial(varargin)
-            obj = obj@EERAT.ERDTrial(varargin{:});
+            obj = obj@EERF.ERDTrial(varargin{:});
         end
     end
 end

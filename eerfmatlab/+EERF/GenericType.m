@@ -1,11 +1,11 @@
-classdef GenericType < EERAT.Db_obj
+classdef GenericType < EERF.Db_obj
     properties (Dependent = true, Transient = true)
         Name;
         Description;
     end
     methods
         function obj = GenericType(varargin)
-            obj = obj@EERAT.Db_obj(varargin{:});
+            obj = obj@EERF.Db_obj(varargin{:});
         end
         function Name=get.Name(obj)
             Name=obj.get_col_value('Name');

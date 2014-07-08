@@ -1,4 +1,4 @@
-classdef SubjectType < EERAT.GenericType
+classdef SubjectType < EERF.GenericType
     properties (Constant) %These are abstract in parent class
         table_name='subject_type';
         key_names={'subject_type_id'};
@@ -11,7 +11,7 @@ classdef SubjectType < EERAT.GenericType
     end
     methods
         function obj = SubjectType(varargin)
-            obj = obj@EERAT.GenericType(varargin{:});
+            obj = obj@EERF.GenericType(varargin{:});
         end
         function detail_types=get.detail_types(self)
             detail_types=self.get_many_to_many('subject_type_has_detail_type',...

@@ -1,4 +1,4 @@
-classdef Experiment < EERAT.Db_obj
+classdef Experiment < EERF.Db_obj
     properties (Constant) %These are abstract in parent class
         table_name='experiment';
         key_names={'experiment_id'};
@@ -13,7 +13,7 @@ classdef Experiment < EERAT.Db_obj
     end
     methods
         function obj = Experiment(varargin)
-            obj = obj@EERAT.Db_obj(varargin{:});
+            obj = obj@EERF.Db_obj(varargin{:});
         end
         function Name=get.Name(obj)
             Name=obj.get_col_value('Name');
