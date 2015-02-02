@@ -20,12 +20,8 @@ To get up and running, we need a database server, Python, Django, the python-dat
 12. Edit ~/.profile and add the following lines.
     `export PATH=/usr/local/mysql/bin:$PATH`
     `export PATH=/usr/local/mysql/lib:$PATH`
-    `export LANG=en_US.UTF-8`
-    `export LC_ALL=en_US.UTF-8`
-    The first two lines are to make sure mysql-python works. The next two are to make sure spyder works.
 13. `source ~/.profile` or you may have to close and reopen terminal.
 14. `pip install mysql-python`
-15. Optional: `pip install spyder`  This is my preferred IDE for Python.
 
 ### On Windows
 
@@ -70,3 +66,56 @@ query_cache_type = 1
 key_buffer_size = 2G
 query_cache_limit = 400M
 ```
+`
+
+## Install Spyder, my preferred Python IDE
+
+1. Edit ~/.profile and add the following lines::
+    
+    export LANG=en_US.UTF-8
+    export LC_ALL=en_US.UTF-8
+
+2. `pip install spyder`
+
+3. Create a dock icon
+    
+    `mkdir /Applications/Spyder.app`
+    
+    `mkdir /Applications/Spyder.app/Contents`
+
+    `mkdir /Applications/Spyder.app/Contents/MacOS`
+
+    `mkdir /Applications/Spyder.app/Contents/Resources`
+    
+    Copy the following into /Applications/Spyder.app/Contents/Info.plist:
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"> 
+<plist version="1.0"> 
+    <dict> 
+        <key>CFBundleIconFile</key> 
+        <string>spyder</string> 
+    </dict> 
+</plist> 
+```
+
+    Copy the following into /Applications/Spyder.app/Contents/MacOS/spyder
+```
+#! /usr/local/bin/python
+
+import os
+import subprocess
+
+envstr = subprocess.check_output('source /etc/profile; source ~/.profile; printenv', shell=True)
+env = [a.split('=') for a in envstr.strip().split('\n')]
+os.environ.update(env)
+
+executable = '/usr/local/bin/spyder'
+arguments = [executable]
+
+os.execve(executable, arguments, os.environ)
+```
+
+    `chmod +xxx /Applications/Spyder.app/Contents/MacOS/spyder`
+    `curl -o /Applications/Spyder.app/Contents/Resources/spyder.icns https://spyderlib.googlecode.com/hg/img_src/spyder.icns`

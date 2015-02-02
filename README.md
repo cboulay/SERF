@@ -5,7 +5,7 @@ The data can be analyzed in real-time and complex features can be extracted from
 
 ## Contents List
 
-- [django-eerf](django-eerf/README.md) is a distribution containing my eerfapp Django web app and eerfhelper to facilitate use of this app outside of the web server context.
+- [django-eerf](django-eerf/README.md) is a python package containing my eerfapp Django web app and eerfhelper to facilitate use of this app outside of the web server context.
 - eerfapp.sql Is some SQL to add some functionality when using non-Django API.
 - [eerfmatlab](eerfmatlab/REAMDE.md) contains some tools for working with the data in Matlab (this is very outdated).
 - standalone.py has some examples for how to interact with the data in Python without running a webserver.
@@ -30,8 +30,7 @@ See [django-eerf](django-eerf/REAMDE.md).
 
 ### ...In a custom Python program
 
-See [standalone.py](https://github.com/cboulay/EERF/tree/master/standalone.py)
-for an example of how to load the data into Python without using a web server.
+See [standalone.py](./standalone.py) for an example of how to load the data into Python without using a web server.
 
 [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) should now be able to use this ORM.
 
