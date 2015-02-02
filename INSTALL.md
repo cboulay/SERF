@@ -66,7 +66,6 @@ query_cache_type = 1
 key_buffer_size = 2G
 query_cache_limit = 400M
 ```
-`
 
 ## Install Spyder, my preferred Python IDE
 
@@ -79,23 +78,18 @@ query_cache_limit = 400M
 
 3. Create a dock icon
     
-    `mkdir /Applications/Spyder.app`
-    
-    `mkdir /Applications/Spyder.app/Contents`
+```
+mkdir /Applications/Spyder.app
+mkdir /Applications/Spyder.app/Contents`
+mkdir /Applications/Spyder.app/Contents/MacOS
+mkdir /Applications/Spyder.app/Contents/Resources
+touch /Applications/Spyder.app/Contents/MacOS/spyder
+chmod +xxx /Applications/Spyder.app/Contents/MacOS/spyder
+curl -o /Applications/Spyder.app/Contents/Resources/spyder.icns https://spyderlib.googlecode.com/hg/img_src/spyder.icns
+touch /Applications/Spyder.app/Contents/Info.plist
+```    
 
-    `mkdir /Applications/Spyder.app/Contents/MacOS`
-
-    `mkdir /Applications/Spyder.app/Contents/Resources`
-
-    `touch /Applications/Spyder.app/Contents/MacOS/spyder`
-
-    `chmod +xxx /Applications/Spyder.app/Contents/MacOS/spyder`
-
-    `curl -o /Applications/Spyder.app/Contents/Resources/spyder.icns https://spyderlib.googlecode.com/hg/img_src/spyder.icns`
-
-    `touch /Applications/Spyder.app/Contents/Info.plist`
-    
-    Copy the following into /Applications/Spyder.app/Contents/Info.plist:
+Copy the following into /Applications/Spyder.app/Contents/Info.plist:
 
 ```
 <?xml version="1.0" encoding="UTF-8"?>
@@ -108,7 +102,7 @@ query_cache_limit = 400M
 </plist> 
 ```
 
-    Copy the following into /Applications/Spyder.app/Contents/MacOS/spyder
+Copy the following into /Applications/Spyder.app/Contents/MacOS/spyder
 
 ```
 #! /usr/local/bin/python
