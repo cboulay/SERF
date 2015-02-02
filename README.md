@@ -3,21 +3,12 @@
 EERF is a [Django](https://www.djangoproject.com/) web app and some helper tools to manage and analyze evoked electrophysiological response data.
 The data can be analyzed in real-time and complex features can be extracted from the data to drive feedback.
 
-
-The core of EERF is the database backend.
-The database schema is designed to provide a complete and flexible representation of epoched neurophysiological data.
-
-EERF also contains several interfaces for interacting with the database.
-There is the Django Python ORM, the Django webserver, and a basic Matlab ORM.
-
-There are also some scripts, in both Python and Matlab, to help with data management and analysis.
-
 ## Contents List
 
 - [django-eerf](django-eerf/README.md) is a distribution containing my eerfapp Django web app and eerfhelper to facilitate use of this app outside of the web server context.
 - eerfapp.sql Is some SQL to add some functionality when using non-Django API.
 - [eerfmatlab](eerfmatlab/REAMDE.md) contains some tools for working with the data in Matlab (this is very outdated).
-- models.png is an image showing the relations between tables in the schema.
+
 - setup.py is a script to install eerfhelper (TODO: Remove reliance on installing it as a package).
 - standalone.py has some examples for how to interact with the data in Python without running a webserver.
 

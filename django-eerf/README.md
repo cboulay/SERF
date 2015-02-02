@@ -2,9 +2,11 @@
 EERFAPP
 =====
 
-EERFAPP is a simple Django app to...
+eerfapp is a Django app. The core of the app is its database. The database schema is designed to provide a complete and flexible representation of epoched neurophysiological data.
 
-Detailed documentation is in the "docs" directory.
+![Database Schema](/models.png?raw=true "Database Schema")
+
+TODO: Detailed documentation in the "docs" directory.
 
 Quick start
 -----------

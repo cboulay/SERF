@@ -1,14 +1,10 @@
-## Prepare your system
-
-Note: If you already have a working Django installation, you can skip ahead to "EERFAPP" below.
-
-### Installing Python and Django and Databases
+## Installing Python and Django and Databases
 
 The most important parts of these tools are the database and its interfaces. The database schema is installed and configured using [Django](https://www.djangoproject.com/download/), a [Python](https://www.python.org/)-based web framework.
 
 To get up and running, we need a database server, Python, Django, the python-database connector, Python's scientific packages, and some other Python packages. Platform-specific instructions are below.
 
-#### On OS X
+### On OS X
 
 1. Install [homebrew](http://brew.sh/).
 2. `brew install python`
@@ -31,11 +27,11 @@ To get up and running, we need a database server, Python, Django, the python-dat
 14. `pip install mysql-python`
 15. Optional: `pip install spyder`  This is my preferred IDE for Python.
 
-#### On Windows
+### On Windows
 
 TODO
 
-### Configuring the database server and Django
+## Configuring the database server and Django
 
 Though any DBMS should work, I use MySQL because some of the data I work with were originally recorded into MySQL. I use the MyISAM storage engine because I had trouble getting good performance out of InnoDB when working with these old data. If you followed the instructions above then mysql and its python connector should already be installed.
 Many of the instructions are from the [Django tutorial](https://docs.djangoproject.com/en/dev/intro/tutorial01/):
@@ -56,3 +52,5 @@ Many of the instructions are from the [Django tutorial](https://docs.djangoproje
 5. Test Django
     - `python manage.py runserver`
     - Navigate to `http://127.0.0.1:8000/`
+
+You are now ready to install the Django [django-eerf/README.md](eerf web application).
