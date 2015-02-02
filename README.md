@@ -73,13 +73,13 @@ Many of the instructions are from the [Django tutorial](https://docs.djangoproje
 3. Configure the Django project.
     1. Edit mysite/settings.py to point to the database. `’ENGINE’: ‘django.db.backends.mysql’, ’NAME’: ‘mysite’, ’USER’: ‘root’, ‘HOST’: ’127.0.0.1’, ‘PORT’: ‘3306’`
     2. Create the Django project database.
-        `mysql -uroot`
-        `create database mysite character set utf8;`
-        `exit;`
+        - `mysql -uroot`
+        - `create database mysite character set utf8;`
+        - `exit;`
 4. Install the base Django tables. From ~/Documents/Django\ Projects/mysite/ `python manage.py migrate`
 5. Test Django
-    `python manage.py runserver`
-    Navigate to `http://127.0.0.1:8000/`
+    - `python manage.py runserver`
+    - Navigate to `http://127.0.0.1:8000/`
 
 #### Installing eerfhelper
 
