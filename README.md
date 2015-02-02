@@ -47,10 +47,12 @@ To get up and running, we need a database server, Python, Django, the python-dat
 10. `pip install django`
 11. `brew install mysql`
 12. Edit ~/.profile and add the following lines.
+```
     export PATH=/usr/local/mysql/bin:$PATH
     export PATH=/usr/local/mysql/lib:$PATH
     export LANG=en_US.UTF-8
     export LC_ALL=en_US.UTF-8
+```
 13. `source ~/.profile` or you may have to close and reopen terminal.
 14. `pip install mysql-python`
 15. `pip install spyder`
