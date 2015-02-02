@@ -53,4 +53,4 @@ Many of the instructions are from the [Django tutorial](https://docs.djangoproje
     - `python manage.py runserver`
     - Navigate to `http://127.0.0.1:8000/`
 
-You are now ready to install the Django [django-eerf/README.md](eerf web application).
+You are now ready to install the Django [eerf web application](django-eerf/README.md).
