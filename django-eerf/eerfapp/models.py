@@ -39,6 +39,7 @@ class NPArrayBlobField(models.Field):
     #===========================================================================
     def db_type(self, connection):
         return 'LONGBLOB'
+
     def to_python(self, value):#From database to python
         if value is not None and len(value)>0:
             if not hasattr(value, '__add__'):# or isinstance(value, basestring):
@@ -50,6 +51,7 @@ class NPArrayBlobField(models.Field):
         else:
             value = np.array([])
         return value
+
     def get_db_prep_save(self, value, connection):#from python to database
         if value is not None:
             value = value.tostring()
@@ -83,7 +85,7 @@ class CSVStringField(models.TextField):
     
 class System(models.Model):
     """
-    A quick identifier of the system. I cannot remember what this is useful for.
+    A quick identifier of the system. I cannot remember what this is useful for. Upgrading?
     """
     name = models.CharField(max_length=135, primary_key=True)
     value = models.CharField(max_length=135, blank=True)
@@ -92,7 +94,7 @@ class System(models.Model):
         
 class Subject(models.Model):
     """
-    A subject/animal/patient. Has detail_values_dict, a dict of its :model:`eerfd.SubjectDetailValue`.
+    A participant/animal/patient. Has detail_values_dict, a dict of its :model:`eerfd.SubjectDetailValue`.
     """
     subject_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=135, unique=True)
@@ -133,6 +135,7 @@ class Subject(models.Model):
     #===========================================================================
     def detail_values_dict(self):#return a dict of detail values.
         return dict([(item.detail_type.name,item.value) for item in self._detail_values.all()])
+
     def update_ddv(self,key,value):
         new_sdv = SubjectDetailValue.objects.get_or_create(subject=self, detail_type=DetailType.objects.get_or_create(name=key)[0])[0]
         new_sdv.value = value
@@ -158,6 +161,7 @@ class DetailType(models.Model):
     detail_type_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=135, unique=True)
     description = models.CharField(max_length=300, blank=True)
+
     class Meta:
         db_table = u'detail_type'
         
@@ -168,6 +172,7 @@ class FeatureType(models.Model):
     feature_type_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=135, unique=True)
     description = models.CharField(max_length=135, blank=True)
+
     class Meta:
         db_table = u'feature_type'
         
@@ -178,9 +183,11 @@ class SubjectDetailValue(models.Model):
     subject = models.ForeignKey(Subject, related_name = "_detail_values", on_delete=models.CASCADE)
     detail_type = models.ForeignKey(DetailType)
     value = models.CharField(max_length=135, null=True, blank=True)
+
     class Meta:
         db_table = u'subject_detail_value'
         unique_together = ("subject", "detail_type")
+
     def __unicode__(self):
         return u"%s=%s" % (self.detail_type.name, self.value)
 
@@ -265,21 +272,21 @@ class Datum(models.Model):
 
 class DatumStore(models.Model):
     datum = models.OneToOneField(Datum, primary_key=True, related_name = "store", on_delete=models.CASCADE)
-    x_vec = NPArrayBlobField(null=True, blank=True)
-    erp = NPArrayBlobField(null=True, blank=True)
-    #x_vec = models.TextField(blank=True)
-    #erp = models.TextField(blank=True)
+    x_vec = NPArrayBlobField(null=True, blank=True)  # Exclusively t_vec because erp
+    erp = NPArrayBlobField(null=True, blank=True)    # is a recorded time series segment
     n_channels = models.PositiveSmallIntegerField(null=True, blank=True)
     n_samples = models.PositiveIntegerField(null=True, blank=True)
     channel_labels = CSVStringField(null=True, blank=True)
+
     class Meta:
         db_table = u'datum_store'
-        
+
     def __unicode__(self):
         return u"%i samples x %i channels" % (self.n_samples, self.n_channels) if self.n_samples else "EMPTY"
-    
+
     def get_data(self):
         return self.erp.reshape((self.n_channels,self.n_samples))
+
     def set_data(self, values):
         self.erp = values
         self.n_channels,self.n_samples = values.shape
@@ -290,11 +297,36 @@ class DatumFeatureValue(models.Model):
     datum = models.ForeignKey(Datum, related_name = "_feature_values", on_delete=models.CASCADE)
     feature_type = models.ForeignKey(FeatureType)
     value = models.FloatField(null=True, blank=True)
+    
     class Meta:
         db_table = u'datum_feature_value'
         unique_together = ("datum", "feature_type")
+
     def __unicode__(self):
         return u"%s=%f" % (self.feature_type.name, self.value)
+
+class DatumFeatureStore(models.Model):
+    dfv = models.OneToOneField(DatumFeatureValue, primary_key=True, related_name="store", on_delete=models.CASCADE)
+    x_vec = NPArrayBlobField(null=True, blank=True)  # e.g., Hz
+    dat_array = NPArrayBlobField(null=True, blank=True)  # e.g., psd values at each Hz
+    n_channels = models.PositiveSmallIntegerField(null=True, blank=True)
+    n_features = models.PositiveIntegerField(null=True, blank=True)
+    channel_labels = CSVStringField(null=True, blank=True)
+
+    class Meta:
+        db_table = u'datum_feature_value_store'
+
+    def __unicode__(self):
+        return u"%i features x %i channels" %(self.n_features, self.n_channels) if self.n_channels else "EMPTY"
+
+    def get_data(self):
+        return self.dat_array.reshape((self.n_channels, self.n_features))
+
+    def set_data(self, values):
+        self.dat_array = values
+        self.n_channels, self.n_features = values.shape
+        self.save()
+    data = property(get_data, set_data)
 
 class DatumDetailValue(models.Model):
     datum = models.ForeignKey(Datum, related_name = "_detail_values", on_delete=models.CASCADE)

@@ -11,28 +11,45 @@ TODO: Detailed documentation in the "docs" directory.
 Quick start
 -----------
 
-1. Add "eerfapp" to your INSTALLED_APPS setting in your Django project settings.py like this::
+1. In the django-eerf folder, run `pip install dist/django-eerfapp-0.8.tar.gz`
+
+2. Add "eerfapp" to your INSTALLED_APPS setting in your Django project settings.py like this::
 
     INSTALLED_APPS = (
         ...
         'eerfapp',
     )
 
-2. Include the eerfapp URLconf in your project urls.py like this::
+3. Include the eerfapp URLconf in your project urls.py like this::
 
-    url(r'^eerfapp/', include('eerfapp.urls')),
+    url(r'^eerfapp/', include('eerfapp.urls', namespace="eerfapp")),
 
-3. In the django-eerf folder, run `python setup.py install`
+4a. Make sure the database server is running. `mysqld_safe &`
 
-4. Skip this step because I have done it for you: `python manage.py makemigrations eerfapp`
+4. Run `python manage.py migrate` to create the eerfapp models.
 
-5. Run `python manage.py migrate` to create the eerfapp models.
+5. Start the development server (`python manage.py runserver`) and visit `http://127.0.0.1:8000/admin/` to test that it is working (you'll need the Admin app enabled).
 
-6. Start the development server (`python manage.py runserver`) and visit `http://127.0.0.1:8000/admin/` to test that it is working (you'll need the Admin app enabled).
-
-7. Visit `http://127.0.0.1:8000/eerfapp/` to use the web app.
+6. Visit `http://127.0.0.1:8000/eerfapp/` to use the web app.
 
 If you get an error about missing sqlparse then you can either install it (`pip install sqlparse`) or turn off debugging in settings.py.
+
+FOR CHAD
+-------
+
+Development cycle, in django-eerfapp directory.
+
+1. `python setup.py sdist` to recreate dist.
+2. `pip uninstall django-eerfapp` uninstalls what might already be there.
+3. `pip install dist/django-eerfapp-0.8.tar.gz` installs new dist.
+
+If models.py changed then you should recreate the migrations.
+
+1. `rm /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*`
+2. `python ~/Documents/Django\ Projects/mysite/manage.py makemigrations eerfapp`
+3. `cp /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*.py eerfapp/migrations/`
+4. `python setup.py sdist` to recreate dist.
+
 
 TODO
 ----

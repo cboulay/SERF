@@ -10,31 +10,53 @@ Description: =====
         EERFAPP
         =====
         
-        EERFAPP is a simple Django app to...
+        eerfapp is a Django app. The core of the app is its database. The database schema is designed to provide a complete and flexible representation of epoched neurophysiological data.
         
-        Detailed documentation is in the "docs" directory.
+        ![Database Schema](/models.png?raw=true "Database Schema")
+        
+        TODO: Detailed documentation in the "docs" directory.
         
         Quick start
         -----------
         
-        1. Add "eerfapp" to your INSTALLED_APPS setting like this::
+        1. In the django-eerf folder, run `pip install dist/django-eerfapp-0.8.tar.gz`
+        
+        2. Add "eerfapp" to your INSTALLED_APPS setting in your Django project settings.py like this::
         
             INSTALLED_APPS = (
                 ...
                 'eerfapp',
             )
         
-        2. Include the eerfapp URLconf in your project urls.py like this::
+        3. Include the eerfapp URLconf in your project urls.py like this::
         
             url(r'^eerfapp/', include('eerfapp.urls')),
         
-        3. Run `python manage.py migrate` to create the eerfapp models.
+        4. Run `python manage.py migrate` to create the eerfapp models.
         
-        4. Start the development server and visit http://127.0.0.1:8000/admin/
-           to ...(you'll need the Admin app enabled).
+        5. Start the development server (`python manage.py runserver`) and visit `http://127.0.0.1:8000/admin/` to test that it is working (you'll need the Admin app enabled).
         
-        5. Visit http://127.0.0.1:8000/eerfapp/ to...
+        6. Visit `http://127.0.0.1:8000/eerfapp/` to use the web app.
         
+        If you get an error about missing sqlparse then you can either install it (`pip install sqlparse`) or turn off debugging in settings.py.
+        
+        FORCHAD
+        -------
+        
+        During development, to re-create migrations.
+        
+        1. `pip uninstall django-eerfapp`
+        2. `pip install dist/django-eerfapp-0.8.tar.gz`
+        3. `rm /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*`
+        4. `python ~/Documents/Django\ Projects/mysite/manage.py makemigrations eerfapp`
+        5. `cp /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*.py eerfapp/migrations/`
+        6. `python setup.py sdist`
+        
+        
+        TODO
+        ----
+        
+        Change the static\*.js to use relative paths.
 Platform: UNKNOWN
 Classifier: Environment :: Web Environment
 Classifier: Framework :: Django
