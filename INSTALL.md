@@ -54,3 +54,19 @@ Many of the instructions are from the [Django tutorial](https://docs.djangoproje
     - Navigate to `http://127.0.0.1:8000/`
 
 You are now ready to install the Django [eerf web application](django-eerf/README.md).
+
+## Additional Tips for installing MySQL
+
+You may need to `chown -R mysql:wheel datadir` and `chmod -R 755 datadir`
+Create a defaults file (usually /etc/my.cnf) with all of your settings. You can use the provided my.cnf to start.
+Run `sudo mysql_install_db --user=mysql --defaults-file=/etc/my.cnf`
+Run `mysqld_safe & --defaults-file=/etc/my.cnf`
+It is not necessary to specify the defaults file when using the default location (/etc/my.cnf).
+
+Consider adding the following to my.cnf
+```
+default-storage-engine = MyISAM
+query_cache_type = 1
+key_buffer_size = 2G
+query_cache_limit = 400M
+```
