@@ -86,6 +86,14 @@ query_cache_limit = 400M
     `mkdir /Applications/Spyder.app/Contents/MacOS`
 
     `mkdir /Applications/Spyder.app/Contents/Resources`
+
+    `touch /Applications/Spyder.app/Contents/MacOS/spyder`
+
+    `chmod +xxx /Applications/Spyder.app/Contents/MacOS/spyder`
+
+    `curl -o /Applications/Spyder.app/Contents/Resources/spyder.icns https://spyderlib.googlecode.com/hg/img_src/spyder.icns`
+
+    `touch /Applications/Spyder.app/Contents/Info.plist`
     
     Copy the following into /Applications/Spyder.app/Contents/Info.plist:
 
@@ -101,6 +109,7 @@ query_cache_limit = 400M
 ```
 
     Copy the following into /Applications/Spyder.app/Contents/MacOS/spyder
+
 ```
 #! /usr/local/bin/python
 
@@ -116,6 +125,3 @@ arguments = [executable]
 
 os.execve(executable, arguments, os.environ)
 ```
-
-    `chmod +xxx /Applications/Spyder.app/Contents/MacOS/spyder`
-    `curl -o /Applications/Spyder.app/Contents/Resources/spyder.icns https://spyderlib.googlecode.com/hg/img_src/spyder.icns`
