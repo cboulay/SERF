@@ -16,12 +16,12 @@ To get up and running, we need a database server, Python, Django, the python-dat
 8. `pip install ipython[all]`
 9. `brew install pyqt`
 10. `pip install django`
-11. `brew install mysql`
+11. `brew install mysql`  (Using 5.7.12 at latest writing)
 12. Edit ~/.profile and add the following lines.
     `export PATH=/usr/local/mysql/bin:$PATH`
     `export PATH=/usr/local/mysql/lib:$PATH`
 13. `source ~/.profile` or you may have to close and reopen terminal.
-14. `pip install mysql-python`
+14. `pip install mysqlclient`
 
 ### On Windows
 
@@ -29,22 +29,32 @@ TODO
 
 ## Configuring the database server and Django
 
-Though any DBMS should work, I use MySQL because some of the data I work with were originally recorded into MySQL. I use the MyISAM storage engine because I had trouble getting good performance out of InnoDB when working with these old data. If you followed the instructions above then mysql and its python connector should already be installed.
+Though any DBMS should work, I use MySQL because some of the data I work with were originally recorded into MySQL.
+I use the MyISAM storage engine because I had trouble getting good performance out of InnoDB when working with these old data.
+If you followed the instructions above then mysql and its python connector should already be installed.
 Many of the instructions are from the [Django tutorial](https://docs.djangoproject.com/en/dev/intro/tutorial01/):
 
 1. Configure the database server.
     1. Create the directory where your mysql data will reside. I used `mkdir /Volumes/STORE/eerfdata`
-    2. `mysql_install_db --verbose --user=root --basedir="$(brew --prefix mysql)" --datadir=/Volumes/STORE/eerfdata --tmpdir=/tmp`
-    3. Specify the data directory in my.cnf . You may choose to edit and use the one from this repo then place it in your /etc/my.cnf
-    4. Run the server `mysqld_safe &`
-2. Create a Django project. From ~/Documents/Django\ Projects/ `django-admin startproject mysite`
-3. Configure the Django project.
+    1. You need a settings file to specify the MyISAM storage engine and some other options.
+    You can use the my.cnf supplied in this repo as a starting point.
+    `cp my.cnf /usr/local/etc/my.cnf`
+    (Use any of the following locations for your settings file: /etc/my.cnf /etc/mysql/my.cnf /usr/local/etc/my.cnf ~/.my.cnf)    
+    Be sure to edit its datadir.
+    1. Initialize the datadir: `sudo mysqld --initialize-insecure --user=`whoami` --basedir="$(brew --prefix mysql)" --datadir=/Volumes/STORE/eerfdata`
+    1. Run the server `mysql.server start` or `mysqld_safe &`
+1. Create a Django project
+	1. `cd ~`
+	1. `mkdir django_eerf`
+	1. `cd django_eerf`
+	1. `django-admin startproject mysite`
+1. Configure the Django project.
     1. Edit mysite/settings.py to point to the database. `’ENGINE’: ‘django.db.backends.mysql’, ’NAME’: ‘mysite’, ’USER’: ‘root’, ‘HOST’: ’127.0.0.1’, ‘PORT’: ‘3306’`
-    2. Create the Django project database.
+    1. Create the Django project database.
         - `mysql -uroot`
         - `create database mysite character set utf8;`
         - `exit;`
-4. Install the base Django tables. From ~/Documents/Django\ Projects/mysite/ `python manage.py migrate`
+4. Install the base Django tables. From ~/Documents/django_eerf/mysite/ `python manage.py migrate`
 5. Test Django
     - `python manage.py runserver`
     - Navigate to `http://127.0.0.1:8000/`
@@ -65,57 +75,4 @@ default-storage-engine = MyISAM
 query_cache_type = 1
 key_buffer_size = 2G
 query_cache_limit = 400M
-```
-
-## Install Spyder, my preferred Python IDE
-
-1. Edit ~/.profile and add the following lines::
-    
-    export LANG=en_US.UTF-8
-    export LC_ALL=en_US.UTF-8
-
-2. `pip install spyder`
-
-3. Create a dock icon
-    
-```
-mkdir /Applications/Spyder.app
-mkdir /Applications/Spyder.app/Contents`
-mkdir /Applications/Spyder.app/Contents/MacOS
-mkdir /Applications/Spyder.app/Contents/Resources
-touch /Applications/Spyder.app/Contents/MacOS/spyder
-chmod +xxx /Applications/Spyder.app/Contents/MacOS/spyder
-curl -o /Applications/Spyder.app/Contents/Resources/spyder.icns https://spyderlib.googlecode.com/hg/img_src/spyder.icns
-touch /Applications/Spyder.app/Contents/Info.plist
-```    
-
-Copy the following into /Applications/Spyder.app/Contents/Info.plist:
-
-```
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"> 
-<plist version="1.0"> 
-    <dict> 
-        <key>CFBundleIconFile</key> 
-        <string>spyder</string> 
-    </dict> 
-</plist> 
-```
-
-Copy the following into /Applications/Spyder.app/Contents/MacOS/spyder
-
-```
-#! /usr/local/bin/python
-
-import os
-import subprocess
-
-envstr = subprocess.check_output('source /etc/profile; source ~/.profile; printenv', shell=True)
-env = [a.split('=') for a in envstr.strip().split('\n')]
-os.environ.update(env)
-
-executable = '/usr/local/bin/spyder'
-arguments = [executable]
-
-os.execve(executable, arguments, os.environ)
 ```

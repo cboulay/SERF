@@ -30,7 +30,9 @@ Description: =====
         
         3. Include the eerfapp URLconf in your project urls.py like this::
         
-            url(r'^eerfapp/', include('eerfapp.urls')),
+            url(r'^eerfapp/', include('eerfapp.urls', namespace="eerfapp")),
+        
+        4a. Make sure the database server is running. `mysqld_safe &`
         
         4. Run `python manage.py migrate` to create the eerfapp models.
         
@@ -40,17 +42,21 @@ Description: =====
         
         If you get an error about missing sqlparse then you can either install it (`pip install sqlparse`) or turn off debugging in settings.py.
         
-        FORCHAD
+        FOR CHAD
         -------
         
-        During development, to re-create migrations.
+        Development cycle, in django-eerfapp directory.
         
-        1. `pip uninstall django-eerfapp`
-        2. `pip install dist/django-eerfapp-0.8.tar.gz`
-        3. `rm /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*`
-        4. `python ~/Documents/Django\ Projects/mysite/manage.py makemigrations eerfapp`
-        5. `cp /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*.py eerfapp/migrations/`
-        6. `python setup.py sdist`
+        1. `python setup.py sdist` to recreate dist.
+        2. `pip uninstall django-eerfapp` uninstalls what might already be there.
+        3. `pip install dist/django-eerfapp-0.8.tar.gz` installs new dist.
+        
+        If models.py changed then you should recreate the migrations.
+        
+        1. `rm /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*`
+        2. `python ~/Documents/Django\ Projects/mysite/manage.py makemigrations eerfapp`
+        3. `cp /usr/local/lib/python2.7/site-packages/eerfapp/migrations/*.py eerfapp/migrations/`
+        4. `python setup.py sdist` to recreate dist.
         
         
         TODO

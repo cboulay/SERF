@@ -20,17 +20,29 @@ Quick start
         'eerfapp',
     )
 
-3. Include the eerfapp URLconf in your project urls.py like this::
+3. Include the eerfapp URLconf in your project's urls.py:
+    Modify the import statement so it reads `from django.conf.urls import url, include`
+    Add the following to the urlpatterns list:
+    `url(r'^eerfapp/', include('eerfapp.urls', namespace="eerfapp")),`
 
-    url(r'^eerfapp/', include('eerfapp.urls', namespace="eerfapp")),
+4. Make sure the database server is running. `mysql.server start` or `mysqld_safe &`
 
-4a. Make sure the database server is running. `mysqld_safe &`
+5. Run `python manage.py migrate` to create the eerfapp models.
+    This gave me a few warnings about deprecations. Copied here for now:
+    ```
+/usr/local/lib/python2.7/site-packages/eerfapp/models.py:33: RemovedInDjango110Warning: SubfieldBase has been deprecated. Use Field.from_db_value instead.
+  class NPArrayBlobField(models.Field):
 
-4. Run `python manage.py migrate` to create the eerfapp models.
+/usr/local/lib/python2.7/site-packages/eerfapp/models.py:61: RemovedInDjango110Warning: SubfieldBase has been deprecated. Use Field.from_db_value instead.
+  class CSVStringField(models.TextField):
 
-5. Start the development server (`python manage.py runserver`) and visit `http://127.0.0.1:8000/admin/` to test that it is working (you'll need the Admin app enabled).
+/usr/local/lib/python2.7/site-packages/eerfapp/urls.py:77: RemovedInDjango110Warning: django.conf.urls.patterns() is deprecated and will be removed in Django 1.10. Update your urlpatterns to be a list of django.conf.urls.url() instances instead.
+  url(r'^import_elizan/$', views.import_elizan, name='import_elizan'),
+    ```
 
-6. Visit `http://127.0.0.1:8000/eerfapp/` to use the web app.
+6. Start the development server (`python manage.py runserver`) and visit `http://127.0.0.1:8000/admin/` to test that it is working (you'll need the Admin app enabled).
+
+7. Visit `http://127.0.0.1:8000/eerfapp/` to use the web app.
 
 If you get an error about missing sqlparse then you can either install it (`pip install sqlparse`) or turn off debugging in settings.py.
 
