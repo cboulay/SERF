@@ -1,4 +1,4 @@
-from django.conf.urls import patterns, include, url
+from django.conf.urls import include, url
 from django.views.generic import DetailView, ListView
 #from eerfapp.models import Subject, Datum
 from eerfapp import models, views
@@ -12,7 +12,7 @@ from eerfapp import models, views
 # )
 #===============================================================================
 
-urlpatterns = patterns('eerfapp.views',
+urlpatterns = [
 
     #/eerfapp/ ==> a redirect to /eerfapp/subjects/
     url(r'^$', views.index, name='index'),
@@ -75,4 +75,4 @@ urlpatterns = patterns('eerfapp.views',
     # Other URLs
     #===========================================================================
     url(r'^import_elizan/$', views.import_elizan, name='import_elizan'),
-)
+]

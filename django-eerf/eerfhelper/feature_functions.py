@@ -71,7 +71,7 @@ def MEP_p2p(datum, refdatum=None):
 	return get_p2p_for_datum_start_stop(datum,x_start,x_stop,chan_label)
 
 def HR_res(datum, refdatum=None):
-	print "TODO: HR_res"
+	print ("TODO: HR_res")
 	
 def sig_func(x, x0, k):
 	return 1 / (1 + np.exp(-k*(x-x0)))

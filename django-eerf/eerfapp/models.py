@@ -32,7 +32,7 @@ class EnumField(models.Field):
 #http://stackoverflow.com/questions/759288/how-do-you-put-a-file-in-a-fixture-in-django
 class NPArrayBlobField(models.Field):
     description = "Store/retrieve numpy arrays as LONGBLOB"
-    __metaclass__ = models.SubfieldBase
+    __metaclass__ = models.DurationField
     #===========================================================================
     # def __init__(self, *args, **kwargs):
     #    super(NPArrayBlobField, self).__init__(*args, **kwargs)
@@ -60,7 +60,7 @@ class NPArrayBlobField(models.Field):
 #http://justcramer.com/2008/08/08/custom-fields-in-django/
 class CSVStringField(models.TextField):
     description = "Stores a list as a comma-separated string into a Text column"
-    __metaclass__ = models.SubfieldBase
+    __metaclass__ = models.DurationField
     def to_python(self, value):
         if not value:
             value = []
@@ -181,7 +181,7 @@ class FeatureType(models.Model):
     
 class SubjectDetailValue(models.Model):
     subject = models.ForeignKey(Subject, related_name = "_detail_values", on_delete=models.CASCADE)
-    detail_type = models.ForeignKey(DetailType)
+    detail_type = models.ForeignKey(DetailType, on_delete=models.PROTECT)
     value = models.CharField(max_length=135, null=True, blank=True)
 
     class Meta:
@@ -193,7 +193,7 @@ class SubjectDetailValue(models.Model):
 
 class Datum(models.Model):
     datum_id = models.AutoField(primary_key=True)
-    subject = models.ForeignKey(Subject, related_name="data")
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="data")
     number = models.PositiveIntegerField(null=False, default=0)
     #number = models.PositiveIntegerField(null=False, default=lambda: Datum.objects.latest('datum_id').number + 1)
     span_type = EnumField(choices=(('trial','trial'), ('day','day'), ('period','period')))
@@ -295,7 +295,7 @@ class DatumStore(models.Model):
 
 class DatumFeatureValue(models.Model):
     datum = models.ForeignKey(Datum, related_name = "_feature_values", on_delete=models.CASCADE)
-    feature_type = models.ForeignKey(FeatureType)
+    feature_type = models.ForeignKey(FeatureType, on_delete=models.PROTECT)
     value = models.FloatField(null=True, blank=True)
     
     class Meta:
@@ -330,7 +330,7 @@ class DatumFeatureStore(models.Model):
 
 class DatumDetailValue(models.Model):
     datum = models.ForeignKey(Datum, related_name = "_detail_values", on_delete=models.CASCADE)
-    detail_type = models.ForeignKey(DetailType)
+    detail_type = models.ForeignKey(DetailType, on_delete=models.PROTECT)
     value = models.CharField(max_length=135, null=True, blank=True)
     class Meta:
         db_table = u'datum_detail_value'
