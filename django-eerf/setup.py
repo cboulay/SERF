@@ -15,7 +15,7 @@ setup(
     license='BSD License',  # example license
     description='A simple Django app to...',
     long_description=README,
-    url='https://github.com/cboulay/EERF',
+    url='https://github.com/mikkeyboi/EERF',
     author='Chadwick Boulay',
     author_email='chadwick.boulay@gmail.com',
     classifiers=[
