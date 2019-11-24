@@ -18,7 +18,7 @@ The data can be analyzed in real-time and complex features can be extracted from
     - Automatically log a new entry or a change to subject_detail_value
     - Automatically set the stop_time field of a datum to +1s for trials or +1 day for days/periods.
     - Automatically set the number of a new datum to be the next integer greater than the latest for that subject/span_type.
-    - From shell/terminal, run `mysql -uroot mysite < eerfapp.sql`
+    - From shell/terminal, run `mysql -uroot expdb < eerfapp.sql`
 
 The web app, and especially its database backend, should now be installed.
 

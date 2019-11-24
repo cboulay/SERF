@@ -4,3 +4,4 @@ data/*
 .project
 *.bak
 core/api/python/build/*
+.idea
