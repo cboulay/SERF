@@ -36,8 +36,14 @@ First we'll install and configure MySQL server.
 1. `conda install django numpy scipy pyqt qtpy pyqtgraph mysqlclient openssl=1.0.2r`
 
 ### On Windows
-
-TODO
+1. Install Miniconda and setup conda environment in Anaconda Prompt:
+    * `conda create -n sql python=3.6 django numpy scipy pyqt qtpy pyqtgraph mysqlclient openssl`
+    * Activate your environment with `conda activate sql`
+1. While inside Anaconda Prompt, navigate to the directory `eerf/django-eerf` and run:
+    * `python setup.py install`
+1. Windows: Install the Developer package (MySQL Server, Workbench, and Shell)
+  * Work through dependencies
+  * MySQL80 will be your service name unless you change this
 
 ## Configuring the database server and Django
 
@@ -77,6 +83,10 @@ Many of the instructions are from the [Django tutorial](https://docs.djangoproje
     - `mysql -uroot -p`
     - `create database expdb character set utf8;`
     - `exit;`
+    - On Windows:
+      - Open Workbench, connect to database (Database > Connect to Database)
+      - Enter your username
+      - Make a new schema called `expdb`
 1. Install the base Django tables. From ~/Documents/django_eerf/expdb/ `python manage.py migrate`
 1. Test Django
     - `python manage.py runserver`
