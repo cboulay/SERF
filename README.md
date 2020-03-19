@@ -26,7 +26,7 @@ The web app, and especially its database backend, should now be installed.
 
 ### ...In a web browser (i.e., in Django)
 
-See [django-eerf](django-eerf/REAMDE.md).
+See [django-eerf](django-eerf/README.md).
 
 ### ...In a custom Python program
 
