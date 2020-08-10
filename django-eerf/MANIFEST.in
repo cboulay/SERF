@@ -1,5 +1,0 @@
-include LICENSE
-include README.md
-recursive-include eerfapp/static *
-recursive-include eerfapp/templates *
-recursive-include docs *

@@ -1,0 +1,5 @@
+[console_scripts]
+serf-makemigrations = serf.scripts.makemigrations:main
+serf-migrate = serf.scripts.migrate:main
+serf-shell = serf.scripts.djangoshell:main
+

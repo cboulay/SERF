@@ -1,0 +1,1 @@
+from serf.boot_django import boot_django

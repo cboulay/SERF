@@ -1,0 +1,25 @@
+<!-- Do NOT put any DOCTYPE here unless you want problems in IEs. -->
+<html>
+	<head>
+		<!-- The following line defines content type and utf-8 as character set. -->
+		<!-- If you want your application to work flawlessly with various local -->
+		<!-- characters, just make ALL strings, on the page, json and database utf-8. -->
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<!-- Include here your own css files if you have them. -->
+		<!-- link rel="stylesheet" type="text/css" href="/static/ext-4.1.1a/resources/css/ext-all.css" -->
+		<script type="text/javascript" src="/static/jquery-1.8.2.min.js"></script>
+		<script type="text/javascript" src="/static/flot/jquery.flot.js"></script>
+		<!-- Main js program -->
+		<!-- Set a title for the page (id is not necessary). -->
+		<title>
+			{% block title %}My amazing site{% endblock %}
+		</title>
+		<!-- You can have onReady function here or in your application file. -->
+		<!-- If you have it in your application file delete the whole -->
+		<!-- following script tag as we must have only one onReady. -->
+		{% block head %}{% endblock %}
+	</head>
+	<body>
+		{% block content %}{% endblock %}
+	</body>
+</html>

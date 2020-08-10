@@ -1,0 +1,16 @@
+<p> TODO: Provide example JSON text. </p>
+
+{% if elizan_subjects %}
+    <form action="{% url 'eerfapp:import_elizan' %}" method="post">
+	{% csrf_token %}
+	<select name="elizan_subjects">
+            {% for elizan_subject in elizan_subjects %}
+            <option value="volvo">Volvo</option>
+            {% endfor %}
+        </select>
+	<input type="text" class="subject_json" name="subject_json">
+	<input type="submit" value="Import" />
+    </form>
+{% else %}
+    <p>No elizan subjects found.</p>
+{% endif %}

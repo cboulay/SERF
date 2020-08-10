@@ -1,38 +1,103 @@
-# Evoked Electrophysiological Response Feedback (EERF)
+# Segmented Electrophys Recordings and Features Database
 
-EERF is a [Django](https://www.djangoproject.com/) web app and some helper tools to manage and analyze evoked electrophysiological response data.
-The data can be analyzed in real-time and complex features can be extracted from the data to drive feedback.
+SERF-DB is a database schema, designed to facilitate collection and analysis of segmented electrophysiological recordings and features. ![Database Schema](/models.png?raw=true "Database Schema")
 
-## Contents List
+- In the `python` folder we provide a python package `serf` comprising a [Django](https://www.djangoproject.com/) application to administer the database and act as an object relational map (ORM), and a `tools` module to help with feature calculation and data analysis. Using this schema, and interfacing with the Django ORM, it is easy to work with the data in real-time in Python.
+- The [matlab](matlab/README.md) folder contains some (very outdated) code for interfacing with the database in Matlab.
+- serf.sql is some SQL to add some functionality when using non-Django API.
 
-- [django-eerf](django-eerf/README.md) is a python package containing my eerfapp Django web app and eerfhelper to facilitate use of this app outside of the web server context.
-- eerfapp.sql Is some SQL to add some functionality when using non-Django API.
-- [eerfmatlab](eerfmatlab/REAMDE.md) contains some tools for working with the data in Matlab (this is very outdated).
-- standalone.py has some examples for how to interact with the data in Python without running a webserver.
+> Django applications are normally run in conjunction with a Django **project**, but in this case we are mostly only interested in the ORM. Therefore we default to the standalone approach, but we do provide some untested guidance below on how to use the application with a Django webserver.
 
 ## Installation and setup
 
-1. Install Django and all its dependencies. See [INSTALL.md](./INSTALL.md) for how I setup my system.
-2. Install [django-eerf](django-eerf/README.md)
-3. Optional (mandatory if you will use the database backend outside the Django/Python context (e.g., Matlab ORM)): Additional SQL triggers to
-    - Automatically log a new entry or a change to subject_detail_value
-    - Automatically set the stop_time field of a datum to +1s for trials or +1 day for days/periods.
-    - Automatically set the number of a new datum to be the next integer greater than the latest for that subject/span_type.
-    - From shell/terminal, run `mysql -uroot expdb < eerfapp.sql`
+1. Install Python and Django. If you came here from the NeuroportDBS repository then you should have already done this.
+1. pip install serf
+    * Option 1: Download the `serf` wheel from the [releases page](https://github.com/cboulay/SERF/releases) and install it with `pip install {name of wheel.whl}`.
+    * Option 2: `pip install git+https://github.com/cboulay/SERF.git#subdirectory=python`
+1. Install MySql.
+    * See [INSTALL_MYSQL.md](./INSTALL_MYSQL.md) for how I do it (Mac / Linux / Win)
+1. Install the serf schema
+    1. Copy [my_serf.cnf](https://raw.githubusercontent.com/cboulay/SERF/master/my_serf.cnf) to where Python thinks is the home directory. The easiest way to check this is to open a command prompt in the correct python environment and run `python -c "import os; print(os.path.expanduser('~'))"`.
+    1. Edit the copied file to make sure its database settings are correct. `[client]` `user` and `password` are important.
+    1. 
+    ```
+    $ serf-makemigrations
+    $ serf-migrate
+    ```
+   You should get output like the following:
+    ```
+     Migrations for 'serf':
+     SERF\python\serf\migrations\0001_initial.py
+       - Create model Datum
+       - Create model DatumFeatureValue
+       - Create model DetailType
+       - Create model FeatureType
+       - Create model Subject
+       - Create model System
+       - Create model DatumFeatureStore
+       - Create model DatumStore
+       - Create model SubjectLog
+       - Create model Procedure
+       - Add field feature_type to datumfeaturevalue
+       - Add field procedure to datum
+       - Add field trials to datum
+       - Create model SubjectDetailValue
+       - Alter unique_together for datumfeaturevalue (1 constraint(s))
+       - Create model DatumDetailValue
+       - Alter unique_together for datum (1 constraint(s))
+     ```
+    `Applying serf.0001_initial... OK`
 
-The web app, and especially its database backend, should now be installed.
-
-## Using EERFAPP...
-
-### ...In a web browser (i.e., in Django)
-
-See [django-eerf](django-eerf/README.md).
+## Using SERF
 
 ### ...In a custom Python program
 
-See [standalone.py](./standalone.py) for an example of how to load the data into Python without using a web server.
+```python
+import serf
+serf.boot_django()
+from serf.models import *
+print(Subject.objects.get_or_create(name='Test')[0])
+```
 
-[BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) should now be able to use this ORM.
+> [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) would normally now be able to use this ORM, except it is out of date. I have some work to do there to get it working again.
+
+### ...In a web browser (i.e., in a Django project)
+
+We assume you have already created your Django project using instructions similar to [the online tutorial up until "Creating the Polls app"](https://docs.djangoproject.com/en/3.1/intro/tutorial01/#creating-a-project).
+
+Instead of continuing the tutorial to create a new app, edit your Django project to add the pip-installed serf app.
+
+In settings.py, make sure the database info is correct ([online documentation](https://docs.djangoproject.com/en/3.1/ref/databases/#connecting-to-the-database)) and `'serf'` is in the list of INSTALLED_APPS:
+```Python
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        # 'NAME': 'serf',
+        # 'HOST': '127.0.0.1',
+        # 'USER': 'username',
+        # 'PASSWORD': 'password',
+        # above options can also be defined in config file
+        'OPTIONS': {'read_default_file': '/path/to/my_serf.cnf'},
+    }
+}
+
+INSTALLED_APPS = [
+    ...
+    'serf',
+]
+```
+
+Edit urls.py
+```Python
+from django.urls import include, path
+url_patterns = [
+    ...
+    path('serf/', include('serf.urls')),
+    #url(r'^serf/', include(('serf.urls','serf'), namespace="serf")),
+]
+```
+
+Test your server: `python manage.py runserver` and go to `localhost:8000/serf`
 
 ### ...In a custom non-Python program
 
