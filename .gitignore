@@ -6,4 +6,6 @@ data/*
 core/api/python/build/*
 .idea
 .DS_Store
-
+python/build
+python/dist
+python/serf.egg-info/*
