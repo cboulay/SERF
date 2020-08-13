@@ -8,7 +8,8 @@ with open(os.path.join(os.path.dirname(__file__), '..', 'README.md')) as readme:
 setup(
     name='serf',
     version='1.1',
-    packages=find_packages(),
+    packages=find_packages() + ['serf/tools/resources'],
+    package_data={"serf/tools/resources": ["*.mat"]},
     include_package_data=True,
     license='BSD License',  # example license
     description='A simple Django app to...',

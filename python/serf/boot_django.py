@@ -29,5 +29,6 @@ def boot_django():
         INSTALLED_APPS=(
             "serf",
         ),
+        USE_TZ=True,
     )
     django.setup()
