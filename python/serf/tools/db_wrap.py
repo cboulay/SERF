@@ -404,7 +404,7 @@ class ProcessWrapper:
             out = np.frombuffer(self.shared_memory.data()[0], dtype=np.int8)[0]
             self.shared_memory.unlock()
         else:
-            out = -1
+            out = 0
 
         return out
 
