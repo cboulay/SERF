@@ -7,15 +7,15 @@ from django.utils import timezone
 from qtpy.QtCore import QSharedMemory
 from serf.tools.db_wrap import DBWrapper
 
-
 SIMOK = False
 SAMPLINGGROUPS = ["0", "500", "1000", "2000", "10000", "30000"]  # , "RAW"]  RAW broken in cbsdk
+SAMPLINGRATE = 30000  # TODO: not hard-code the sampling rate?
 
 
 class NSPBufferWorker:
 
     def __init__(self):
-        self.current_depth = -20.000
+        self.current_depth = None  # -20.000
 
         # try to resolve LSL stream
         self.depth_inlet = None
@@ -38,8 +38,10 @@ class NSPBufferWorker:
 
         # Default values
         self.procedure_id = None
-        self.buffer_length = 6 * 30000
-        self.sample_length = 4 * 30000
+        self.buffer_length = 6 * SAMPLINGRATE
+        self.sample_length = 4 * SAMPLINGRATE
+        self.delay_length = 0.500 * SAMPLINGRATE
+        self.overwrite_depth = True
         self.validity_threshold = [self.sample_length * .9] * self.n_chan
         self.threshold = [False] * self.n_chan
         self.settings = []
@@ -91,9 +93,10 @@ class NSPBufferWorker:
             self.reset_procedure(sett_dict['procedure_id'])
 
         if 'buffer_length' in sett_keys:
-            # TODO: not hard-code the sampling rate?
-            self.buffer_length = int(float(sett_dict['buffer_length']) * 30000)
-            self.sample_length = int(float(sett_dict['sample_length']) * 30000)
+            self.buffer_length = int(float(sett_dict['buffer_length']) * SAMPLINGRATE)
+            self.sample_length = int(float(sett_dict['sample_length']) * SAMPLINGRATE)
+            self.delay_length = int(float(sett_dict['delay_buffer']) * SAMPLINGRATE)
+            self.overwrite_depth = sett_dict['overwrite_depth']
             self.reset_buffer()
 
         if 'electrode_settings' in sett_keys:
@@ -116,7 +119,10 @@ class NSPBufferWorker:
         # with highest validity count.
         self.validity = np.zeros((self.n_chan, self.buffer_length), dtype=bool)
         self.valid_idx = (0, 0)
+
+        self.delay_counter = 0
         self.update_buffer_status = True
+        self.delay_done = False
 
     def clear_buffer(self):
         self.buffer.fill(0)
@@ -126,9 +132,31 @@ class NSPBufferWorker:
         # list of tuples: (index of validity value, value)
         # saves the index with largest validity across all channels
         self.valid_idx = (0, 0)
+        self.delay_counter = 0
 
         self.update_buffer_status = True
-        self.start_time = timezone.now()
+        self.delay_done = False
+        # self.start_time = timezone.now()
+
+    def wait_for_delay_end(self, data):
+        data_length = data[0][1].shape[0]
+        self.delay_counter += data_length
+        # check if we have accumulated enough data to end delay and start recording
+        if self.delay_counter <= self.delay_length:
+            return False
+        else:
+            # truncate the data to the first index over the delay period
+            start_idx = max(0, int(self.delay_length - self.delay_counter))
+            for chan_idx, (chan, values) in enumerate(data):
+                data[chan_idx][1] = values[start_idx:]
+
+            # now is for the last sample. subtract data length / SAMPLINGRATE to get time of first sample
+            self.start_time = timezone.now()
+            time_delta = timezone.timedelta(seconds=data[0][1].shape[0] / SAMPLINGRATE)
+            self.start_time -= time_delta
+
+            self.write_shared_memory(-1)
+            return True
 
     def resolve_stream(self):
         # will register to LSL stream to read electrode depth
@@ -157,62 +185,65 @@ class NSPBufferWorker:
             # 1st level is a list of channels
             # 2nd level is a list [chan_id, np.array(data)]
             data = self.cbsdk_conn.get_continuous_data()
-            rec_status = self.cbsdk_conn.get_recording_state()
 
+            rec_status = self.cbsdk_conn.get_recording_state()
             if not rec_status:
                 self.write_shared_memory(0)
 
             # only process the NSP data if Central is recording
-            elif data and self.update_buffer_status:
+            elif data and self.current_depth:
+                if not self.delay_done:
+                    self.delay_done = self.wait_for_delay_end(data)
 
-                # all data segments should have the same length, so first check if we run out of buffer space
-                data_length = data[0][1].shape[0]
-                if (self.buffer_idx + data_length) >= self.buffer_length:
-                    # if we run out of buffer space before data has been sent to the DB few things could have gone
-                    # wrong:
-                    #   - data in buffer is not good enough
-                    #   - the new data chunk is larger than the difference between buffer and sample length
-                    #       (e.g. 6s buffer and 4s sample, if the current buffer has 3s of data and it receives a 4s
-                    #       long chunk then the buffer would overrun, and still not have enough data to send to DB.
-                    #       Although unlikely in real-life, it happened during debugging.)
+                if self.delay_done and self.update_buffer_status:
+                    # all data segments should have the same length, so first check if we run out of buffer space
+                    data_length = data[0][1].shape[0]
+                    if (self.buffer_idx + data_length) >= self.buffer_length:
+                        # if we run out of buffer space before data has been sent to the DB few things could have gone
+                        # wrong:
+                        #   - data in buffer is not good enough
+                        #   - the new data chunk is larger than the difference between buffer and sample length
+                        #       (e.g. 6s buffer and 4s sample, if the current buffer has 3s of data and it receives a 4s
+                        #       long chunk then the buffer would overrun, and still not have enough data to send to DB.
+                        #       Although unlikely in real-life, it happened during debugging.)
 
-                    # trim data to only fill the buffer, discarding the rest
-                    # TODO: is this the optimal solution? Slide buffer instead?
-                    data_length = self.buffer_length - self.buffer_idx
+                        # trim data to only fill the buffer, discarding the rest
+                        # TODO: is this the optimal solution? Slide buffer instead?
+                        data_length = self.buffer_length - self.buffer_idx
 
-                # continue to validate received data
-                for chan_idx, (chan, values) in enumerate(data):
+                    # continue to validate received data
+                    for chan_idx, (chan, values) in enumerate(data):
 
-                    if data_length > 0:
-                        # Validate data
-                        valid = self.validate_data_sample(values[:data_length])
+                        if data_length > 0:
+                            # Validate data
+                            valid = self.validate_data_sample(values[:data_length])
 
-                        # append data to buffer
-                        self.buffer[chan_idx,
-                                    self.buffer_idx:self.buffer_idx + data_length] = values[:data_length]
+                            # append data to buffer
+                            self.buffer[chan_idx,
+                                        self.buffer_idx:self.buffer_idx + data_length] = values[:data_length]
 
-                        self.validity[chan_idx,
-                                      self.buffer_idx:self.buffer_idx + data_length] = valid
+                            self.validity[chan_idx,
+                                          self.buffer_idx:self.buffer_idx + data_length] = valid
 
-                # increment buffer index, all data segments should have same length, if they don't, will match the first
-                # channel
-                self.buffer_idx += data_length
+                    # increment buffer index, all data segments should have same length, if they don't, will match
+                    # the first channel
+                    self.buffer_idx += data_length
 
-                # check if data length > sample length
-                if self.buffer_idx >= self.sample_length:
+                    # check if data length > sample length
+                    if self.buffer_idx >= self.sample_length:
 
-                    # compute total validity of last sample_length and if > threshold, send to DB
-                    sample_idx = self.buffer_idx - self.sample_length
+                        # compute total validity of last sample_length and if > threshold, send to DB
+                        sample_idx = self.buffer_idx - self.sample_length
 
-                    temp_sum = [np.sum(x[sample_idx:self.buffer_idx]) for x in self.validity]
+                        temp_sum = [np.sum(x[sample_idx:self.buffer_idx]) for x in self.validity]
 
-                    # check if validity is better than previous sample, if so, store it
-                    if np.sum(temp_sum) > self.valid_idx[1]:
-                        self.valid_idx = (sample_idx, np.sum(temp_sum))
+                        # check if validity is better than previous sample, if so, store it
+                        if np.sum(temp_sum) > self.valid_idx[1]:
+                            self.valid_idx = (sample_idx, np.sum(temp_sum))
 
-                    if all(x >= y for x, y in zip(temp_sum, self.validity_threshold)) or \
-                            self.buffer_idx >= self.buffer_length:
-                        self.send_to_db()
+                        if all(x >= y for x, y in zip(temp_sum, self.validity_threshold)) or \
+                                self.buffer_idx >= self.buffer_length:
+                            self.send_to_db()
 
             # check for new depth
             # At this point, the individual channels have either been sent to the DB or are still collecting waiting for
@@ -226,7 +257,7 @@ class NSPBufferWorker:
                 # If new sample
                 if sample[0]:
                     # New depth
-                    if sample[0][0] != self.current_depth:
+                    if sample[0][0] != self.current_depth or self.overwrite_depth:
                         # check whether the channels are still acquiring data
                         # it can be because they have insufficient samples or because the samples do not have a high
                         # enough validity value. If this is the case, send the best one to the DB, even if possibly
@@ -239,7 +270,7 @@ class NSPBufferWorker:
 
                         # only if recording
                         if rec_status:
-                            self.write_shared_memory(-1)
+                            self.write_shared_memory(-2)
 
             time.sleep(.010)
 
@@ -259,16 +290,16 @@ class NSPBufferWorker:
             #   DatumDetailValue:
             #       - detail_type: depth (fetch from DetailType
             #       - value: depth value
-            self.db_wrapper.create_depth_datum(depth=self.current_depth,
-                                               data=self.buffer[:,
-                                                                self.valid_idx[0]:self.valid_idx[0]+self.sample_length],
-                                               is_good=np.array([x >= y for x, y in zip(
-                                                   np.sum(self.validity[:, self.valid_idx[0]:
-                                                          self.valid_idx[0] + self.sample_length], axis=1),
-                                                   self.validity_threshold)], dtype=np.bool),
-                                               group_info=self.group_info,
-                                               start_time=self.start_time,
-                                               stop_time=timezone.now())
+            self.db_wrapper.save_depth_datum(depth=self.current_depth,
+                                             data=self.buffer[:,
+                                                              self.valid_idx[0]:self.valid_idx[0]+self.sample_length],
+                                             is_good=np.array([x >= y for x, y in zip(
+                                                 np.sum(self.validity[:, self.valid_idx[0]:
+                                                        self.valid_idx[0] + self.sample_length], axis=1),
+                                                 self.validity_threshold)], dtype=np.bool),
+                                             group_info=self.group_info,
+                                             start_time=self.start_time,
+                                             stop_time=timezone.now())
 
             self.write_shared_memory(1)
 

@@ -166,26 +166,39 @@ class DBWrapper(object):
         return out_info
 
     # Saving to DB
-    def create_depth_datum(self, depth=0.000, data=None, is_good=np.array([True], dtype=np.bool), group_info=None,
-                           start_time=django.utils.timezone.now(), stop_time=django.utils.timezone.now()):
+    def save_depth_datum(self, depth=0.000, data=None, is_good=np.array([True], dtype=np.bool), group_info=None,
+                         start_time=django.utils.timezone.now(), stop_time=django.utils.timezone.now()):
         if self.current_procedure:
-            dt = Datum()
-            dt.procedure = self.current_procedure
-            dt.is_good = is_good
-            dt.span_type = 'period'
+            # check if depth already recorded. If so, we need to delete it to make sure the new features are computer
+            # and that the updated value gets picked up by the plots.
+            dt, _ = DetailType.objects.get_or_create(name='depth')
+            ddv = DatumDetailValue.objects.filter(datum__in=Datum.objects.filter(procedure=self.current_procedure),
+                                                  detail_type=dt,
+                                                  value=depth)
+            if ddv:
+                # this will cascade to all dependent fields
+                Datum.objects.get(datum_id=ddv[0].datum_id).delete()
+
+            #create new datum
+            dat = Datum()
+            dat.procedure = self.current_procedure
+            dat.is_good = is_good
+            dat.span_type = 'period'
             if not timezone.is_aware(start_time):
                 start_time = start_time.replace(tzinfo=timezone.utc)
-            dt.start_time = start_time
+            dat.start_time = start_time
             if not timezone.is_aware(stop_time):
                 stop_time = stop_time.replace(tzinfo=timezone.utc)
-            dt.stop_time = stop_time
-            dt.save()
+            dat.stop_time = stop_time
+            dat.save()
 
             # add datum detail values
-            dt.update_ddv('depth', depth)
+            dat.update_ddv('depth', depth)
 
             ds = DatumStore()
-            ds.datum = dt
+            ds_created = True
+            ds.datum = dat
+
             # channel labels needs to be a list of strings
             if type(group_info) is dict:
                 ds.channel_labels = [x['label'].decode('utf-8') for x in group_info]
@@ -194,6 +207,7 @@ class DBWrapper(object):
                     ds.channel_labels = [x['label'].decode('utf-8') for x in group_info]
                 else:
                     ds.channel_labels = group_info
+
             ds.set_data(data)
             ds.save()
 
@@ -295,7 +309,7 @@ class DBWrapper(object):
                         out_info[datum.datum_id] = dict(tmp_out)
                     else:
                         continue
-                except (ObjectDoesNotExist, IndexError) as e:
+                except (ObjectDoesNotExist, IndexError, TypeError) as e:
                     continue
 
             return out_info
