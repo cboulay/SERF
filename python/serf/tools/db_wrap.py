@@ -179,7 +179,7 @@ class DBWrapper(object):
                 # this will cascade to all dependent fields
                 Datum.objects.get(datum_id=ddv[0].datum_id).delete()
 
-            #create new datum
+            # create new datum
             dat = Datum()
             dat.procedure = self.current_procedure
             dat.is_good = is_good
@@ -196,7 +196,6 @@ class DBWrapper(object):
             dat.update_ddv('depth', depth)
 
             ds = DatumStore()
-            ds_created = True
             ds.datum = dat
 
             # channel labels needs to be a list of strings

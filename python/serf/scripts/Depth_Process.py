@@ -7,15 +7,11 @@ from django.utils import timezone
 from qtpy.QtCore import QSharedMemory
 from serf.tools.db_wrap import DBWrapper
 
-SIMOK = False
-SAMPLINGGROUPS = ["0", "500", "1000", "2000", "10000", "30000"]  # , "RAW"]  RAW broken in cbsdk
-SAMPLINGRATE = 30000  # TODO: not hard-code the sampling rate?
-
 
 class NSPBufferWorker:
 
     def __init__(self):
-        self.current_depth = None  # -20.000
+        self.current_depth = None
 
         # try to resolve LSL stream
         self.depth_inlet = None
@@ -33,14 +29,15 @@ class NSPBufferWorker:
         self.cbsdk_conn.connect()
 
         # neural data buffer
-        self.group_info = self.cbsdk_conn.get_group_config(SAMPLINGGROUPS.index("30000"))
-        self.n_chan = len(self.group_info)
+        self.group_info = {}  # self.cbsdk_conn.get_group_config(SAMPLINGGROUPS.index("30000"))
+        self.n_chan = 1  # len(self.group_info)
 
         # Default values
         self.procedure_id = None
-        self.buffer_length = 6 * SAMPLINGRATE
-        self.sample_length = 4 * SAMPLINGRATE
-        self.delay_length = 0.500 * SAMPLINGRATE
+        self.sampling_rate = 30000
+        self.buffer_length = 180000  # 6 * SAMPLINGRATE
+        self.sample_length = 120000  # 4 * SAMPLINGRATE
+        self.delay_length = 15000  # 0.500 * SAMPLINGRATE
         self.overwrite_depth = True
         self.validity_threshold = [self.sample_length * .9] * self.n_chan
         self.threshold = [False] * self.n_chan
@@ -92,11 +89,19 @@ class NSPBufferWorker:
         if 'procedure_id' in sett_keys:
             self.reset_procedure(sett_dict['procedure_id'])
 
-        if 'buffer_length' in sett_keys:
-            self.buffer_length = int(float(sett_dict['buffer_length']) * SAMPLINGRATE)
-            self.sample_length = int(float(sett_dict['sample_length']) * SAMPLINGRATE)
-            self.delay_length = int(float(sett_dict['delay_buffer']) * SAMPLINGRATE)
+        if 'sampling_group_id' in sett_keys:
+            self.group_info = self.cbsdk_conn.get_group_config(sett_dict['sampling_group_id'])
+            self.n_chan = len(self.group_info)
+
+            self.sampling_rate = sett_dict['sampling_rate']
+            self.buffer_length = int(float(sett_dict['buffer_length']) * self.sampling_rate)
+            self.sample_length = int(float(sett_dict['sample_length']) * self.sampling_rate)
+            self.delay_length = int(float(sett_dict['delay_buffer']) * self.sampling_rate)
             self.overwrite_depth = sett_dict['overwrite_depth']
+            # default values, might be overwritten by electrode_settings
+            self.validity_threshold = [self.sample_length * .9] * self.n_chan
+            self.threshold = [False] * self.n_chan
+
             self.reset_buffer()
 
         if 'electrode_settings' in sett_keys:
@@ -152,7 +157,7 @@ class NSPBufferWorker:
 
             # now is for the last sample. subtract data length / SAMPLINGRATE to get time of first sample
             self.start_time = timezone.now()
-            time_delta = timezone.timedelta(seconds=data[0][1].shape[0] / SAMPLINGRATE)
+            time_delta = timezone.timedelta(seconds=data[0][1].shape[0] / self.sampling_rate)
             self.start_time -= time_delta
 
             self.write_shared_memory(-1)
