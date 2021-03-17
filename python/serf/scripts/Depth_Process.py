@@ -31,6 +31,7 @@ class NSPBufferWorker:
         # neural data buffer
         self.group_info = {}  # self.cbsdk_conn.get_group_config(SAMPLINGGROUPS.index("30000"))
         self.n_chan = 1  # len(self.group_info)
+        self.valid_electrodes = []  # only electrodes with the correct sampling group of 30kHz
 
         # Default values
         self.procedure_id = None
@@ -91,6 +92,7 @@ class NSPBufferWorker:
 
         if 'sampling_group_id' in sett_keys:
             self.group_info = self.cbsdk_conn.get_group_config(sett_dict['sampling_group_id'])
+            self.valid_electrodes = [x['chan'] for x in self.group_info]
             self.n_chan = len(self.group_info)
 
             self.sampling_rate = sett_dict['sampling_rate']
@@ -190,6 +192,8 @@ class NSPBufferWorker:
             # 1st level is a list of channels
             # 2nd level is a list [chan_id, np.array(data)]
             data = self.cbsdk_conn.get_continuous_data()
+            # Only keep channels within our sampling group
+            data = [x for x in data if x[0] in self.valid_electrodes]
 
             rec_status = self.cbsdk_conn.get_recording_state()
             if not rec_status:
