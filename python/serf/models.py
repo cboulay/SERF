@@ -222,7 +222,10 @@ class Procedure(models.Model):
     entry = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # entry point coordinates
     medication_status = EnumField(choices=(('none', 'none'), ('on', 'on'), ('off', 'off'), ('half', 'half')),
                                   default='none')
-    name = models.CharField(max_length=135, blank=True)
+    offset_direction = EnumField(choices=(('none', 'none'), ('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D'),
+                                          ('E', 'E'), ('F', 'F'), ('G', 'G'), ('H', 'H')), default='none')
+    offset_size = models.FloatField(default=0.0)
+    target_name = models.CharField(max_length=135, blank=True)
 
     cfg_roots = ['left', 'right', 'bilateral', 'full', 'array']
     suffixes = [('_' + str(_)) if _ > 1 else '' for _ in range(1, 5)]
