@@ -209,6 +209,7 @@ class Procedure(models.Model):
     date = models.DateField(blank=True, null=True, default=datetime.date.today)
     subject = models.ForeignKey(Subject, related_name="_procedures", on_delete=models.CASCADE)
     type = EnumField(choices=(('none', 'none'),
+                              ('DBS', 'DBS'),
                               ('surgical', 'surgical'),
                               ('experiment', 'experiment'),
                               ('monitoring', 'monitoring'),
@@ -222,14 +223,18 @@ class Procedure(models.Model):
     entry = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # entry point coordinates
     medication_status = EnumField(choices=(('none', 'none'), ('on', 'on'), ('off', 'off'), ('half', 'half')),
                                   default='none')
-    name = models.CharField(max_length=135, blank=True)
+    offset_direction = EnumField(choices=(('none', 'none'), ('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D'),
+                                          ('E', 'E'), ('F', 'F'), ('G', 'G'), ('H', 'H')), default='none')
+    offset_size = models.FloatField(default=0.0)
 
     cfg_roots = ['left', 'right', 'bilateral', 'full', 'array']
     suffixes = [('_' + str(_)) if _ > 1 else '' for _ in range(1, 5)]
     import itertools
     choices = ['none'] + [_[0] + _[1] for _ in itertools.product(cfg_roots, suffixes)]
     recording_config = EnumField(choices=tuple([(_, _) for _ in choices]), default='none')
+
     target = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # entry point coordinates
+    target_name = models.CharField(max_length=135, blank=True)
 
     class Meta:
         db_table = u'procedure'
