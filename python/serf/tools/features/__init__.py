@@ -14,9 +14,9 @@ class ClassName:
 
 """
 
-from . import dbs_features
+from . import stn_features
 from . import dl_features
 from . import lfp_features
 from . import spike_features
 
-__all__ = ['dbs_features', 'dl_features', 'lfp_features', 'spike_features']
+__all__ = ['stn_features.py', 'dl_features', 'lfp_features', 'spike_features']

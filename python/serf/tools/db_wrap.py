@@ -210,6 +210,40 @@ class DBWrapper(object):
             ds.set_data(data)
             ds.save()
 
+    def save_mapping_response(self, depth=0.000, channel_label='None', response='None'):
+        # query datum associated with subject, procedure and depth
+        dt, _ = DetailType.objects.get_or_create(name='depth')
+        dat = DatumDetailValue.objects.filter(datum__in=Datum.objects.filter(procedure=self.current_procedure),
+                                              detail_type=dt,
+                                              value=depth)
+        if dat:
+            dat = dat[0].datum
+
+            # check if datum already has mapping ddv
+            dt, _ = DetailType.objects.get_or_create(name='sensorimotor_mapping')
+            ddv = DatumDetailValue.objects.get_or_create(datum=dat, detail_type=dt)
+
+            # update datum detail value => comma separate string: 'chan_label response, chan_label response'
+            ddv.value = self.update_sensorymotor_response(ddv.value, channel_label, response)
+            ddv.save()
+
+    @staticmethod
+    def update_sensorymotor_response(str, channel_label, response):
+        d = {}
+        split = str.split(',')
+        for sub in split:
+            chan, resp = sub.split(' ')
+            d[chan] = resp
+        d[channel_label] = response
+
+        out_str = ''
+        for k, v in d.items():
+            out_str += k + ' ' + v + ','
+
+        # remove trailing ,
+        out_str = out_str.rstrip(',')
+        return out_str
+
     # FEATURES =========================================================================================================
     def list_all_features(self):  # lists from files in the features directory and create the DB entry if needed
         # dictionary {category: [list of tuple (class name, class)]}

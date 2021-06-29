@@ -13,9 +13,12 @@ class NSPBufferWorker:
     def __init__(self):
         self.current_depth = None
 
-        # try to resolve LSL stream
-        self.depth_inlet = None
-        self.resolve_stream()
+        # try to resolve LSL streams
+        self.depth_inlet, tmp_depth = self.resolve_stream('depth1214')
+        if tmp_depth[0]:
+            self.current_depth = tmp_depth[0][0]
+
+        self.map_inlet, _ = self.resolve_stream('mapping1214')
 
         # DB wrapper
         self.db_wrapper = DBWrapper()
@@ -165,15 +168,16 @@ class NSPBufferWorker:
             self.write_shared_memory(-1)
             return True
 
-    def resolve_stream(self):
+    def resolve_stream(self, source_id):
         # will register to LSL stream to read electrode depth
-        info = resolve_byprop('source_id', 'depth1214', timeout=1)
+        info = resolve_byprop('source_id', source_id, timeout=1)
         if len(info) > 0:
-            self.depth_inlet = stream_inlet(info[0])
-            sample = self.depth_inlet.pull_sample(0)
-            # If new sample
-            if sample[0]:
-                self.current_depth = sample[0][0]
+            inlet = stream_inlet(info[0])
+            sample = inlet.pull_sample(0)
+        else:
+            inlet = None
+            sample = [None]
+        return inlet, sample
 
     def run_buffer(self):
         while self.is_running:
@@ -260,7 +264,7 @@ class NSPBufferWorker:
             # clean data (i.e. validity_threshold). If the channel is still acquiring data but has sufficiently long
             # segments, we will send the cleanest segment to the DB (i.e. valid_idx).
             if not self.depth_inlet:
-                self.resolve_stream()
+                self.depth_inlet, _ = self.resolve_stream('depth1214')
             else:
                 sample = self.depth_inlet.pull_sample(0)
                 # If new sample
@@ -280,6 +284,16 @@ class NSPBufferWorker:
                         # only if recording
                         if rec_status:
                             self.write_shared_memory(-2)
+
+            if self.map_inlet:
+                sample = self.map_inlet.pull_sample(0)
+                if sample[0] and self.current_depth:
+                    chan_lbl, resp = sample[0]
+                    self.db_wrapper.save_mapping_response(depth=self.current_depth,
+                                                          channel_label=chan_lbl,
+                                                          response=resp)
+            else:
+                self.map_inlet, _ = self.resolve_stream('mapping1214')
 
             time.sleep(.010)
 
