@@ -14,11 +14,11 @@ GAMMABAND = [60, 200]
 MAXSEGLEN = 2**14
 
 
-# DBS Features
+# STN Features
 class BetaPower(FeatureBase):
     name = "BetaPower"
     desc = "Band-Pass filter in the beta 13-30Hz range then np.abs(Hilbert)**2."
-    category = "DBS"
+    category = "STN"
 
     def run(self, data):
         """
@@ -54,7 +54,7 @@ class NoiseRMS(FeatureBase):
     # discard the lowest 5%
     # :param data: Neural data segment to compute noise RMS on. It is a Channel x Sample np.array
     # :return: RMS values for each channel and an array of 0s, one for each channel as the x_axis values"""
-    category = "DBS"
+    category = "STN"
 
     def run(self, data):
         """
@@ -95,7 +95,7 @@ class PAC(FeatureBase):
 
     name = "PAC"
     desc = """ Using MSPACMAN algorithm to compute Beta to high-gamma PAC. """
-    category = "DBS"
+    category = "STN"
 
     def __init__(self, db_id):
         super(PAC, self).__init__(db_id)
