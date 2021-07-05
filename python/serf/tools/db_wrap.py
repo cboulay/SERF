@@ -118,9 +118,9 @@ class DBWrapper(object):
     # return datum ids for values greater than gt
     # matches current procedure
     def list_all_datum_ids(self, gt=0):
-        return Datum.objects.filter(procedure=self.current_procedure,
-                                    span_type='period',
-                                    datum_id__gt=gt).order_by('number').values_list('datum_id', flat=True)
+        return list(Datum.objects.filter(procedure=self.current_procedure,
+                                         span_type='period',
+                                         datum_id__gt=gt).order_by('number').values_list('datum_id', flat=True))
 
     def list_channel_labels(self):
         labels = set([])
@@ -210,7 +210,29 @@ class DBWrapper(object):
             ds.set_data(data)
             ds.save()
 
-    def save_mapping_response(self, depth=0.000, channel_label='None', response='None'):
+    def save_datum_note(self, depth=0.000, note=''):
+        # query datum associated with subject, procedure and depth
+        dt, _ = DetailType.objects.get_or_create(name='depth')
+        dat = DatumDetailValue.objects.filter(datum__in=Datum.objects.filter(procedure=self.current_procedure),
+                                              detail_type=dt,
+                                              value=depth)
+        if dat:
+            dat = dat[0].datum
+
+            # check if datum already has mapping ddv
+            dt, _ = DetailType.objects.get_or_create(name='note')
+            ddv, created = DatumDetailValue.objects.get_or_create(datum=dat, detail_type=dt)
+
+            if created:
+                current_value = ''
+            else:
+                current_value = ddv.value
+
+            # concatenates notes and separates by carriage returns.
+            ddv.value = current_value + '\r\n' + note
+            ddv.save()
+
+    def save_mapping_response(self, depth=0.000, response=''):
         # query datum associated with subject, procedure and depth
         dt, _ = DetailType.objects.get_or_create(name='depth')
         dat = DatumDetailValue.objects.filter(datum__in=Datum.objects.filter(procedure=self.current_procedure),
@@ -221,31 +243,74 @@ class DBWrapper(object):
 
             # check if datum already has mapping ddv
             dt, _ = DetailType.objects.get_or_create(name='sensorimotor_mapping')
-            ddv = DatumDetailValue.objects.get_or_create(datum=dat, detail_type=dt)
+            ddv, created = DatumDetailValue.objects.get_or_create(datum=dat, detail_type=dt)
 
-            # update datum detail value => comma separate string: 'chan_label response, chan_label response'
-            ddv.value = self.update_sensorymotor_response(ddv.value, channel_label, response)
+            if created:
+                current_value = {}
+            else:
+                current_value = json.loads(ddv.value)
+            response_dict = json.loads(response)
+            ddv.value = self.update_mapping_response(current_value, response_dict)
             ddv.save()
 
     @staticmethod
-    def update_sensorymotor_response(str, channel_label, response):
-        d = {}
-        split = str.split(',')
-        for sub in split:
-            chan, resp = sub.split(' ')
-            d[chan] = resp
-        d[channel_label] = response
+    def update_mapping_response(d, response):
 
-        out_str = ''
-        for k, v in d.items():
-            out_str += k + ' ' + v + ','
+        for chan, resp in response.items():
+            if resp == 'Clear':
+                if chan in d.keys():
+                    d.pop(chan)
+            else:
+                d[chan] = resp
 
-        # remove trailing ,
-        out_str = out_str.rstrip(',')
+        out_str = json.dumps(d)
         return out_str
 
+    def load_mapping_response(self, chan_lbl='None', gt=0):
+        all_data = self.list_all_datum_ids(gt=gt)
+
+        depth_detail_id = DetailType.objects.filter(name='depth').values_list('detail_type_id', flat=True)
+        mapping_detail_id = DetailType.objects.filter(
+            name='sensorimotor_mapping').values_list('detail_type_id', flat=True)
+
+        out_info = {}
+        limb_labels = ['None', 'Unspecified', 'Foot', 'Leg', 'Hand', 'Arm', 'Head']
+        stim_labels = ['Kinesthetic', 'Tactile']
+
+        for d_id in all_data:
+            try:
+                datum = Datum.objects.get(datum_id=d_id)
+                depth = datum._detail_values.get(detail_type_id=depth_detail_id[0])
+                map = datum._detail_values.get(detail_type_id=mapping_detail_id[0])
+
+                if depth.value and map.value:
+                    out_info[datum.datum_id] = {'depth': float(depth.value)}
+
+                    d = json.loads(map.value)
+
+                    # expected data format is {feature: [x, y, valid]
+                    # we return: {stimuli: [depth, [responsive limbs], True]}
+                    out_info[datum.datum_id]['Kinesthetic'] = [[depth.value], [0], True]
+                    out_info[datum.datum_id]['Tactile'] = [[depth.value], [0], True]
+                    out_info[datum.datum_id]['Custom'] = [[depth.value], [0], True]
+
+                    if chan_lbl in d.keys():
+                        limbs = [limb_labels.index(x) for x in d[chan_lbl]['Limbs'] if x in limb_labels]
+                        for stim in d[chan_lbl]['Stimuli']:
+                            if stim in stim_labels:
+                                out_info[datum.datum_id][stim][1] = limbs
+                            else:
+                                out_info[datum.datum_id]['Custom'][1] = limbs
+                else:
+                    continue
+            except (ObjectDoesNotExist, IndexError) as e:
+                continue
+
+        return out_info
+
     # FEATURES =========================================================================================================
-    def list_all_features(self):  # lists from files in the features directory and create the DB entry if needed
+    def list_all_features(self):
+        # lists from files in the features directory and create the DB entry if needed
         # dictionary {category: [list of tuple (class name, class)]}
         # list all the modules in features
         modules = inspect.getmembers(features, inspect.ismodule)
@@ -306,7 +371,7 @@ class DBWrapper(object):
             output = False
         return output
 
-    def load_features_data(self, category='DBS', chan_lbl='None', gt=0):
+    def load_features_data(self, category='STN', chan_lbl='None', gt=0):
         if category in self.all_features.keys():
             features = self.all_features[category]
 

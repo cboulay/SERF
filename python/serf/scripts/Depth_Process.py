@@ -288,10 +288,16 @@ class NSPBufferWorker:
             if self.map_inlet:
                 sample = self.map_inlet.pull_sample(0)
                 if sample[0] and self.current_depth:
-                    chan_lbl, resp = sample[0]
-                    self.db_wrapper.save_mapping_response(depth=self.current_depth,
-                                                          channel_label=chan_lbl,
-                                                          response=resp)
+                    tmp_str = sample[0][0]
+                    # we will use the same inlet to send both notes and sensorimotor mapping responses
+                    # notes are normal strings and mapping responses are json formatted python dicts
+                    try:
+                        json.loads(tmp_str)
+                        self.db_wrapper.save_mapping_response(depth=self.current_depth,
+                                                              response=tmp_str)
+                    except json.decoder.JSONDecodeError:
+                        self.db_wrapper.save_datum_note(depth=self.current_depth,
+                                                        note=tmp_str)
             else:
                 self.map_inlet, _ = self.resolve_stream('mapping1214')
 
