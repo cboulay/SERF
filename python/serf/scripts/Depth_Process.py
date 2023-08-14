@@ -61,7 +61,7 @@ class NSPBufferWorker:
         if self.shared_memory.isAttached():
             self.shared_memory.lock()
             signal = self.shared_memory.data()
-            kill_sig = np.frombuffer(signal[-1], dtype=np.bool)
+            kill_sig = np.frombuffer(signal[-1], dtype=bool)
             settings = ''.join([x.decode('utf-8') for x in signal[1:-1] if x != b'\x00'])
             # clear shared_memory but
             # leave the first byte unchanged because this is the output byte
@@ -305,7 +305,7 @@ class NSPBufferWorker:
                                              is_good=np.array([x >= y for x, y in zip(
                                                  np.sum(self.validity[:, self.valid_idx[0]:
                                                         self.valid_idx[0] + self.sample_length], axis=1),
-                                                 self.validity_threshold)], dtype=np.bool),
+                                                 self.validity_threshold)], dtype=bool),
                                              group_info=self.group_info,
                                              start_time=self.start_time,
                                              stop_time=timezone.now())

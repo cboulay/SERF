@@ -103,7 +103,7 @@ class PAC(FeatureBase):
         # Create the filter banks
         decimate_by = 30
         fpsize = BETABAND[1] - BETABAND[0] + 1  # number of frequencies for phase
-        fasize = np.int(np.round((GAMMABAND[1] - GAMMABAND[0]) / 10) + 1)   # number of frequencies for amp
+        fasize = int(np.round((GAMMABAND[1] - GAMMABAND[0]) / 10) + 1)   # number of frequencies for amp
 
         # from Dvorak and Fenton, JNeurosciMeth, 2014:
         #     For accurate PAC estimation, standard PAC algorithms require amplitude filters with a bandwidth

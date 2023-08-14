@@ -166,7 +166,7 @@ class DBWrapper(object):
         return out_info
 
     # Saving to DB
-    def save_depth_datum(self, depth=0.000, data=None, is_good=np.array([True], dtype=np.bool), group_info=None,
+    def save_depth_datum(self, depth=0.000, data=None, is_good=np.array([True], dtype=bool), group_info=None,
                          start_time=django.utils.timezone.now(), stop_time=django.utils.timezone.now()):
         if self.current_procedure:
             # check if depth already recorded. If so, we need to delete it to make sure the new features are computer
@@ -414,7 +414,7 @@ class ProcessWrapper:
         # the depth recording.
         if self.shared_memory.isAttached():
             self.shared_memory.lock()
-            out = np.frombuffer(self.shared_memory.data()[0], dtype=np.int8)[0]
+            out = np.frombuffer(self.shared_memory.data()[0:], dtype=np.int8)[0]
             self.shared_memory.unlock()
         else:
             out = 0

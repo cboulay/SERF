@@ -19,7 +19,7 @@ class DBSSpikeFeatures(FeatureBase):
         :return:
             n_channel x 4 [RMS, Rate, BI, FF]
         """
-        out_data = np.zeros((data.shape[0], 4), dtype=np.float)
+        out_data = np.zeros((data.shape[0], 4), dtype=np.float64)
         for idx, dat in enumerate(data):
             dat = high_pass_filter(int_to_voltage(dat))
 
@@ -81,10 +81,10 @@ class DBSSpikeFeatures(FeatureBase):
                 _FF = 0
 
             # Some values are float64 for some reason.
-            out_data[idx, 0] = np.float(_RMS)
-            out_data[idx, 1] = np.float(_Rate)
-            out_data[idx, 2] = np.float(_BI)
-            out_data[idx, 3] = np.float(_FF)
+            out_data[idx, 0] = np.float64(_RMS)
+            out_data[idx, 1] = np.float64(_Rate)
+            out_data[idx, 2] = np.float64(_BI)
+            out_data[idx, 3] = np.float64(_FF)
 
         return out_data, np.zeros((out_data.shape[1],))
 

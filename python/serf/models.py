@@ -42,7 +42,7 @@ class NPArrayBlobField(models.BinaryField):
     description = "Store/retrieve numpy arrays as LONGBLOB"
 
     # ===========================================================================
-    def __init__(self, np_dtype=np.float, *args, **kwargs):
+    def __init__(self, np_dtype=np.float64, *args, **kwargs):
         self.np_dtype = np_dtype
         super().__init__(*args, **kwargs)
         # super(NPArrayBlobField, self).__init__(*args, **kwargs)
@@ -74,7 +74,7 @@ class NPArrayBlobField(models.BinaryField):
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        if self.np_dtype != np.float:
+        if self.np_dtype != np.float64:
             kwargs['np_dtype'] = self.np_dtype
         return name, path, args, kwargs
         
@@ -215,12 +215,12 @@ class Procedure(models.Model):
                               ('monitoring', 'monitoring'),
                               ('other', 'other')), default='none')
     # optional
-    a = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # A-E Coordinates
+    a = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # A-E Coordinates
     distance_to_target = models.FloatField(null=True, blank=True)
-    e = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # A-E Coordinates
+    e = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # A-E Coordinates
     electrode_config = EnumField(choices=(('none', 'none'), ('+', '+'), ('x', 'x'), ('l', 'l')),
                                  default='none')
-    entry = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # entry point coordinates
+    entry = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # entry point coordinates
     medication_status = EnumField(choices=(('none', 'none'), ('on', 'on'), ('off', 'off'), ('half', 'half')),
                                   default='none')
     offset_direction = EnumField(choices=(('none', 'none'), ('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D'),
@@ -233,7 +233,7 @@ class Procedure(models.Model):
     choices = ['none'] + [_[0] + _[1] for _ in itertools.product(cfg_roots, suffixes)]
     recording_config = EnumField(choices=tuple([(_, _) for _ in choices]), default='none')
 
-    target = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # entry point coordinates
+    target = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # entry point coordinates
     target_name = models.CharField(max_length=135, blank=True)
 
     class Meta:
@@ -288,7 +288,7 @@ class Datum(models.Model):
     span_type = EnumField(choices=(('trial', 'trial'), ('day', 'day'), ('period', 'period')))
     # optional
     # is_good = models.BooleanField(null=False, default=True)
-    is_good = NPArrayBlobField(np.bool, null=True, blank=True, editable=True)
+    is_good = NPArrayBlobField(bool, null=True, blank=True, editable=True)
     start_time = models.DateTimeField(blank=True, null=True, default=datetime.datetime.now)
     stop_time = models.DateTimeField(blank=True, null=True, default=None)
     # ===========================================================================
@@ -363,7 +363,7 @@ class Datum(models.Model):
             self.stop_time = new_time
 
     if False:  # Remove code to calculate features.
-        from serf.tools.features import hreflex_features as feature_functions
+        from .tools.features import hreflex_features as feature_functions
         def recalculate_child_feature_values(self):
             # REcalculate implies we want to calculate using period's details.
             if self.span_type == 'period':
@@ -381,7 +381,7 @@ class Datum(models.Model):
 
 class DatumStore(models.Model):
     datum = models.OneToOneField(Datum, primary_key=True, related_name="store", on_delete=models.CASCADE)
-    x_vec = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # Exclusively t_vec because erp
+    x_vec = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # Exclusively t_vec because erp
     dat_array = NPArrayBlobField(np.int16, null=True, blank=True, editable=True)  # is a recorded time series segment
     n_channels = models.PositiveSmallIntegerField(null=True, blank=True)
     n_samples = models.PositiveIntegerField(null=True, blank=True)
@@ -419,8 +419,8 @@ class DatumFeatureValue(models.Model):
 
 class DatumFeatureStore(models.Model):
     dfv = models.OneToOneField(DatumFeatureValue, primary_key=True, related_name="store", on_delete=models.CASCADE)
-    x_vec = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # e.g., Hz
-    dat_array = NPArrayBlobField(np.float, null=True, blank=True, editable=True)  # e.g., psd values at each Hz
+    x_vec = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # e.g., Hz
+    dat_array = NPArrayBlobField(np.float64, null=True, blank=True, editable=True)  # e.g., psd values at each Hz
     n_channels = models.PositiveSmallIntegerField(null=True, blank=True)
     n_features = models.PositiveIntegerField(null=True, blank=True)
     channel_labels = CSVStringField(null=True, blank=True)

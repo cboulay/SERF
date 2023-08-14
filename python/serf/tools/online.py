@@ -99,7 +99,7 @@ class Datum:
                 erp_name = 'MEP_p2p' if isp2p else 'MEP_aaa'
             # get xy_array as dat_TMS_powerA, MEP_aaa
             x = self._get_child_details(stim_det_name)
-            x = x.astype(np.float)
+            x = x.astype(np.float64)
             x_bool = ~np.isnan(x)
             y = self._get_child_features(erp_name)
             if model_type == 'threshold':

@@ -55,7 +55,7 @@ class FeaturesWorker:
         if self.shared_memory.isAttached():
             self.shared_memory.lock()
             signal = self.shared_memory.data()
-            kill_sig = np.frombuffer(signal[-1], dtype=np.bool)
+            kill_sig = np.frombuffer(signal[-1], dtype=bool)
             settings = ''.join([x.decode('utf-8') for x in signal[:-1] if x != b'\x00'])
             # clear shared_memory
             self.shared_memory.data()[:] = np.zeros((self.shared_memory.size(),), dtype=np.int8).tobytes()
