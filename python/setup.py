@@ -28,6 +28,8 @@ setup(
         'console_scripts': ['serf-shell=serf.scripts.djangoshell:main',
                             'serf-makemigrations=serf.scripts.makemigrations:main',
                             'serf-migrate=serf.scripts.migrate:main',
+                            'serf-cbacquire=serf.scripts.Depth_Process:main',
+                            'serf-procfeatures=serf.scripts.Features_Process:main'
                             ],
     }
 )

@@ -200,10 +200,10 @@ class DBWrapper(object):
 
             # channel labels needs to be a list of strings
             if type(group_info) is dict:
-                ds.channel_labels = [x['label'].decode('utf-8') for x in group_info]
+                ds.channel_labels = [x['label'] for x in group_info]
             elif type(group_info) is list:
                 if type(group_info[0]) is dict:
-                    ds.channel_labels = [x['label'].decode('utf-8') for x in group_info]
+                    ds.channel_labels = [x['label'] for x in group_info]
                 else:
                     ds.channel_labels = group_info
 
@@ -341,8 +341,10 @@ class ProcessWrapper:
         self.worker.setProcessChannelMode(QProcess.ForwardedChannels)
 
         # The shared memory object will be used the send the process parameters and the kill signal (the last byte).
-        # Parameters will be a space separated string and the kill signal will be set to 1 when the process needs to
-        # terminate.
+        # The first byte is the status.
+        # The next 9 bytes are reserved.
+        # Bytes 10-4086 are space-separated string of parameters.
+        # The final byte (4096) is a kill signal: 1 to terminate; 0 to keep going.
         self.shared_memory = QSharedMemory()
         self.shared_memory.setKey(self.process_name)
 
@@ -352,9 +354,10 @@ class ProcessWrapper:
         # before starting the worker, we will check whether the named shared memory object exists and
         # as a failsafe, we will send the kill signal to all attached processes.
         if self.shared_memory.attach() or self.shared_memory.isAttached():
-            # if attached means that the shared memory block already exists, so terminate process
+            # if attached means that the shared memory block already exists, so terminate process.
+            #  The last byte is a kill signal.
             self.shared_memory.lock()
-            self.shared_memory.data()[-1:] = memoryview(np.array([True], dtype=np.int8).tobytes())
+            self.shared_memory.data()[-1:] = memoryview(b"\x01")
             self.shared_memory.unlock()
         # if shared memory is not attached and can't attach (i.e. doesn't exits) create it
         elif not self.shared_memory.attach() and not self.shared_memory.isAttached():
@@ -378,8 +381,8 @@ class ProcessWrapper:
         if self.shared_memory.isAttached() and len_b_settings < 4086:
             self.shared_memory.lock()
             # clear to make sure we don't have leftovers
-            self.shared_memory.data()[:] = np.zeros((self.shared_memory.size(),), dtype=np.int8).tobytes()
-            self.shared_memory.data()[-(len_b_settings+10):-10] = b_settings
+            self.shared_memory.data()[10:-10] = np.zeros((self.shared_memory.size() - 20,), dtype=np.int8).tobytes()
+            self.shared_memory.data()[10:len_b_settings+10] = b_settings
             self.shared_memory.unlock()
 
     def start_worker(self):
@@ -388,7 +391,7 @@ class ProcessWrapper:
 
             # make sure kill signal is off
             self.shared_memory.lock()
-            self.shared_memory.data()[-1:] = memoryview(np.array([False]).tobytes())
+            self.shared_memory.data()[-1:] = memoryview(b"\x00")
             self.shared_memory.unlock()
 
             run_command = "python " + os.path.join(os.path.dirname(serf.scripts.__file__),
@@ -400,7 +403,7 @@ class ProcessWrapper:
     def kill_worker(self):
         if self.shared_memory.isAttached():
             self.shared_memory.lock()
-            self.shared_memory.data()[-1:] = memoryview(np.array([True]).tobytes())
+            self.shared_memory.data()[-1:] = memoryview(b"\x01")
             self.shared_memory.unlock()
         else:
             self.worker.kill()
@@ -410,11 +413,10 @@ class ProcessWrapper:
         self.shared_memory.detach()
 
     def worker_status(self):
-        # reads the stdout from the process. The script prints either 'in_use' or 'done' to show the current state of
-        # the depth recording.
+        # The status is in the first byte.
         if self.shared_memory.isAttached():
             self.shared_memory.lock()
-            out = np.frombuffer(self.shared_memory.data()[0:], dtype=np.int8)[0]
+            out = np.frombuffer(self.shared_memory.data()[:1], dtype=np.int8)[0]
             self.shared_memory.unlock()
         else:
             out = 0
@@ -422,4 +424,5 @@ class ProcessWrapper:
         return out
 
     def is_running(self):
-        return self.worker.state() != 0
+        _state = self.worker.state()
+        return _state == QProcess.ProcessState.Running

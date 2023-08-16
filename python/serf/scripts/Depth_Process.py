@@ -1,118 +1,86 @@
 import time
 import json
 import numpy as np
+import zmq
 from cerebuswrapper import CbSdkConnection
 from pylsl import stream_inlet, resolve_byprop
 from django.utils import timezone
-from qtpy.QtCore import QSharedMemory
 from serf.tools.db_wrap import DBWrapper
 
 
 class NSPBufferWorker:
 
-    def __init__(self):
+    def __init__(self, zmq_ctrl_port=60001, zmq_depth_port=60002):
         self.current_depth = None
 
         # try to resolve LSL stream
+        # TODO: Use ZeroMQ
         self.depth_inlet = None
         self.resolve_stream()
 
         # DB wrapper
         self.db_wrapper = DBWrapper()
 
-        # shared memory object to receive kill signal
-        self.shared_memory = QSharedMemory()
-        self.shared_memory.setKey("Depth_Process")
+        # ZeroMQ subscription
+        context = zmq.Context()
+        self._ctrl_sock = context.socket(zmq.SUB)
+        self._ctrl_sock.connect(f"tcp://localhost:{zmq_ctrl_port}")
+        self._ctrl_sock.setsockopt_string(zmq.SUBSCRIBE, "feature_settings")
+
+        # ZeroMQ publisher
+        self._depth_sock = context.socket(zmq.PUB)
+        self._depth_sock.bind(f"tcp://*:{zmq_depth_port}")
 
         # cbSDK; connect using default parameters
         self.cbsdk_conn = CbSdkConnection(simulate_ok=False)
         self.cbsdk_conn.connect()
 
-        # neural data buffer
-        self.group_info = {}  # self.cbsdk_conn.get_group_config(SAMPLINGGROUPS.index("30000"))
-        self.n_chan = 1  # len(self.group_info)
-        self.valid_electrodes = []  # only electrodes with the correct sampling group of 30kHz
+        # Default settings
+        self._buffer_dur = 6.0
+        self._sample_dur = 4.0
+        self._new_depth_delay = 0.5
+        self._validity_thresh = 0.9
+        self._sampling_group_id = 5
+        self._reset_group_info()
+        self.reset_buffer()
 
-        # Default values
-        self.procedure_id = None
-        self.sampling_rate = 30000
-        self.buffer_length = 180000  # 6 * SAMPLINGRATE
-        self.sample_length = 120000  # 4 * SAMPLINGRATE
-        self.delay_length = 15000  # 0.500 * SAMPLINGRATE
-        self.overwrite_depth = True
-        self.validity_threshold = [self.sample_length * .9] * self.n_chan
-        self.threshold = [False] * self.n_chan
-        self.settings = []
         self.start_time = timezone.now()
+        self._depth_sock.send_string(f"depth_status startup")
+        self.is_running = True
 
-        # process settings
-        if self.shared_memory.attach(QSharedMemory.ReadWrite):
-            _, settings = self.read_shared_memory()
+    def _reset_group_info(self):
+        self.group_info = self.cbsdk_conn.get_group_config(self._sampling_group_id)
+        self.n_chan = len(self.group_info)
+        self.valid_electrodes = [x["chan"] for x in self.group_info]
+        self.sampling_rate = 30000  # TODO: Get from sampling_group_id
+        self.buffer_length = int(self.sampling_rate * self._buffer_dur)
+        self.sample_length = int(self.sampling_rate * self._sample_dur)
+        self.delay_length = int(self.sampling_rate * self._new_depth_delay)
+        self.overwrite_depth = True
+        # default values, might be overwritten by electrode_settings
+        self.validity_threshold = [self.sample_length * self._validity_thresh] * self.n_chan
+        self.threshold = [False] * self.n_chan
 
-            if settings != '':
-                self.process_settings(settings)
-
-            # loop
-            self.is_running = True
-        else:
-            self.is_running = False
-
-    def read_shared_memory(self):
-        if self.shared_memory.isAttached():
-            self.shared_memory.lock()
-            signal = self.shared_memory.data()
-            kill_sig = np.frombuffer(signal[-1], dtype=bool)
-            settings = ''.join([x.decode('utf-8') for x in signal[1:-1] if x != b'\x00'])
-            # clear shared_memory but
-            # leave the first byte unchanged because this is the output byte
-            self.shared_memory.data()[1:] = np.zeros((self.shared_memory.size()-1,), dtype=np.int8).tobytes()
-            self.shared_memory.unlock()
-        else:
-            kill_sig = True
-            settings = ''
-        return kill_sig, settings
-
-    def write_shared_memory(self, in_use_done):
-        # The output is 8bit integer:
-        #    -1 : Recording
-        #     0 : NSP not recording
-        #     1 : Done
-        if self.shared_memory.isAttached():
-            self.shared_memory.lock()
-            self.shared_memory.data()[0] = np.array([in_use_done], dtype=np.int8).tobytes()
-            self.shared_memory.unlock()
-
-    def process_settings(self, sett_str):
+    def process_settings(self, sett_dict):
         # process inputs
-        sett_dict = json.loads(sett_str)
-        sett_keys = sett_dict.keys()
+        sett_keys = list(sett_dict.keys())
 
-        if 'procedure_id' in sett_keys:
-            self.reset_procedure(sett_dict['procedure_id'])
+        if "procedure" in sett_keys and "procedure_id" in sett_dict["procedure"]:
+            self.reset_procedure(sett_dict["procedure"]["procedure_id"])
 
-        if 'sampling_group_id' in sett_keys:
-            self.group_info = self.cbsdk_conn.get_group_config(sett_dict['sampling_group_id'])
-            self.valid_electrodes = [x['chan'] for x in self.group_info]
-            self.n_chan = len(self.group_info)
-
-            self.sampling_rate = sett_dict['sampling_rate']
-            self.buffer_length = int(float(sett_dict['buffer_length']) * self.sampling_rate)
-            self.sample_length = int(float(sett_dict['sample_length']) * self.sampling_rate)
-            self.delay_length = int(float(sett_dict['delay_buffer']) * self.sampling_rate)
-            self.overwrite_depth = sett_dict['overwrite_depth']
-            # default values, might be overwritten by electrode_settings
-            self.validity_threshold = [self.sample_length * .9] * self.n_chan
-            self.threshold = [False] * self.n_chan
-
+        if "sampling_group_id" in sett_keys:
+            self._sampling_group_id = sett_dict["sampling_group_id"]
+            # self._validity_thresh = sett_dict["???"]
+            self._reset_group_info()
             self.reset_buffer()
 
-        if 'electrode_settings' in sett_keys:
+        if "buffer" in sett_keys and "electrode_settings" in sett_dict["buffer"]:
             for ii, info in enumerate(self.group_info):
-                label = info['label'].decode('utf-8')
-                if label in sett_dict['electrode_settings'].keys():
-                    self.threshold[ii] = bool(sett_dict['electrode_settings'][label]['threshold'])
-                    self.validity_threshold[ii] = \
-                        float(sett_dict['electrode_settings'][label]['validity']) / 100 * self.sample_length
+                label = info["label"]
+                if label in sett_dict["buffer"]["electrode_settings"]:
+                    el_sett = sett_dict["buffer"]["electrode_settings"][label]
+                    self.threshold[ii] = bool(el_sett["threshold"])
+                    self.validity_threshold[ii] = float(el_sett["validity"]) / 100 * self.sample_length
 
     def reset_procedure(self, proc_id):
         self.procedure_id = proc_id
@@ -132,6 +100,8 @@ class NSPBufferWorker:
         self.delay_done = False
 
     def clear_buffer(self):
+        if self.buffer is None:
+            self.reset_buffer()
         self.buffer.fill(0)
         self.buffer_idx = 0
 
@@ -162,7 +132,7 @@ class NSPBufferWorker:
             time_delta = timezone.timedelta(seconds=data[0][1].shape[0] / self.sampling_rate)
             self.start_time -= time_delta
 
-            self.write_shared_memory(-1)
+            self._depth_sock.send_string(f"depth_status recording")
             return True
 
     def resolve_stream(self):
@@ -176,17 +146,20 @@ class NSPBufferWorker:
                 self.current_depth = sample[0][0]
 
     def run_buffer(self):
+        prev_status = None
         while self.is_running:
-            # check for kill signal
-            kill_sig, new_settings = self.read_shared_memory()
-
-            if kill_sig:
-                self.is_running = False
-                continue
-
-            if new_settings != '':
-                self.process_settings(new_settings)
-
+            try:
+                received_msg = self._ctrl_sock.recv_string(flags=zmq.NOBLOCK)[len("feature_settings")+1:]
+                settings_dict = json.loads(received_msg)
+                # Check for kill signal
+                if "running" in settings_dict and not settings_dict["running"]:
+                    self.is_running = False
+                    continue
+                # Process remaining settings
+                self.process_settings(settings_dict)
+            except zmq.ZMQError:
+                received_msg = None
+            
             # collect NSP data, regardless of recording status to keep cbsdk buffer empty
             # data is a list of lists.
             # 1st level is a list of channels
@@ -195,15 +168,14 @@ class NSPBufferWorker:
             # Only keep channels within our sampling group
             data = [x for x in data if x[0] in self.valid_electrodes]
 
-            rec_status = self.cbsdk_conn.get_recording_state()
-            if not rec_status:
-                self.write_shared_memory(0)
-
             # only process the NSP data if Central is recording
-            elif data and self.current_depth:
+            _status = "recording" if self.cbsdk_conn.get_recording_state() else "notrecording"
+            if _status == "recording" and data and self.current_depth:
+
                 if not self.delay_done:
                     self.delay_done = self.wait_for_delay_end(data)
 
+                # Only process if we are in a new depth, past the delay, and we didn't just send a snippet to the db.
                 if self.delay_done and self.update_buffer_status:
                     # all data segments should have the same length, so first check if we run out of buffer space
                     data_length = data[0][1].shape[0]
@@ -233,6 +205,8 @@ class NSPBufferWorker:
 
                             self.validity[chan_idx,
                                           self.buffer_idx:self.buffer_idx + data_length] = valid
+                            
+                            _status = "accumulating"
 
                     # increment buffer index, all data segments should have same length, if they don't, will match
                     # the first channel
@@ -252,7 +226,10 @@ class NSPBufferWorker:
 
                         if all(x >= y for x, y in zip(temp_sum, self.validity_threshold)) or \
                                 self.buffer_idx >= self.buffer_length:
-                            self.send_to_db()
+                            # We have accumulated enough data for this depth. Send to db!
+                            stored = self.send_to_db()
+                            if stored:
+                                _status = "done"
 
             # check for new depth
             # At this point, the individual channels have either been sent to the DB or are still collecting waiting for
@@ -262,30 +239,34 @@ class NSPBufferWorker:
             if not self.depth_inlet:
                 self.resolve_stream()
             else:
-                sample = self.depth_inlet.pull_sample(0)
+                depth, ts = self.depth_inlet.pull_sample(0)
                 # If new sample
-                if sample[0]:
+                if depth:
                     # New depth
-                    if sample[0][0] != self.current_depth or self.overwrite_depth:
-                        # check whether the channels are still acquiring data
-                        # it can be because they have insufficient samples or because the samples do not have a high
-                        # enough validity value. If this is the case, send the best one to the DB, even if possibly
-                        # corrupted
+                    if depth[0] != self.current_depth or self.overwrite_depth:
+                        # We are moving on. If still updating the buffer, then we can check to see if we have 
+                        #  enough valid samples -- though maybe not high quality -- and save the best available segment.
                         if self.update_buffer_status:
-                            self.send_to_db()
+                            _ = self.send_to_db()
 
+                        # New depth verified. Let's clear the buffer for accumulation again.
                         self.clear_buffer()
-                        self.current_depth = sample[0][0]
+                        self.current_depth = depth[0]
 
-                        # only if recording
-                        if rec_status:
-                            self.write_shared_memory(-2)
+            # Optionally publish the recording status.
+            b_send_status = prev_status is None  # Previously unknown
+            # or status has changed, but not from done->recording -- we'd like to keep the "done" status for a bit.
+            b_send_status |= _status != prev_status and not (prev_status == "done" and _status == "recording")
+            if b_send_status:
+                self._depth_sock.send_string(f"depth_status {_status}")
+                prev_status = _status
 
             time.sleep(.010)
 
     def send_to_db(self):
+        do_save = self.valid_idx[1] != 0
         # if we actually have a computed validity (i.e. segment is long enough)
-        if self.valid_idx[1] != 0:
+        if do_save:
             # the info that needs to be sent the DB_wrapper is:
             #   Datum:
             #       - subject_id
@@ -309,10 +290,8 @@ class NSPBufferWorker:
                                              group_info=self.group_info,
                                              start_time=self.start_time,
                                              stop_time=timezone.now())
-
-            self.write_shared_memory(1)
-
         self.update_buffer_status = False
+        return do_save
 
     @staticmethod
     def validate_data_sample(data):
@@ -326,6 +305,10 @@ class NSPBufferWorker:
         return validity
 
 
-if __name__ == '__main__':
+def main():
     worker = NSPBufferWorker()
     worker.run_buffer()
+
+
+if __name__ == '__main__':
+    main()
