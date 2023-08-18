@@ -43,6 +43,7 @@ class DBWrapper(object):
         self.current_subject, created = Subject.objects.get_or_create(id=subject_details['id'])
 
         if created:
+            print('Created a new Subject entry')
             # add details
             for key, val in subject_details.items():
                 # subject_id is an auto-field
@@ -50,7 +51,7 @@ class DBWrapper(object):
                     setattr(self.current_subject, key, val)
             self.current_subject.save()
         else:
-            print('Found existing subject entry. Loading it.')
+            print('Found existing Subject entry. Loading it.')
 
         return self.current_subject.subject_id
 
@@ -88,7 +89,7 @@ class DBWrapper(object):
         self.current_procedure, created = Procedure.objects.get_or_create(**procedure_details)
 
         if not created:
-            print('Loading existing entry.')
+            print('Loading existing Procedure.')
 
         return self.current_procedure.procedure_id
 
