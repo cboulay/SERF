@@ -86,7 +86,13 @@ class DBWrapper(object):
             if not isinstance(procedure_details['subject'], Subject):
                 del procedure_details['subject']
 
-        self.current_procedure, created = Procedure.objects.get_or_create(**procedure_details)
+        keep_keys = ["date", "subject_id", "recording_config", "electrode_config", "distance_to_target", "target_name"]
+        trim_details = {}
+        for k in keep_keys:
+            if k in procedure_details:
+                trim_details[k] = procedure_details[k]
+
+        self.current_procedure, created = Procedure.objects.get_or_create(**trim_details)
 
         if not created:
             print('Loading existing Procedure.')
