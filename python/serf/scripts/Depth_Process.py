@@ -10,11 +10,11 @@ from serf.tools.db_wrap import DBWrapper
 
 class NSPBufferWorker:
 
-    def __init__(self, zmq_ctrl_port=60001, zmq_depth_port=60002):
+    def __init__(self, zmq_ctrl_port=60001, zmq_depth_port=60002, zmq_ddu_port=60005):
         self.current_depth = None
 
         # try to resolve LSL stream
-        # TODO: Use ZeroMQ
+        self._b_use_lsl = True  # TODO: Get rid of this once new DDU app is confirmed working.
         self.depth_inlet = None
         self.resolve_stream()
 
@@ -23,13 +23,18 @@ class NSPBufferWorker:
 
         # ZeroMQ subscription
         context = zmq.Context()
+        # procedure settings
         self._ctrl_sock = context.socket(zmq.SUB)
         self._ctrl_sock.connect(f"tcp://localhost:{zmq_ctrl_port}")
-        self._ctrl_sock.setsockopt_string(zmq.SUBSCRIBE, "feature_settings")
+        self._ctrl_sock.setsockopt_string(zmq.SUBSCRIBE, "procedure_settings")
+        # ddu depth
+        self._ddu_sock = context.socket(zmq.SUB)
+        self._ddu_sock.connect(f"tcp://localhost:{zmq_ddu_port}")
+        self._ddu_sock.setsockopt_string(zmq.SUBSCRIBE, "ddu")
 
         # ZeroMQ publisher
-        self._depth_sock = context.socket(zmq.PUB)
-        self._depth_sock.bind(f"tcp://*:{zmq_depth_port}")
+        self._snippet_sock = context.socket(zmq.PUB)
+        self._snippet_sock.bind(f"tcp://*:{zmq_depth_port}")
 
         # cbSDK; connect using default parameters
         self.cbsdk_conn = CbSdkConnection(simulate_ok=False)
@@ -45,7 +50,7 @@ class NSPBufferWorker:
         self.reset_buffer()
 
         self.start_time = timezone.now()
-        self._depth_sock.send_string(f"depth_status startup")
+        self._snippet_sock.send_string(f"snippet_status startup")
         self.is_running = True
 
     def _reset_group_info(self):
@@ -132,7 +137,7 @@ class NSPBufferWorker:
             time_delta = timezone.timedelta(seconds=data[0][1].shape[0] / self.sampling_rate)
             self.start_time -= time_delta
 
-            self._depth_sock.send_string(f"depth_status recording")
+            self._snippet_sock.send_string(f"snippet_status recording")
             return True
 
     def resolve_stream(self):
@@ -149,7 +154,7 @@ class NSPBufferWorker:
         prev_status = None
         while self.is_running:
             try:
-                received_msg = self._ctrl_sock.recv_string(flags=zmq.NOBLOCK)[len("feature_settings")+1:]
+                received_msg = self._ctrl_sock.recv_string(flags=zmq.NOBLOCK)[len("procedure_settings")+1:]
                 settings_dict = json.loads(received_msg)
                 # Check for kill signal
                 if "running" in settings_dict and not settings_dict["running"]:
@@ -158,8 +163,8 @@ class NSPBufferWorker:
                 # Process remaining settings
                 self.process_settings(settings_dict)
             except zmq.ZMQError:
-                received_msg = None
-            
+                pass
+
             # collect NSP data, regardless of recording status to keep cbsdk buffer empty
             # data is a list of lists.
             # 1st level is a list of channels
@@ -236,29 +241,40 @@ class NSPBufferWorker:
             # either of the following conditions: acquire sufficient data (i.e. sample_length) or acquire sufficiently
             # clean data (i.e. validity_threshold). If the channel is still acquiring data but has sufficiently long
             # segments, we will send the cleanest segment to the DB (i.e. valid_idx).
+            new_depth = None
+            try:
+                received_msg = self._ddu_sock.recv_string(flags=zmq.NOBLOCK)[len("ddu") + 1:]
+                if received_msg:
+                    new_depth = float(received_msg)
+                self._b_use_lsl = False
+                self.depth_inlet = None
+            except zmq.ZMQError:
+                pass
             if not self.depth_inlet:
-                self.resolve_stream()
+                if self._b_use_lsl:
+                    self.resolve_stream()
             else:
                 depth, ts = self.depth_inlet.pull_sample(0)
-                # If new sample
                 if depth:
-                    # New depth
-                    if depth[0] != self.current_depth or self.overwrite_depth:
-                        # We are moving on. If still updating the buffer, then we can check to see if we have 
-                        #  enough valid samples -- though maybe not high quality -- and save the best available segment.
-                        if self.update_buffer_status:
-                            _ = self.send_to_db()
+                    new_depth = depth[0]
 
-                        # New depth verified. Let's clear the buffer for accumulation again.
-                        self.clear_buffer()
-                        self.current_depth = depth[0]
+            # If new depth value
+            if new_depth is not None and (new_depth != self.current_depth or self.overwrite_depth):
+                # We are moving on. If still updating the buffer, then we can check to see if we have
+                #  enough valid samples -- though maybe not high quality -- and save the best available segment.
+                if self.update_buffer_status:
+                    _ = self.send_to_db()
+
+                # New depth verified. Let's clear the buffer for accumulation again.
+                self.clear_buffer()
+                self.current_depth = new_depth
 
             # Optionally publish the recording status.
             b_send_status = prev_status is None  # Previously unknown
             # or status has changed, but not from done->recording -- we'd like to keep the "done" status for a bit.
             b_send_status |= _status != prev_status and not (prev_status == "done" and _status == "recording")
             if b_send_status:
-                self._depth_sock.send_string(f"depth_status {_status}")
+                self._snippet_sock.send_string(f"snippet_status {_status}")
                 prev_status = _status
 
             time.sleep(.010)

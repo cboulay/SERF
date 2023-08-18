@@ -15,7 +15,7 @@ class FeaturesWorker:
         context = zmq.Context()
         self._ctrl_sock = context.socket(zmq.SUB)
         self._ctrl_sock.connect(f"tcp://localhost:{zmq_ctrl_port}")
-        self._ctrl_sock.setsockopt_string(zmq.SUBSCRIBE, "feature_settings")
+        self._ctrl_sock.setsockopt_string(zmq.SUBSCRIBE, "procedure_settings")
 
         self.procedure_id = None
         self.settings = []
@@ -51,15 +51,14 @@ class FeaturesWorker:
         try:
             while self.is_running:
                 try:
-                    received_msg = self._ctrl_sock.recv_string(flags=zmq.NOBLOCK)[len("feature_settings")+1:]
-                except zmq.ZMQError:
-                    received_msg = None
-                if received_msg:
+                    received_msg = self._ctrl_sock.recv_string(flags=zmq.NOBLOCK)[len("procedure_settings")+1:]
                     settings_dict = json.loads(received_msg)
                     if "running" in settings_dict and not settings_dict["running"]:
                         self.is_running = False
                         continue
                     self.process_settings(settings_dict)
+                except zmq.ZMQError:
+                    pass
 
                 new_datum = self.db_wrapper.list_all_datum_ids(gt=self.gt)
 
