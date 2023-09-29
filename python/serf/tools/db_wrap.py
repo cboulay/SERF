@@ -129,11 +129,14 @@ class DBWrapper(object):
                                     span_type='period',
                                     datum_id__gt=gt).order_by('number').values_list('datum_id', flat=True)
 
-    def list_channel_labels(self):
-        labels = set([])
+    # Get the list of channels for the most recent non-empty datum in this procedure
+    def list_channel_labels(self) -> list:
+        labels = []
         for dat in self.list_all_datum_ids():
             try:
-                labels.update(Datum.objects.get(datum_id=dat).store.channel_labels)
+                store: DatumStore = Datum.objects.get(datum_id=dat).store
+                if store.n_channels > 0:
+                    labels = list(store.channel_labels)
             except ObjectDoesNotExist:
                 continue
         return labels
