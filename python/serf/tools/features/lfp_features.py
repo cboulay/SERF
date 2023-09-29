@@ -99,7 +99,7 @@ class LFPSpectrumAndEpisodes(FeatureBase):
     def compute_p_episodes(self, pwr, pwr_thresholds, n_periods=3):
         # 3 periods * 1kHz
         dur_thresholds = (n_periods * SR) // self.fo
-        cross = np.greater(pwr, np.atleast_3d(pwr_thresholds)).astype(np.int)
+        cross = np.greater(pwr, np.atleast_3d(pwr_thresholds)).astype(int)
 
         # since diff.shape[1] = cross.shape[1]-1 and the first sample might be above threshold
         # we need to concatenate the first cross column.
