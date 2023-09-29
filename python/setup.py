@@ -7,7 +7,7 @@ with open(os.path.join(os.path.dirname(__file__), '..', 'README.md')) as readme:
 
 setup(
     name='serf',
-    version='1.2',
+    version='1.3',
     packages=find_packages() + ['serf/tools/resources'],
     package_data={"serf/tools/resources": ["*.mat"]},
     include_package_data=True,
@@ -28,8 +28,6 @@ setup(
         'console_scripts': ['serf-shell=serf.scripts.djangoshell:main',
                             'serf-makemigrations=serf.scripts.makemigrations:main',
                             'serf-migrate=serf.scripts.migrate:main',
-                            'serf-cbacquire=serf.scripts.Depth_Process:main',
-                            'serf-procfeatures=serf.scripts.Features_Process:main'
                             ],
     }
 )
