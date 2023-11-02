@@ -86,16 +86,27 @@ class DBWrapper(object):
             if not isinstance(procedure_details["subject"], Subject):
                 del procedure_details["subject"]
 
-        keep_keys = ["date", "subject_id", "recording_config", "electrode_config", "distance_to_target", "target_name"]
-        trim_details = {}
-        for k in keep_keys:
-            if k in procedure_details:
-                trim_details[k] = procedure_details[k]
+        # Some of the fields cannot be used in get_or_create because they cannot be hashed
+        skip_fields = ["a", "e", "entry", "target", "target_name", "type"]
 
-        self.current_procedure, created = Procedure.objects.get_or_create(**trim_details)
+        if "procedure_id" in procedure_details and procedure_details["procedure_id"] != -1:
+            self.current_procedure, created = \
+                Procedure.objects.get_or_create(procedure_id=procedure_details["procedure_id"])
+        else:
+            procedure_details.pop("procedure_id")
+            filter_kwargs = {k: v for k, v in procedure_details.items() if k not in skip_fields}
+            self.current_procedure, created = Procedure.objects.get_or_create(**filter_kwargs)
 
-        if not created:
-            print('Loading existing Procedure.')
+        if created:
+            print(f"Created new Procedure with id {self.current_procedure.procedure_id}.")
+            # add the skip_fields to the created procedure
+            for k, v in procedure_details.items():
+                if k in skip_fields:
+                    if hasattr(self.current_procedure, k):
+                        setattr(self.current_procedure, k, v)
+            self.current_procedure.save()
+        else:
+            print(f"Loading existing Procedure with id {self.current_procedure.procedure_id}.")
 
         return self.current_procedure.procedure_id
 
