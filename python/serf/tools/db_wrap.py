@@ -36,22 +36,22 @@ class DBWrapper(object):
     # SUBJECT ==========================================================================================================
     def load_or_create_subject(self, subject_details):
         # validate that the subject doesn't already exist
-        if subject_details['id'] == '':
-            print('You must enter a subject id.')
+        if subject_details["id"] == "":
+            print("You must enter a subject id.")
             return -1
 
         self.current_subject, created = Subject.objects.get_or_create(id=subject_details['id'])
 
         if created:
-            print('Created a new Subject entry')
+            print(f"Created a new Subject with id {self.current_subject.subject_id}")
             # add details
             for key, val in subject_details.items():
                 # subject_id is an auto-field
-                if hasattr(self.current_subject, key) and key != 'subject_id':
+                if hasattr(self.current_subject, key) and key != "subject_id":
                     setattr(self.current_subject, key, val)
             self.current_subject.save()
         else:
-            print('Found existing Subject entry. Loading it.')
+            print(f"Using existing Subject with id {self.current_subject.subject_id}.")
 
         return self.current_subject.subject_id
 
@@ -76,15 +76,15 @@ class DBWrapper(object):
     # PROCEDURE ========================================================================================================
     def load_or_create_procedure(self, procedure_details):
         # validate that the subject doesn't already exist
-        if not procedure_details['subject_id']:
-            print('You must enter a subject id.')
+        if not procedure_details["subject_id"]:
+            print("You must enter a subject id.")
             return -1
 
         # subject field needs to be an instance of Subject(), if not, remove key from dict.
         # We do have the subject id field set.
-        if 'subject' in procedure_details.keys():
-            if not isinstance(procedure_details['subject'], Subject):
-                del procedure_details['subject']
+        if "subject" in procedure_details.keys():
+            if not isinstance(procedure_details["subject"], Subject):
+                del procedure_details["subject"]
 
         keep_keys = ["date", "subject_id", "recording_config", "electrode_config", "distance_to_target", "target_name"]
         trim_details = {}
@@ -181,7 +181,7 @@ class DBWrapper(object):
         if self.current_procedure:
             # check if depth already recorded. If so, we need to delete it to make sure the new features are computer
             # and that the updated value gets picked up by the plots.
-            dt, _ = DetailType.objects.get_or_create(name='depth')
+            dt, _ = DetailType.objects.get_or_create(name="depth")
             ddv = DatumDetailValue.objects.filter(datum__in=Datum.objects.filter(procedure=self.current_procedure),
                                                   detail_type=dt,
                                                   value=depth)
