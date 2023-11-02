@@ -179,14 +179,15 @@ class DBWrapper(object):
     def save_depth_datum(self, depth=0.000, data=None, is_good=np.array([True], dtype=bool), group_info=None,
                          start_time=django.utils.timezone.now(), stop_time=django.utils.timezone.now()):
         if self.current_procedure:
-            # check if depth already recorded. If so, we need to delete it to make sure the new features are computer
+            # check if depth already recorded. If so, we need to delete it to make sure the new features are computed
             # and that the updated value gets picked up by the plots.
             dt, _ = DetailType.objects.get_or_create(name="depth")
             ddv = DatumDetailValue.objects.filter(datum__in=Datum.objects.filter(procedure=self.current_procedure),
                                                   detail_type=dt,
                                                   value=depth)
             if ddv:
-                # this will cascade to all dependent fields
+                # this will cascade to all dependent fields like ddv
+                print(f"Deleting duplicate depth data for procedure {self.current_procedure}, depth {depth}")
                 Datum.objects.get(datum_id=ddv[0].datum_id).delete()
 
             # create new datum
@@ -204,6 +205,7 @@ class DBWrapper(object):
 
             # add datum detail values
             dat.update_ddv('depth', depth)
+            print(f"Saved new datum entry for procedure {dat.procedure} and depth {depth} with id {dat.datum_id}")
 
             ds = DatumStore()
             ds.datum = dat
@@ -219,6 +221,7 @@ class DBWrapper(object):
 
             ds.set_data(data)
             ds.save()
+            print(f"Saved new DatumStore for datum id {ds.datum.datum_id} with channel labels {ds.channel_labels}")
 
     # FEATURES =========================================================================================================
     def list_all_features(self):  # lists from files in the features directory and create the DB entry if needed
