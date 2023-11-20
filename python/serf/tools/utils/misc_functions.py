@@ -17,13 +17,13 @@ def high_pass_filter(data, filt_order=4, cut_off=250, fs=30000):
         sos = signal.butter(filt_order, cut_off, 'hp', fs=fs, output='sos')
 
     # mirror pad the signal to remove edge effects
-    pad = np.concatenate((np.flip(data[:fs]), data, np.flip(data[-fs:])))
+    pad = np.concatenate((np.flip(data[..., :fs]), data, np.flip(data[..., -fs:])), axis=-1)
 
     # filter
-    filtered = signal.sosfilt(sos, pad)
+    filtered = signal.sosfilt(sos, pad, axis=-1)
 
     # remove pad
-    data = filtered[fs:-fs]
+    data = filtered[..., fs:-fs]
 
     return data
 
@@ -33,13 +33,13 @@ def band_pass_filter(data, filt_order=4, bp=[13, 30], fs=30000):
     sos = signal.butter(filt_order, bp, 'bp', fs=fs, output='sos')
 
     # mirror pad the signal to remove edge effects
-    pad = np.concatenate((np.flip(data[:fs]), data, np.flip(data[-fs:])))
+    pad = np.concatenate((np.flip(data[..., :fs]), data, np.flip(data[..., -fs:])), axis=-1)
 
     # filter
-    filtered = signal.sosfilt(sos, pad)
+    filtered = signal.sosfilt(sos, pad, axis=-1)
 
     # remove pad
-    data = filtered[fs:-fs]
+    data = filtered[..., fs:-fs]
 
     return data
 

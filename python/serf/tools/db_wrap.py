@@ -167,7 +167,10 @@ class DBWrapper(object):
                 else:
                     continue
 
-                chan_id = datum.store.channel_labels.index(chan_lbl)
+                if chan_lbl.lower() == "all":
+                    chan_id = np.s_[:]
+                else:
+                    chan_id = datum.store.channel_labels.index(chan_lbl)
                 if chan_id != -1:
                     chan_data = datum.store.get_data()[chan_id, :]
                 else:
@@ -320,7 +323,11 @@ class DBWrapper(object):
                     for feat in features:
                         feat_type = FeatureType.objects.filter(name=feat.name).values_list('feature_type_id', flat=True)
                         feat_value = datum._feature_values.filter(feature_type_id=feat_type[0])
-                        chan_id = feat_value[0].store.channel_labels.index(chan_lbl)
+
+                        if chan_lbl.lower() == "all":
+                            chan_id = np.s_[:]
+                        else:
+                            chan_id = feat_value[0].store.channel_labels.index(chan_lbl)
 
                         if chan_id != -1:
                             tmp_out[feat.name] = [feat_value[0].store.x_vec,
