@@ -1,12 +1,12 @@
 # Segmented Electrophys Recordings and Features Database
 
-SERF-DB is a database schema, designed to facilitate collection and analysis of segmented electrophysiological recordings and features. ![Database Schema](/models.png?raw=true "Database Schema")
+SERF-DB is a database schema, designed to facilitate collection and analysis of segmented electrophysiological recordings and features. ![Database Schema](models.png?raw=true "Database Schema")
 
 - In the `python` folder we provide a python package `serf` comprising a [Django](https://www.djangoproject.com/) application to administer the database and act as an object relational map (ORM), and a `tools` module to help with feature calculation and data analysis. Using this schema, and interfacing with the Django ORM, it is easy to work with the data in real-time in Python.
 - The [matlab](matlab/README.md) folder contains some (very outdated) code for interfacing with the database in Matlab.
 - serf.sql is some SQL to add some functionality when using non-Django API.
 
-> Django applications are normally run in conjunction with a Django **project**, but in this case we are mostly only interested in the ORM. Therefore we default to the standalone approach, but we do provide some untested guidance below on how to use the application with a Django webserver.
+> Django applications are typically run in conjunction with a Django **project**, but in this case we are mostly only interested in the ORM. Therefore, we default to the standalone approach, but we do provide some untested guidance below on how to use the application with a Django webserver.
 
 ## Installation and setup
 

@@ -2,7 +2,7 @@
 
 We assume that you followed other instructions to install Python and Django. The rest of the instructions are for installing the MySQL database server and its interfaces. Though any DBMS should work, I use MySQL because some of the data I work with were originally recorded into MySQL.
 
-### On OS X
+### On MacOS
 
 1. Install [homebrew](http://brew.sh/) if you don't have it already.
 1. `brew install mysql`
@@ -50,14 +50,11 @@ You'll likely want to change the data directory. In the past I've also needed to
 datadir = /Volumes/STORE/eerfdata
 default-storage-engine = MyISAM
 default_tmp_storage_engine = MyISAM
-query_cache_type = 1
-key_buffer_size = 2G
-query_cache_limit = 400M
 ```
 
 If you changed the datadir then you'll need to copy the original data structure to the new location (Windows) or use `sudo mysql_install_db --user=root --defaults-file=/etc/my.cnf`.
 
-Then restart the server: `mysqld_safe & --defaults-file=/etc/my.cnf`
+Then restart the server: `mysqld_safe --defaults-file=/etc/my.cnf &`
 
 It is not necessary to specify the defaults file when using the default location (/etc/my.cnf).
 
