@@ -146,8 +146,8 @@ class PAC(FeatureBase):
         """
         data = int_to_voltage(data)
 
-        x_los = self.los.analysis(data, window='hanning')
-        x_his = self.his.analysis(data, window='hanning')
+        x_los = self.los.analysis(data, window='hann')
+        x_his = self.his.analysis(data, window='hann')
 
         angs, amps = np.angle(x_los), np.abs(x_his)
 
