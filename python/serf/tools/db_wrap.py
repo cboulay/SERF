@@ -1,6 +1,8 @@
 import os
 import json
 import inspect
+import typing
+
 import numpy as np
 from qtpy.QtCore import QProcess, QSharedMemory
 import serf.tools.features as features
@@ -89,7 +91,7 @@ class DBWrapper(object):
         # Some of the fields cannot be used in get_or_create because they cannot be hashed
         skip_fields = ["a", "e", "entry", "target", "target_name", "type"]
 
-        if "procedure_id" in procedure_details and procedure_details["procedure_id"] != -1:
+        if "procedure_id" in procedure_details and procedure_details["procedure_id"] is not None:
             self.current_procedure, created = \
                 Procedure.objects.get_or_create(procedure_id=procedure_details["procedure_id"])
         else:
@@ -121,16 +123,16 @@ class DBWrapper(object):
         return Procedure.objects.filter(subject=s_id).order_by('date')
 
     @staticmethod
-    def load_procedure_details(p_id, fields=None, exclude=None):
-        # can't use model_to_dict because:
-        #    1- it skips non editable fields, such as NPArrayBlobField (i.e. BinaryField)
-        #    2- would return the binary array, that would still need to be converted to np.array
-        try:
-            curr_proc = model_to_dict(Procedure.objects.get(procedure_id=p_id), fields=fields, exclude=exclude)
-        except ObjectDoesNotExist:
-            curr_proc = model_to_dict(Procedure(), fields=fields, exclude=exclude)
+    def load_procedure_details(p_id: typing.Optional[int], fields=None, exclude=None) -> typing.Dict:
+        if p_id is not None:
+            try:
+                curr_proc = Procedure.objects.get(procedure_id=p_id)
+            except ObjectDoesNotExist:
+                curr_proc = Procedure()
+        else:
+            curr_proc = Procedure()
 
-        return curr_proc
+        return model_to_dict(curr_proc, fields=fields, exclude=exclude)
 
     # DATUM ============================================================================================================
     # return datum ids for values greater than gt
