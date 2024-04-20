@@ -10,16 +10,17 @@ SERF-DB is a database schema, designed to facilitate collection and analysis of 
 
 ## Installation and setup
 
-1. Install Python and Django. If you came here from the NeuroportDBS repository then you should have already done this.
-1. pip install serf
+1. install serf
     * Option 1: Download the `serf` wheel from the [releases page](https://github.com/cboulay/SERF/releases) and install it with `pip install {name of wheel.whl}`.
     * Option 2: `pip install git+https://github.com/cboulay/SERF.git#subdirectory=python`
 1. Install MySql.
     * See [INSTALL_MYSQL.md](./INSTALL_MYSQL.md) for how I do it (Mac / Linux / Win)
+1. Make sure MySQL server is running.
+    * Win: `mysqld` or `mysqld_safe --defaults-file=/etc/my.cnf &` 
+    * macOS: `mysqld` or `brew services start mysql`
 1. Install the serf schema
     1. Copy [my_serf.cnf](https://raw.githubusercontent.com/cboulay/SERF/master/my_serf.cnf) to where Python thinks is the home directory. The easiest way to check this is to open a command prompt in the correct python environment and run `python -c "import os; print(os.path.expanduser('~'))"`.
     1. Edit the copied file to make sure its database settings are correct. `[client]` `user` and `password` are important.
-    1. 
     ```
     $ serf-makemigrations
     $ serf-migrate
@@ -49,6 +50,10 @@ SERF-DB is a database schema, designed to facilitate collection and analysis of 
     `Applying serf.0001_initial... OK`
 
 ## Using SERF
+
+* Make sure MySQL server is running.
+    * Win: `mysqld` or `mysqld_safe --defaults-file=/etc/my.cnf &` 
+    * macOS: `brew services start mysql`
 
 ### ...In a custom Python program
 
